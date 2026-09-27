@@ -1,0 +1,4016 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>StarPivot — 宇宙模拟（N 体）</title>
+<meta name="theme-color" content="#0a0f1e">
+<style>
+  /* StarPivot 设计系统 v1 —— 深空版。令牌名、字号阶梯、间距刻度、圆角与阴影
+     与 home / index / kids 完全同名同刻度；只换取值（这一页是"星空"性格，
+     底色深、强调色亮）。组件层同样共用：.card / .note / .okbox / .warnbox /
+     表格 / 按钮 / .tychip / .bodycard。
+     ⚠ 下面那两条双模式显隐规则是判据逐字钉住的（_probe_dualmode.js 读的是
+       第一段 style 块的文本），改动它们会让判据变红 —— 所以保持原样。 */
+  :root{
+    /* —— 颜色令牌（深空版）—— */
+    --bg:#0a0f1e; --card:#111a30; --card2:#16203a;
+    --line:#25324f; --line2:#37476e;
+    --ink:#e9edf7; --ink2:#a2b0d0; --ink3:#7f8daf;
+    --accent:#5b9cff; --accent-soft:#15223e;
+    --accent2:#f5a25d; --accent2-soft:#2a1a0c;
+    --ok:#5ad3a3; --ok-soft:#0f2a20;
+    --warn:#f0a071; --warn-soft:#2a1708;
+    --danger:#ff8f85; --danger-soft:#2a1113;
+    --grid:#182240;
+    /* —— 字号阶梯（与其余三页同一比例）—— */
+    --fs-xs:11.5px; --fs-sm:12.5px; --fs-base:14px; --fs-md:15px;
+    --fs-lg:16.5px; --fs-xl:20px; --fs-2xl:25px; --fs-3xl:38px;
+    /* —— 行高 —— */
+    --lh-tight:1.3; --lh-body:1.6; --lh-loose:1.75;
+    /* —— 间距刻度 —— */
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
+    /* —— 圆角与阴影 —— */
+    --r-1:6px; --r-2:10px; --r-3:14px; --r-full:999px;
+    --sh-1:0 1px 2px rgba(0,0,0,.30); --sh-2:0 10px 28px rgba(0,0,0,.45);
+    --ring:0 0 0 3px rgba(91,156,255,.40);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --dur:.16s; --ease:cubic-bezier(.2,.6,.2,1);
+    --wrap:1180px;
+  }
+  *{box-sizing:border-box}
+  /* 触屏：点按不闪系统灰；刘海屏 / Home 指示条处留安全区。 */
+  html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:rgba(91,156,255,.22)}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+       padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
+       font:var(--fs-base)/var(--lh-body) -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:var(--sp-5) var(--sp-5) var(--sp-6)}
+  header{display:flex;align-items:baseline;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-2)}
+  h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:.2px;line-height:var(--lh-tight)}
+  .ver{color:var(--ink3);font-size:var(--fs-sm)}
+  .back{color:var(--accent);font-size:var(--fs-sm);text-decoration:none}
+  .sub{color:var(--ink2);font-size:var(--fs-base);line-height:var(--lh-loose);max-width:82ch;margin-bottom:var(--sp-4)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-3);
+        padding:var(--sp-4);margin-bottom:var(--sp-4);box-shadow:var(--sh-1)}
+  h2{margin:0 0 var(--sp-3);font-size:var(--fs-lg);font-weight:650;letter-spacing:.1px}
+  label{font-size:var(--fs-sm);color:var(--ink2);display:block;margin-bottom:var(--sp-1)}
+  /* 表单控件字号 ≥16px：iOS Safari 在 <16px 的输入框聚焦时会整页放大。
+     控件声明 touch-action:manipulation —— 画布自己用 none（要接管拖动转向）。 */
+  select,input,button{font:inherit;font-size:max(16px,var(--fs-base));color:var(--ink);
+        background:var(--card2);border:1px solid var(--line2);border-radius:var(--r-1);padding:6px 10px;
+        touch-action:manipulation}
+  button{cursor:pointer;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
+  button:hover{border-color:var(--accent)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#08122a;font-weight:650}
+  button.primary:hover{filter:brightness(1.06)}
+  input[type=checkbox]{accent-color:var(--accent)}
+  canvas{width:100%;display:block;border-radius:var(--r-2);background:#070b16;cursor:grab;touch-action:none}
+  #view{height:72vh;min-height:420px}
+  /* 放置模式下换成十字准星：光标本身就是"这里能放"的提示。
+     写在 .dragging 之前 —— 同一元素同时有两个类时后定义的胜出，而拖动时该显示"抓"。 */
+  canvas.placing{cursor:crosshair}
+  canvas.dragging{cursor:grabbing}
+  /* 撤销按钮在没有可撤销的投放时禁用（灰掉而不是藏起来 —— 位置固定，不会跳）。 */
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .stage:fullscreen{border-radius:0;padding:var(--sp-2);display:flex;flex-direction:column;justify-content:center;background:var(--bg)}
+  .stage:fullscreen canvas{height:calc(100vh - 16px);border-radius:0}
+  /* 全屏时藏掉选中卡：全屏是"只看画面"，而画布本身占满整屏，卡片会把布局顶出去。 */
+  .stage:fullscreen #selcard{display:none !important}
+  .row{display:flex;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;align-items:flex-end}
+  .stat{font-size:var(--fs-sm);color:var(--ink2)}
+  .stat b{color:var(--ink);font-family:var(--mono)}
+  .okbox{border-left:3px solid var(--ok);background:var(--ok-soft);padding:var(--sp-2) var(--sp-3);
+         border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#bff0dc;line-height:var(--lh-loose)}
+  .warnbox{border-left:3px solid var(--warn);background:var(--warn-soft);padding:var(--sp-2) var(--sp-3);
+           border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#f6d3b6;line-height:var(--lh-loose)}
+  .legend{display:flex;gap:var(--sp-3);flex-wrap:wrap;font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-2)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  /* ---- 双模式：普通人 / 教授 ----
+     同一份数据、同一套内核，只改"露多少"。专业元素一律挂 .pro-only，
+     只为普通人准备的大白话元素挂 .simple-only；切换只动 body 上的一个类名。 */
+  body.mode-simple .pro-only{display:none !important}
+  body.mode-pro    .simple-only{display:none !important}
+  #modeswitch{display:inline-flex;gap:0;border:1px solid var(--line2);border-radius:var(--r-2);overflow:hidden}
+  #modeswitch button{border:0;border-radius:0;padding:5px 13px;font-size:var(--fs-sm);background:transparent;color:var(--ink2)}
+  #modeswitch button.on{background:var(--accent);color:#08122a;font-weight:650}
+  .tychip{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);padding:6px 12px;border-radius:var(--r-full);
+          border:1px solid var(--line2);background:var(--card2);color:var(--ink);cursor:pointer;
+          transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
+  .tychip:hover{border-color:var(--accent)}
+  .tychip.on{background:var(--accent);border-color:var(--accent);color:#08122a;font-weight:650}
+  .tychip.big{font-size:var(--fs-md);padding:9px 16px}
+  #palette{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+  /* —— 折叠区：第二屏才需要的东西 ——
+     起因：普通人模式下来要面对 95 个可见控件、画布排在所有控件之后。
+     现在首屏只留"画面 + 演奏条 + 一键开局 + 常用类型"，其余收起来（内容一句没删）。 */
+  details.card{padding:0}
+  details.card>summary{padding:var(--sp-4);cursor:pointer;font-size:var(--fs-md);
+        font-weight:650;color:var(--ink)}
+  details.card>summary::marker{color:var(--ink3)}
+  details.card[open]>summary{border-bottom:1px solid var(--line)}
+  details.card>.dbody{padding:var(--sp-3) var(--sp-4) var(--sp-1)}
+  details.tyfold{margin-top:var(--sp-2)}
+  details.tyfold>summary{cursor:pointer;font-size:var(--fs-sm);color:var(--ink2)}
+  .bodycard{border:1px solid var(--line);border-radius:var(--r-2);padding:var(--sp-3);margin-bottom:var(--sp-2);background:var(--card2)}
+  .bodycard h4{margin:0 0 var(--sp-2);font-size:var(--fs-sm);font-weight:650;display:flex;align-items:center;gap:var(--sp-2)}
+  .bodycard .knobs{display:flex;gap:var(--sp-4);flex-wrap:wrap;align-items:center}
+  .bodycard .knobs label{margin:0 0 2px}
+  .plainterm{color:var(--ink3);font-size:var(--fs-xs)}
+  .note{font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-2);line-height:var(--lh-loose)}
+  input[type=range]{padding:0;accent-color:var(--accent)}
+  /* —— 可访问性：键盘焦点必须看得见（深底上给亮色描边）—— */
+  a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,
+  select:focus-visible,[tabindex]:focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-1)}
+  /* —— 响应式：窄屏收边距、画布变矮、参数表横滚 —— */
+  /* —— 平板档：561–1024px（iPad 竖 768 / 横 1024）——
+     意图：控制区本来就是 flex + wrap，这个宽度下仍有两列可排；把画布压到 62vh，
+     让"画布 + 旋钮"能同屏出现，不必来回滚；机身表在 1024 内取消横滚。 */
+  @media(min-width:561px) and (max-width:1024px){
+    #view{height:62vh;min-height:360px}
+    .wrap{padding-left:var(--sp-5);padding-right:var(--sp-5)}
+    #bodytable table{min-width:0}
+  }
+  @media(max-width:860px){
+    #view{height:58vh;min-height:300px}
+    .wrap{padding:var(--sp-4) var(--sp-4) var(--sp-5)}
+  }
+  @media(max-width:720px){
+    h1{font-size:var(--fs-xl)}
+    .card{padding:var(--sp-3);border-radius:var(--r-2)}
+    #bodytable{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  }
+  /* —— 触摸设备（pointer:coarse）：可点区域最小 44×44 —— */
+  @media(pointer:coarse){
+    button,select,input,summary,[tabindex]{min-height:44px}
+    .tychip{padding-top:12px;padding-bottom:12px}
+    a{display:inline-flex;align-items:center;min-height:44px}
+  }
+  /* —— 尊重系统"减少动态效果" —— */
+  @media(prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>StarPivot · 宇宙模拟</h1>
+    <span class="pro-only ver">N 体辛积分 · AU/M☉/yr · G=4π²</span>
+    <span id="modeswitch">
+      <button id="mode_simple">普通人</button><button id="mode_pro">教授</button>
+    </span>
+    <a class="back" href="home.html">← 首页</a>
+    <a class="back" href="index.html">← 轨道递推 / 碰撞预警</a>
+  </header>
+  <div class="sub simple-only">
+    在一颗恒星旁边放几个天体，看它们怎么转、会不会撞上、哪一颗上可能长出生命。
+    这里<b>没有</b>可以改坏的物理：所有数字都由本机的一个 C++ 内核算出来，这个页面只负责把结果画出来。
+    <b>怎么开始</b>：下面的「一键开局」点一个，马上就有画面；想自己放，就点一个<a href="#palette">天体类型</a>再点画面。
+    场景、算法、碰撞、视角这些在「更多设置」里，想调再点开。
+  </div>
+  <div class="sub pro-only">
+    所有运动由 C++ 内核 <code>starpivot nbody</code> 真实积分（leapfrog 辛积分器），
+    本页只做投影绘制与播放，不做任何数值计算。
+    唯一的例外是<b>帧间插值</b>：把两个内核采样点连起来画（和把点连成线是同一件事），
+    它只影响画面平滑度，不产生任何新的物理量——判断、时刻、演化数值仍然全部取自内核。
+  </div>
+
+  <div id="errbar" class="warnbox" style="display:none;margin-bottom:12px"></div>
+
+
+
+
+
+  <div class="card stage" id="stage">
+    <canvas id="view"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="note" id="statline"></div>
+    <!-- 选中天体的数据卡就在画面正下方 —— 点一下画面，数据要在视线里出现才有用；
+         原来它排在页面底部（H-R 图之后，隔着好几屏），点完只看到镜头动了一下。
+         默认 display:none，所以既不占首屏、也不进"首屏可见控件"的预算。 -->
+    <div id="selcard" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+      <h2 style="margin:0 0 6px">选中的天体 <span style="font-size:12px;font-weight:400;color:var(--ink2)">
+        全部来自内核回显，页面不算</span>
+        <span style="float:right"><button id="selclose" style="font-size:11.5px;padding:3px 9px">✕ 取消选中 · 回全景</button></span></h2>
+      <div id="selbody" class="stat" style="font-size:12.5px"></div>
+    </div>
+  </div>
+
+  <!-- 演奏条：第一屏只留这几个 —— 播放、拖时间、点画面放行星、看导览。
+       其余（场景 / 算法 / 碰撞 / 生物 / 视角 / 导出）在下面的「更多设置」里。 -->
+  <div class="card">
+    <div class="note" id="howto" style="margin:0 0 10px">三步上手：<b>①</b> 下面「一键开局」点一个 —— 马上有画面；　<b>②</b> 想自己放：点一个天体类型，再点画面空白处；　<b>③</b> 播放 / 拖时间轴，看它们怎么动。</div>
+    <div class="row">
+      <div><button id="play">⏸ 暂停</button></div>
+      <div><button id="dirbtn" title="倒放 / 正放">⟲ 倒放</button></div>
+      <div style="flex:1 1 260px"><label>时间 <span id="tlabel" class="stat"></span></label>
+        <input id="scrub" type="range" min="0" max="1000" value="1000" style="width:100%"></div>
+      <div><label>播放速度（帧/秒）</label>
+        <input id="speed" type="range" min="2" max="120" value="40" style="width:140px"></div>
+      <div><button id="placemode">✛ 点画面放行星</button></div>
+      <div><button id="unplace" title="撤销刚才点画面放下的那一颗（也可以按 Ctrl+Z）">↩ 撤销上一颗</button></div>
+      <div><button id="tourstart">▶ 开始导览</button></div>
+      <div><button id="share">🔗 复制分享链接</button></div>
+      <div><button id="fs">⛶ 全屏</button></div>
+    </div>
+    <div class="note" id="sharenote" style="display:none;margin-top:6px"></div>
+    <div class="note" id="qrow" style="margin-top:8px"></div>
+    <!-- 稳定性挑战原来是页面下方一张独立卡片，而它的提示写着"先在下面的行星表里把天体加好" ——
+         那张表现在收在「更多设置」里、普通人模式还看不到它，提示与流程早就对不上了。
+         现在把它搬进演奏条：开始挑战就直接进放置模式，放一颗判一次，成绩就在这一行下面。 -->
+    <div class="row" id="chrow" style="margin-top:12px">
+      <div style="flex:0 0 auto">
+        <b style="font-size:13px">🏁 稳定性挑战</b>
+        <span class="stat" style="font-size:12px;display:block">
+          玩法层：规则是编排的，判据只有两条，都从内核输出里读</span>
+      </div>
+      <div><button id="ch_start" class="primary">开始挑战</button></div>
+      <div><button id="ch_quit">退出挑战</button></div>
+    </div>
+    <div id="challengebox" class="note" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card" id="tourcard" style="display:none">
+    <h2>导览 <span class="stat" id="tourcount" style="font-weight:400"></span>
+      <span style="float:right"><button id="tour_close" style="font-size:11.5px;padding:3px 9px">关闭</button></span></h2>
+    <div id="tourbody" style="font-size:13.5px;line-height:1.75"></div>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <div><button id="tour_prev">← 上一步</button></div>
+      <div><button id="tour_next" class="primary">下一步 →</button></div>
+      <div><button id="tour_skip">跳过 · 自由探索</button></div>
+      <div class="stat" id="tourdeep" style="font-size:11.5px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>一键开局 · 预设宇宙</h2>
+    <div id="presets" class="row" style="gap:8px;align-items:flex-start"></div>
+    <div class="note" id="presetnote" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>放什么？<span class="stat" style="font-weight:400">
+      点一个类型，再点画面空白处 —— 就放下一颗。类型表来自内核（<code>starpivot catalog</code>），
+      半径与光度都由内核按类型算，页面不参与。</span></h2>
+    <div id="palette"></div>
+    <div class="note" id="typenote" style="margin-top:8px">正在读取内核的类型表…</div>
+  </div>
+
+  <details class="card" id="advbox">
+    <summary>更多设置 · 场景 / 算法 / 碰撞 / 生物 / 视角 / 导出</summary>
+    <div class="dbody">
+    <div class="row">
+      <div>
+        <label>场景</label>
+        <select id="scenario">
+          <option value="solar">太阳系 · 太阳+8 大行星+冥王星</option>
+          <option value="figure8">三体 · 8 字周期轨道（Chenciner–Montgomery）</option>
+          <option value="custom">自定义 · 你添加的行星（太阳系可选）</option>
+        </select>
+      </div>
+      <div><label>积分年数</label>
+        <input id="years" type="number" value="50" min="1" max="100000" step="1" style="width:90px"></div>
+      <div><label>时长</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink)">
+          <input id="perpetual" type="checkbox" style="width:auto"> 永久（算到末尾自动延长，一直演化下去）</label></div>
+      <div><label>输出帧数</label>
+        <input id="samples" type="number" value="2000" min="10" max="2000" style="width:90px"></div>
+      <div><label>计算方法 <span class="plainterm" id="integplain"></span></label>
+        <select id="integ">
+          <option value="leapfrog">蛙跳（辛 · 推荐）</option>
+          <option value="hermite">Hermite4（四阶 · 单步更准）</option>
+          <option value="euler">半隐式欧拉（一阶 · 会偷能量）</option>
+          <option value="kepler">开普勒解析（不含互相扰动）</option>
+        </select></div>
+      <div><button id="compute" class="primary">重新计算</button></div>
+    </div>
+    <!-- "参数改过了，还没重算"跟着参数走：以前它在演奏条里，而参数已经收进这里 ——
+         在别处喊一句、要重算的按钮却在另一处，是最容易让人"改了没反应"的摆法。 -->
+    <div class="note" id="dirtyhint" style="display:none;margin-top:6px"></div>
+    <div id="custombox" style="display:none;margin-top:12px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+        <b style="font-size:13px">你的行星</b>
+        <span class="stat pro-only">开普勒根数（日心）：a · e · i(倾角) · Ω(升交点) · ω(近日点) · M0(平近点) · 质量(M☉) · 半径(km)。
+          默认 A/B 是一组<b>真会撞上</b>的初值（同一椭圆 ω 相差 180° 使轨道相交，实测 t≈0.8 年撞击）。</span>
+        <span class="stat simple-only">每个天体只有两个旋钮值得动：<b>离恒星多远</b>和<b>轨道有多扁</b>。
+          其余参数（倾角、方位角、初始角度）都取 0，放在「教授」模式里。</span>
+        <button id="addbody" class="pro-only" style="font-size:12px">+ 添加行星</button>
+        <label style="display:flex;align-items:center;gap:5px;margin:0;font-size:12.5px;color:var(--ink)">
+          <select id="solarmode" style="font-size:12.5px">
+            <option value="full">背景：太阳+八大行星+冥王星</option>
+            <option value="sun">背景：只放太阳</option>
+            <option value="none">背景：不放太阳系</option>
+          </select>
+        </label>
+        <span id="solarhint" class="stat" style="font-size:12px;color:#f5c6a5"></span>
+      </div>
+      <table id="bodytable" class="pro-only" style="width:100%;font-size:12.5px"></table>
+      <div id="simplebodies" class="simple-only"></div>
+    </div>
+    <div id="collidebox" style="display:none;margin-top:12px">
+      <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+        <div><label>碰撞模式</label>
+          <select id="collide">
+            <option value="fragment">撞击碎裂 · 高速撞碎、低速重聚（默认 · 碎片成束溅射 + 级联）</option>
+            <option value="merge">合并 · 完美吸积（碰到就并起来，不分碎）</option>
+            <option value="off">关 · 质点互相穿过（真实半径下几乎不会碰到）</option>
+          </select></div>
+        <div><label>半径放大 ×</label><input id="rscale" type="number" value="450" min="1" max="100000" step="10" style="width:100px"></div>
+        <div id="fragopts" style="display:none;gap:14px;align-items:flex-end;flex-wrap:wrap">
+          <div><label>碎块数</label><input id="nfrag" type="number" value="4" min="2" max="12" style="width:70px"></div>
+          <div><label>色散速度 km/s</label><input id="disp" type="number" value="0.3" step="0.1" style="width:80px"></div>
+          <div><label>碎裂阈值 km/s</label><input id="fmin" type="number" value="0.5" step="0.5" style="width:80px"></div>
+          <div><label>喷流成束 0–1</label><input id="spray" type="number" value="0.6" min="0" max="1" step="0.1" style="width:80px"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink)">
+          <input id="starcollide" type="checkbox" style="width:auto"> 恒星参与碰撞
+        </label>
+      </div>
+      <div class="note" style="margin-top:6px"><b>默认是「撞击碎裂」</b>：它把两种情况都包进来了 ——
+        <b>低速撞击重聚（合并）、高速才撞碎</b>。默认那对 A/B 的相对速度约 12 km/s，
+        所以会先并起来、随即炸成几块，而且<b>碎屑之间还会接着互撞再碎</b>（级联）——
+        阈值 0.5 km/s 是内核默认值，调到 3 以上就只剩一次碎裂。
+        这是内核判的，不是动画。<br>
+        <b>画面上看得见的四件事</b>（撞击点与时刻都来自内核的事件表，页面只负责画）：
+        ① 撞的那一下有<b>闪光 + 一圈往外扩的冲击环</b>（碎裂暖色、合并冷色）；
+        ② 碎屑会从<b>撞击点</b>朝各自的位置拉出一条渐隐的线，那一组线就是一个"扇"；
+        ③ <b>喷流成束 0–1</b> 控制这个扇的方向性 —— 0 是各向同性的气团（原地散开），
+        越大碎屑越沿<b>撞击来向</b>抛出去、并在飞行中被沿来向拉长成一条"束"
+        （内核会把碎屑环摆成垂直于来向、环心沿来向前移、速度上加一份沿轴剪切；
+        <b>不是撞击动力学</b>，是一个写明的模型参数，动量在任何取值下都精确守恒）；
+        ④ 天体一多名字会糊，所以超过 40 颗时只留本体与选中的那一颗的名字
+        （点它一下，下面那张卡里照样有全部信息）。<br>
+        真实半径极小（地球 4.3e-5 AU），碰撞概率近乎为零，
+        所以半径需要放大才能看到碰撞——这是<b>演示开关，不是物理</b>。默认恒星不参与碰撞
+        （否则放大后的太阳会吞掉内行星）。<br>
+        <b>靠近恒星的那些预设会把碰撞设回「关」</b>（TRAPPIST-1 这类：行星只隔 0.0x AU，
+        半径放大 450× 之后一开场就互相重叠）—— 预设会写全它自己的状态，不靠上一次剩下的。
+        碎裂为参数化模型：<b>无状态方程、无潮汐破坏判据、无掠撞逃逸</b>；
+        低速撞击只吸积（重聚），高速才碎裂。</div>
+    </div>
+    <div id="biobox" style="display:none;margin-top:12px">
+      <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink)">
+          <input id="bioon" type="checkbox" checked style="width:auto"> 生物演化
+        </label>
+        <div><label>走完 9 级阶梯所需年数</label>
+          <input id="bioyears" type="number" min="1" step="1" style="width:110px"
+                 placeholder="内核默认"></div>
+        <div><label>bond albedo（地球 0.306）</label>
+          <input id="albedo" type="number" min="0.01" max="0.99" step="0.01"
+                 style="width:95px" placeholder="内核默认"></div>
+        <div><label>温室增温 K <span id="ghlabel" class="stat"></span></label>
+          <input id="greenhouse" type="range" min="0" max="300" step="1" value="33"
+                 style="width:170px"></div>
+      </div>
+      <div class="note" id="bionote" style="margin-top:6px"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div><label>逐帧</label>
+        <span style="display:inline-flex;gap:4px">
+          <button id="fr_first" title="回到开头">⏮</button>
+          <button id="fr_prev" title="上一帧（手动定位会先暂停）">◀</button>
+          <button id="fr_next" title="下一帧">▶</button>
+          <button id="fr_last" title="跳到结尾">⏭</button>
+        </span></div>
+      <div><label>俯仰（0=正俯视）</label><input id="tilt" type="range" min="-90" max="90" value="0" style="width:150px"></div>
+      <div><label>缩放</label><input id="zoom" type="range" min="20" max="300" value="100" style="width:130px"></div>
+      <div><label style="display:flex;align-items:center;gap:5px;color:var(--ink);margin-bottom:9px">
+        <input id="interp" type="checkbox" checked style="width:auto"> 帧间插值</label></div>
+      <div><button id="resetview">⊙ 黄道复位</button></div>
+    </div>
+    <div class="note" style="margin-top:8px">
+      <b>键盘</b>：空格播放/暂停、← → 逐帧、Shift+←/→ 跳到首尾（在输入框里打字时不接管）。<br>
+      <b>点画面放行星</b>：打开「✛ 点画面放行星」后，在空白处点一下就在那个位置放一颗
+      （屏幕坐标反解回黄道面，纯几何）；点已有的星体仍然是选中它。<br>
+      在画面里<b>点一下任意一个星体</b>：视角会转到<b>它自己那条轨道的正对面</b>
+      —— 也就是把相机放到它的轨道法向上，能完整看到这一圈轨道的形状；再点一次（或点空白处）
+      回到黄道俯视。轨道面由内核给出的 <code>ic_heliocentric</code> 里的
+      倾角 i 与升交点 Ω 决定：yaw = −Ω、俯仰 = −i，画面只做一次正交投影，不参与积分。
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div><button id="exportcl">⧉ 复制等价 CLI 命令</button></div>
+      <div><button id="exportpng">⤓ 导出 PNG</button></div>
+      <div><button id="exportcsv">⤓ 导出数据 CSV</button></div>
+    </div>
+    <div class="note" id="toolnote" style="display:none;margin-top:6px"></div>
+    <div class="note" id="sessionnote" style="margin-top:8px"></div>
+    </div>
+  </details>
+
+  <div class="card" id="ecard">
+    <h2>能量误差曲线<span class="stat" style="font-weight:400">
+      纵轴是 |E−E₀|/|E₀|（对数）。<b>贴着底 = 这个算法保能量，往上爬 = 它在偷能量。</b>
+      换「更多设置」里的「计算方法」，曲线会跟着变。</span></h2>
+    <canvas id="ecv" width="1120" height="260" style="background:#0a0f1e;cursor:default"></canvas>
+    <div class="note" id="enote" style="margin-top:8px"></div>
+  </div>
+
+
+
+  <div class="card" id="hrcard" style="display:none">
+    <h2>H-R 图（赫罗图）<span class="stat" style="font-weight:400">
+      把刚说的前两个维度画出来：横轴是表面温度（光谱型 O→M），纵轴是光度。
+      每颗发光天体按内核回显的 (T_eff, L) 落一个点。</span></h2>
+    <canvas id="hr" width="1120" height="520" style="background:#0a0f1e;cursor:default"></canvas>
+    <div class="note" id="hrnote" style="margin-top:8px"></div>
+  </div>
+
+
+
+  <div class="card" id="biocard" style="display:none">
+    <h2>每颗星体的演化 · <span style="font-size:12px;font-weight:400;color:#f5c6a5">
+      风格化模型：第 1 层是真公式，第 2 层是编排</span></h2>
+    <div id="biowarn"></div>
+    <div id="biotable" class="stat" style="max-height:320px;overflow:auto"></div>
+    <div class="note" id="biolayer"></div>
+  </div>
+
+  <div class="card" id="eventcard" style="display:none">
+    <h2>碰撞 / 碎裂 / 重聚事件时间线</h2>
+    <div id="eventlist" class="stat" style="max-height:220px;overflow:auto"></div>
+    <!-- 颜色规则要写出来：否则用户只看到"碎片颜色不一样"，不知道那是血缘还是随便配的 -->
+    <div class="note">来源色是按<b>血缘</b>聚合出来的，不是随机配的：碎片继承母体的色系
+      （<code>X#1…X#n</code> 是 <code>X</code> 的深浅变体 —— 一眼看出"这些是一家人"），
+      合并时幸存者按<b>质量</b>吸收被吃掉那颗的颜色（被吃掉那颗的质量就是它自己的
+      <code>mass_msun</code>，它死之后再没变过）。血缘与质量都来自内核，页面只做混色。
+      这一层颜色画在<b>球外那圈细环</b>上（球体本色让给了生命形态），
+      也画在下面表格与图例里的小圆点上。</div>
+  </div>
+
+  <div class="card">
+    <h2>这份模拟的可信度</h2>
+    <div id="verdict"></div>
+    <div class="note">太阳系初值为 J2000 日心平根数（Standish/JPL 近似值）——视觉化足够，
+      但<b>不是星历表精度</b>，别拿去对某天某时的行星exact方位。三体场景初值与
+      <code>tests/fixtures.hpp</code> 逐字一致（该初值经基线验证：一个整周期闭合 4.1e-8 AU）。
+      辛积分器的能量误差在固定带内振荡而非累积，这是它能跑长期演化的原因。</div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const cv = document.getElementById('view'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+
+  const COLORS = {
+    Sun:'#ffd54a', Mercury:'#b8b8b8', Venus:'#e8c468', Earth:'#4a90e2', Mars:'#d1553a',
+    Jupiter:'#d9a066', Saturn:'#e3c98f', Uranus:'#7fd4d4', Neptune:'#5a6fe0', Pluto:'#cfcfcf',
+    A:'#ff6b6b', B:'#4ecdc4', C:'#f7b32b'
+  };
+  // 自定义行星的回退调色板（按序取色，撞名才可能撞色）
+  const PALETTE = ['#ff6b6b','#4ecdc4','#f7b32b','#a78bfa','#34d399','#f472b6','#60a5fa','#fbbf24','#e879f9','#4ade80','#fb923c','#38bdf8'];
+  // ---- 颜色按"来源"聚合 ----
+  // 起因是一条使用反馈："碰撞过程分散，颜色聚合一定要模拟起来"。
+  // 碎片的名字就是血缘（内核给的是 X#1…X#n），合并事件里 a 是幸存者、b 被吃掉 ——
+  // 两边都是内核数据，页面只做一件显示层的事：把颜色沿这条链算出来。
+  //   · 本体：用自己的色（表里没有就按序取调色板）
+  //   · 碎片 X#n：从 X 的颜色派生（同色系、按 n 分深浅）→ 一眼看出"这些是一家人"
+  //   · 合并：幸存者吸收被吃掉那颗的颜色，**按质量加权**
+  //     （被吃掉那颗的质量就是它自己的 mass_msun —— 它死之后再没变过；
+  //       幸存者当时的质量 = 事件的 mass_before 减去它。拿不到就各半，不假装按质量。）
+  let lineageColor = {};
+  // 撞击点索引（显示层）：每个事件一条 {t, fi, p, kind, axis, spray, n}。
+  // ⚠ 必须声明在这里 —— 加载期就会调到的函数（render / rebuildLineageColors 的调用点）
+  // 都在这行**之后**，而 `let` 在定义前是 TDZ。写在后面会让整个脚本在第一行调用处
+  // 抛 "Cannot access before initialization"，而症状与原因毫不相关（这个坑真踩过两次）。
+  let impactPts = [], impactAtT = {};
+  function hexRGB(h){ const n = parseInt(String(h).slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  function rgbHex(c){ return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v)))
+    .toString(16).padStart(2, '0')).join(''); }
+  function mixColor(c1, c2, w){                      // w = c2 占的权重
+    const a = hexRGB(c1), b = hexRGB(c2);
+    return rgbHex([0, 1, 2].map(i => a[i] * (1 - w) + b[i] * w));
+  }
+  function shadeOf(c, k){                            // 同色系变体：k 越大越深
+    const a = hexRGB(c), t = Math.min(0.40, 0.08 + 0.08 * (k - 1));
+    return rgbHex(a.map(v => v * (1 - t)));
+  }
+  function baseColorOf(id, idx){ return COLORS[id] || PALETTE[idx % PALETTE.length]; }
+  function colorOf(id, idx){
+    const s = String(id), i = s.indexOf('#');
+    return lineageColor[s] || baseColorOf(i < 0 ? s : s.slice(0, i), idx);
+  }
+  function rebuildLineageColors(){
+    lineageColor = {};
+    if (!data || !data.bodies) return;
+    const byId = {};
+    data.bodies.forEach(b => { byId[b.id] = b; });
+    const ownerOf = id => { const h = String(id).indexOf('#'); return h < 0 ? String(id) : String(id).slice(0, h); };
+    const shadeOfId = (id) => {
+      const s = String(id), h = s.indexOf('#');
+      return h < 0 ? null : parseInt(s.slice(h + 1), 10) || 1;
+    };
+    // ① 先给"一开始就在的天体"上色：本体用自己的色
+    data.bodies.forEach((b, i) => {
+      if (ownerOf(b.id) === b.id) lineageColor[b.id] = baseColorOf(b.id, i);
+    });
+    // ② 按时间顺序走事件（内核给的事件本来就按时间排）：
+    //    merge    → 幸存者按质量吸收被吃掉那颗的颜色（这就是"聚合"）
+    //    fragment → 碎片继承**母体当时**的颜色（母体可能刚吸收过对方，那碎片就是混合色）
+    for (const ev of (data.events || [])){
+      if (ev.kind === 'merge'){
+        const A = ev.a, B = ev.b;
+        if (!A || !B || !lineageColor[A] || !lineageColor[B]) continue;
+        const mAbs = (byId[B] && +byId[B].mass_msun) || 0;
+        const mTot = +ev.mass_before || 0;
+        const w = (mTot > 0 && mAbs > 0 && mAbs < mTot) ? mAbs / mTot : 0.5;
+        lineageColor[A] = mixColor(lineageColor[A], lineageColor[B], w);
+      } else if (ev.kind === 'fragment'){
+        const root = lineageColor[ev.a];
+        if (!root) continue;
+        data.bodies.forEach((b, i) => {
+          const k = shadeOfId(b.id);
+          if (k !== null && ownerOf(b.id) === ev.a) lineageColor[b.id] = shadeOf(root, k);
+        });
+      }
+    }
+    // ③ 兜底：上面没覆盖到的（数据异常）按母体的基础色给一个，宁可有色也不要空
+    data.bodies.forEach((b, i) => {
+      if (!lineageColor[b.id]) lineageColor[b.id] = baseColorOf(ownerOf(b.id), i);
+    });
+  }
+
+  // ---- 物质：基调色 + 表现形态（这一层只编码"它是什么做的"）----
+  // 使用反馈："根据大小，物质，生命，做成不同颜色不同表现形态"。
+  // 四个维度各占一个通道，互不抢：
+  //   物质 → 球体的**基调色** + **画法**（恒星有自发光晕、气巨有横纹、冰巨有亮边、
+  //          岩质有硬边并把背光侧压暗、致密遗迹是极小的亮点、黑洞只剩吸积辉光）
+  //   生命 → 在基调色上**染色**（阶色，权重随阶增长）+ 一圈阶色柔光；死寂往灰里压
+  //   大小 → 球的**像素半径**（radius_km 对数压缩，见 sizeR）
+  //   血缘 → 球外那圈细环（原来那一层，没动）
+  //
+  // 素材**全部来自内核回显**，页面一个物理量都不推：
+  //   type / emits_light → 决定"哪一族"；t_eff_K → 恒星的色相；density_g_cm3 → 行星族的深浅；
+  //   radius_km → 大小。
+  // 只有下面两件事是页面自己定的，而且都写在界面上（不假装是内核给的）：
+  //   ①「色温 → sRGB」是一条**渲染映射**的公开近似公式，不是物理。它跟"阶 → 颜色"、
+  //     "L → 光晕半径"是同一类东西：只决定"这个温度看上去什么颜色"，不参与任何计算。
+  //   ② 内核把中子星/脉冲星/磁星的 t_eff_K 记 0（它在模型里对行星的辐照度可忽略，
+  //     这是内核的取舍），没有温度就推不出色相 → 这一档用页面固定色，并在数据卡里写明。
+  const MAT_STAR = ['O_V','B_V','A_V','F_V','G_V','K_V','M_V','WR','carbon','sd','subgiant',
+    'G_III','K_III','M_III','B_II','K_II','O_I','B_I','A_I','G_I','K_I','M_I','M_0','B_0',
+    'pre_main','metal_poor','cepheid','rr_lyrae','mira'];
+  const MAT_REMNANT = ['white_dwarf','neutron_star','pulsar','magnetar','black_hole'];
+  const MAT_BROWN = ['brown_dwarf'];
+  const MAT_GAS = ['gas_giant'];
+  const MAT_ICE = ['ice_giant'];
+  const MAT_ROCK = ['rocky','super_earth'];
+  const MAT_OF_TYPE = {};
+  MAT_STAR.forEach(k => MAT_OF_TYPE[k] = 'star');
+  MAT_REMNANT.forEach(k => MAT_OF_TYPE[k] = 'remnant');
+  MAT_BROWN.forEach(k => MAT_OF_TYPE[k] = 'brown');
+  MAT_GAS.forEach(k => MAT_OF_TYPE[k] = 'gas');
+  MAT_ICE.forEach(k => MAT_OF_TYPE[k] = 'ice');
+  MAT_ROCK.forEach(k => MAT_OF_TYPE[k] = 'rock');
+  const MAT_ZH = { star:'恒星', remnant:'致密遗迹', brown:'褐矮星', gas:'气态巨行星',
+                   ice:'冰巨星', rock:'岩质行星', none:'未登记类型' };
+  const MAT_SHAPE = { star:'光滑亮球 + 自发光晕', remnant:'极小亮点 + 微光',
+                      brown:'暗红球 + 淡光晕', gas:'横条纹球 + 一圈环（环是页面装饰，内核没有环参数）',
+                      ice:'冷色球 + 亮边 + 一圈环（环是页面装饰，内核没有环参数）',
+                      rock:'硬边球（背光侧压暗）', none:'素色球' };
+  // 行星族的基调色 + 密度锚点。色相由**族**给，深浅由**内核的密度**给。
+  // 这不是"手挑好看颜色"：木星(1.33)/土星(0.69) 落在同一族的深浅两端 →
+  // 土星更淡更黄、木星更橙；天王星(1.27)/海王星(1.64) 同理 → 天王星偏青、海王星偏蓝。
+  // 这两组的先后顺序与真实观感一致，而顺序完全由内核的 density_g_cm3 决定。
+  const MAT_TONE = {
+    rock: { lo:'#c6d2da', mid:'#a08a72', hi:'#6b6560', rlo:1.8, rmid:3.9, rhi:5.6 },
+    gas:  { lo:'#e8d7a0', mid:'#d2a765', hi:'#b8843f', rlo:0.6, rmid:1.3, rhi:1.8 },
+    ice:  { lo:'#8fd8e2', mid:'#6cbcd8', hi:'#4a7fc8', rlo:1.1, rmid:1.5, rhi:1.8 },
+  };
+  const MAT_BH_TONE = '#12161f';     // 黑洞：视界以内不发光（内核记 L=0、t_eff_K=0）
+  const MAT_DENSE_TONE = '#d8e8ff';  // 中子星/脉冲星/磁星：内核 t_eff_K=0 → 页面固定色
+
+  // 黑体色温 → sRGB。**渲染映射，不是物理**（见上面 ①）。分段拟合普朗克轨迹的公开近似：
+  // 40000 K → 蓝白，10000 K → 冷白，5778 K（太阳）→ 暖白，3200 K → 橙红。
+  function bbColor(T){
+    const K = +T;
+    if (!(K > 0)) return null;                       // 内核没给温度 → 交给调用方兜底
+    const t = Math.max(1000, Math.min(40000, K)) / 100;
+    const cl = v => Math.max(0, Math.min(255, Math.round(v)));
+    const r = t <= 66 ? 255 : 329.698727446 * Math.pow(t - 60, -0.1332047592);
+    const g = t <= 66 ? 99.4708025861 * Math.log(t) - 161.1195681661
+                      : 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+    const b = t >= 66 ? 255
+            : (t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307);
+    return rgbHex([cl(r), cl(g), cl(b)]);
+  }
+  function matFamilyOf(bd){
+    const t = String((bd && bd.type) || '');
+    return t ? (MAT_OF_TYPE[t] || 'none') : 'none';
+  }
+  // 物质基调色。三条规则，按序 —— 这是球体本色的**底色**（生命再往上染色）。
+  //   ① 恒星 → 黑体色(T_eff)；内核没给温度就退回来源色（无类型的天体也走这一条）；
+  //   ② 致密遗迹 → 白矮星有温度（1e4 K）走黑体色；中子星/黑洞 t_eff_K=0 → 固定族色；
+  //   ③ 行星族 → 族基调色 + density_g_cm3 定深浅；
+  //   ④ 类型都没登记 → 退回来源色（页面这时什么都不知道，不假装知道）。
+  function matTone(bd, idx){
+    if (!bd) return '#8a8a8a';
+    const fam = matFamilyOf(bd);
+    if (fam === 'star') return bbColor(bd.t_eff_K) || colorOf(bd.id, idx);
+    if (fam === 'remnant'){
+      if (String(bd.type) === 'black_hole') return MAT_BH_TONE;
+      return bbColor(bd.t_eff_K) || MAT_DENSE_TONE;
+    }
+    if (fam === 'brown'){
+      const c = bbColor(bd.t_eff_K) || MAT_TONE.gas.hi;
+      return mixColor(c, '#5a2418', 0.45);   // 真实褐矮星比同温度的黑体色暗得多、偏红褐
+    }
+    if (fam === 'gas' || fam === 'ice' || fam === 'rock'){
+      const s = MAT_TONE[fam], rho = +bd.density_g_cm3;
+      if (!(rho > 0) || !s) return MAT_TONE.rock.mid;
+      const w = (rho - s.rlo) / (s.rmid - s.rlo);
+      return w <= 1 ? mixColor(s.lo, s.mid, Math.max(0, w))
+                    : mixColor(s.mid, s.hi, Math.min(1, (rho - s.rmid) / (s.rhi - s.rmid)));
+    }
+    return colorOf(bd.id, idx);              // ④ 无类型 → 来源色
+  }
+  // 大小：radius_km 对数压缩成像素半径。**不是一比一**，界面上写明了这一点。
+  // 一比一画不出来：地球半径是太阳的 1/109，默认视角下 1 AU 只有几个像素，
+  // 按真比例地球不到 0.02 px。对数压缩保住"大的看起来更大"这个**次序**，
+  // 同时给一个最小可见尺寸，免得小行星变成看不见的一点。
+  // 实测锚点：太阳 10.9 / 木星 7.9 / 地球 4.8 / 冥王星 2.6 / 30 km 黑洞 2.2 px。
+  const SIZE_REF_KM = 400, SIZE_LOG_K = 3.0, SIZE_BASE = 1.2, SIZE_MIN = 2.2, SIZE_MAX = 13;
+  function sizeR(bd){
+    const R = bd && +bd.radius_km;
+    if (!(R > 0)) return 4.5;                // 内核没给半径 → 一个中性值，不假装知道
+    return Math.max(SIZE_MIN,
+      Math.min(SIZE_MAX, SIZE_BASE + SIZE_LOG_K * Math.log10(R / SIZE_REF_KM)));
+  }
+  function lightenC(c, t){ const a = hexRGB(c); return rgbHex(a.map(v => v + (255 - v) * t)); }
+  function darkenC(c, t){ const a = hexRGB(c); return rgbHex(a.map(v => v * (1 - t))); }
+
+  // ---- 撞击的瞬时表现：闪光 / 冲击环 / 碎屑喷流 ----
+  //
+  // 需求原话："碰撞要开始朝着这个方向去做" + "碎片要成束溅射"。
+  // 起因是**画布上撞的那一下什么都不发生** —— 内核确实报了 merge/fragment，
+  // 碎片也在空间上散开了（间距 0.048 → 1.954 AU），但撞击瞬间没有闪光、没有冲击环、
+  // 看不出碎屑是从哪一点被朝哪个方向打出来的。
+  //
+  // ⚠ 这一整块是**显示层**，它一个物理量都不产生：
+  //   * 撞击的**时刻**来自内核的 events[].t；
+  //   * 撞击的**位置**来自内核逐帧坐标 p[] 里那位参与者的位置（碎裂的母体在撞击后
+  //     位置就冻在那儿了，所以直接就是撞击点）；
+  //   * 喷流的**方向**来自内核回显的 events[].spray_axis。
+  //   唯一由页面自己定的是一个**时长**参数：撞击表现持续多久才淡出
+  //   （IMPACT_WIN_FRAC，按模拟总时长的比例给）。它只决定"看得见多久"，
+  //   不参与任何计算 —— 和"帧间插值"、"变星光晕映射成像素"是同一类东西。
+  const IMPACT_WIN_FRAC = 0.05;  // 撞击表现占模拟总时长的比例（显示参数）
+  function impactWindow(){
+    if (!data || !data.frames || data.frames.length < 2) return 0;
+    const a = data.frames[0].t, b = data.frames[data.frames.length-1].t;
+    return Math.max(1e-9, (b - a) * IMPACT_WIN_FRAC);
+  }
+  function rebuildImpactIndex(){
+    impactPts = []; impactAtT = {};
+    if (!data || !data.events || !data.frames || !data.frames.length) return;
+    const idxOf = {};
+    data.bodies.forEach((b, i) => { idxOf[b.id] = i; });
+    for (const ev of (data.events || [])){
+      const pi = idxOf[ev.a];
+      if (pi === undefined) continue;
+      // 事件时刻最近的那一帧：参与者的位置就是撞击点。
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < data.frames.length; i++){
+        const dd = Math.abs(data.frames[i].t - ev.t);
+        if (dd < bd){ bd = dd; best = i; }
+      }
+      const p = data.frames[best].p[pi];
+      if (!p) continue;                     // 这一帧里它还没有位置（不该发生，但别让它炸）
+      const rec = { t: ev.t, fi: best, p: [p[0], p[1], p[2]], kind: ev.kind,
+                    axis: ev.spray_axis || [0,0,0], spray: +ev.spray || 0,
+                    n: ev.fragments || 0 };
+      impactPts.push(rec);
+      // 碎屑按**出生时刻**认领撞击点：born_at 与事件的 t 是同一个数。
+      if (ev.kind === 'fragment') impactAtT[ev.t] = rec;
+    }
+  }
+
+  // ---- 演化阶梯的配色 ----
+  // 这是"阶"的色阶，不是涨跌，所以不用红绿约定：从死寂的灰走到文明的橙。
+  // 颜色只编码内核给出的 stage 整数，页面不做任何判定。
+  // 第 0 格（死寂岩石）从 #59616e 提到 #6b7383：它现在是**所有没生命天体的球体本色**
+  // （还要被往这个色里压当灰调用），而在深空底 #0a0f1e 上原值只有 3.05:1、
+  // 在图例卡 #111a30 上只有 2.77:1 —— 非文字图形要 3:1，原来那格在卡上是不过的。
+  // 现在是 4.00 / 3.63。改这一格要重算这两处的对比度（_check_bio_page.js 里有复算）。
+  const STAGE_COLORS = ['#6b7383','#6d7c8c','#4f9aa8','#3fb28f','#5cc46a',
+                        '#8fd44a','#c6d93b','#f0d64a','#ffb03a'];
+  // 判定码 -> 文案与颜色。码值与内核 verify 的 verdict_names 一一对应：
+  // 0 no_light / 1 frozen / 2 evolving / 3 sterilized
+  // 判定。name / tip 是术语版（教授模式），plain 是给普通人的一句话 ——
+  // 同一件事的两种说法，判定码本身仍然来自内核，页面只是换措辞。
+  const VERDICT = [
+    { name:'无光照', col:'#6b7280', tip:'它是光源自己（r=0），辐照度为 0',
+      plain:'没有光照到它' },
+    { name:'冻结',   col:'#7fb2e5', tip:'地表温低于水的冰点 273 K，液态水不存在',
+      plain:'太冷了：水全冻成冰，出不了生命' },
+    { name:'演化中', col:'#5cc46a', tip:'地表温落在 273–373 K，水能以液态存在',
+      plain:'温度刚好：可能有液态水，正在发生演化' },
+    { name:'灭菌',   col:'#e8746b', tip:'地表温达到水的沸点 373 K，进度归零',
+      plain:'太热了：水被蒸干，任何生命都会被灭菌' }
+  ];
+  const verdictText = v => (v ? (uiMode === 'simple' ? v.plain : v.name) : '-');
+  // 内核回显的"这个数是怎么来的"，翻成人话。页面不判断来源，只翻译内核给的字符串。
+  // 为什么这件事必须显示出来：类型表给的是"某一类星"的代表值，真实个体要用观测值。
+  // 两者可以差 2.5 倍（TRAPPIST-1 的 L），而 S=L/r² 直接决定行星在不在可居带。
+  // 不标注来源，用户就分不清屏幕上这个温度是"这一颗星的"还是"这一类星的"。
+  const SRC_ZH = {
+    given: '你自己给的观测值',
+    derived_from_radius_and_t_eff: '由观测的半径与温度推出',
+    type_grid: '类型表里这一类星的代表值',
+    mass_luminosity_relation: '按质光关系估的',
+    none: '不发光'
+  };
+  const srcZh = s => SRC_ZH[s] || s || '';
+  const stageColor = s => STAGE_COLORS[Math.max(0, Math.min(8, s | 0))];
+
+  // ---- 球体本色 = 物质 × 生命 ----
+  // 两条使用反馈先后落在同一个通道上，所以这里分主次，而不是二选一：
+  //   前一条："行星颜色为生命形态" → 生命必须**一眼看得出来**；
+  //   这一条："根据大小，物质，生命，做成不同颜色不同表现形态" → 物质也必须看得出来。
+  // 于是球体本色 = 在**物质基调色**（matTone：类型 + 表面温度 + 密度）上**染一层生命色**：
+  //   · 有生命（stage ≥ 1）：往那一阶的阶色上染，权重随阶增长 ——
+  //     刚起步时还看得出它是颗岩石星还是气巨星，走到高阶才被阶色接管（本来就该如此：
+  //     一个走到"文明级"的星球，它的样子是被生物圈决定的）。同时再叠一圈阶色柔光，
+  //     那是"活着"的第二个可见通道，不必靠色调去猜。
+  //   · 死寂（stage = 0）：往"死寂岩石"那一格的灰里压 LIFE_DEAD_MIX，且**不画柔光** ——
+  //     灰调 + 无光两个信号一起说"这里没有生命"，而物质色还留着一点，
+  //     所以还认得出屏幕上这颗是木星还是火星。
+  //   · 发光的星（恒星/遗迹）：它自己没有"生命形态"这回事 —— 保持物质色，不参与。
+  //   · 没有演化数据（关了演化）：全部退回物质色。
+  // 血缘/来源那一层颜色没有被丢掉：它挪到了球外那圈细环上（见 render 与图例），
+  // 所以"碎片认得出是一家人""合并按质量混色"在画布上照样看得见。
+  const LIFE_DEAD_MIX = 0.62;   // 死寂天体往死寂灰里压多少（0 = 完全物质色，1 = 纯灰）
+  const LIFE_TINT_BASE = 0.50, LIFE_TINT_PER = 0.045;  // 生命染色权重：阶越高，物质色被盖得越多
+  const LIFE_HALO_BASE = 0.10, LIFE_HALO_PER = 0.055;  // 活着的天体外面那圈阶色柔光
+  const lifeTintW = s => Math.min(1, LIFE_TINT_BASE + LIFE_TINT_PER * Math.max(0, s | 0));
+  const lifeHaloA = s => Math.min(0.75, LIFE_HALO_BASE + LIFE_HALO_PER * Math.max(0, s | 0));
+  function lifeColorOf(b, fi){
+    const bd = data && data.bodies ? data.bodies[b] : null;
+    if (!bd) return '#8a8a8a';
+    const tone = matTone(bd, b);
+    const bi = bioAt(fi, b);
+    if (!bi || bd.emits_light) return tone;      // 恒星/遗迹 / 无演化数据 → 物质色
+    return bi.stage >= 1 ? mixColor(tone, stageColor(bi.stage), lifeTintW(bi.stage))
+                         : mixColor(tone, stageColor(0), LIFE_DEAD_MIX);
+  }
+  // 球面明暗 + 物质族质感。⚠ 这一整块只用 CanvasGradient（不是字符串颜色）来填，
+  // 理由不是好看的讲究，是判据：_probe_tools.js 靠"细环 stroke → 球体填充 → 写名字"
+  // 这个**相邻序列**反推"哪一笔属于哪颗天体"，插一笔字符串样式的填充进去就会认错球。
+  // 渐变是对象、不是字符串，那条还原逻辑会直接跳过它。
+  function shadeSphere(x, y, rr, base, fam, lx, ly){
+    const rg = (ox, oy, r, stops) => {
+      const g = ctx.createRadialGradient(x + ox, y + oy, Math.max(0.02, r * 0.03),
+                                         x + ox, y + oy, Math.max(0.05, r));
+      stops.forEach(s => g.addColorStop(s[0], s[1]));
+      return g;
+    };
+    const hiK = fam === 'rock' ? 0.30 : 0.42, loK = fam === 'rock' ? 0.66 : 0.50;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI*2); ctx.clip();
+    // ① 明暗：高光点朝**主星那一侧**偏移（方向是投影出来的真实几何，不是写死的斜对角），
+    //    背光侧压暗 —— 球这样才立得起来。
+    ctx.fillStyle = rg(lx * rr * 0.40, ly * rr * 0.40, rr * 1.30,
+      [[0, lightenC(base, hiK)], [0.46, base], [1, darkenC(base, loK)]]);
+    ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI*2); ctx.fill();
+    // ② 物质族自己的那一层质感
+    if (fam === 'gas' && rr >= 5){          // 气巨：横条纹（球太小就画不出条，只留明暗）
+      const g = ctx.createLinearGradient(0, y - rr, 0, y + rr);
+      const bd2 = darkenC(base, 0.34), gp = lightenC(base, 0.20);
+      [[0, gp], [0.13, bd2], [0.25, gp], [0.39, bd2], [0.52, gp], [0.65, bd2],
+       [0.77, gp], [0.89, bd2], [1, gp]].forEach(s => g.addColorStop(s[0], s[1]));
+      ctx.globalAlpha = 0.42;
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    if (fam === 'star' || fam === 'remnant' || fam === 'brown'){
+      // 自发光/近自发光：核心更亮，边缘不发暗（没有"背光侧"这回事）
+      ctx.fillStyle = rg(lx * rr * 0.16, ly * rr * 0.16, rr * 1.05,
+        [[0, 'rgba(255,255,255,0.85)'], [0.40, lightenC(base, 0.35) + '00'],
+         [1, 'rgba(255,255,255,0)']]);
+      ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI*2); ctx.fill();
+    }
+    // ③ 边缘：岩质没有大气 → 压暗；冰巨有大气 → 提亮
+    if (fam === 'rock' || fam === 'none'){
+      ctx.fillStyle = rg(lx * rr * 0.32, ly * rr * 0.32, rr * 1.04,
+        [[0, 'rgba(0,0,0,0)'], [0.66, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.46)']]);
+      ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI*2); ctx.fill();
+    } else if (fam === 'ice' || fam === 'gas'){
+      ctx.fillStyle = rg(0, 0, rr * 1.0,
+        [[0, 'rgba(255,255,255,0)'], [0.70, 'rgba(255,255,255,0)'], [1, 'rgba(222,246,255,0.34)']]);
+      ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ---- 自定义行星编辑器 ----
+  // 默认给一组"真的会撞上"的初值：同一椭圆旋转 180°（轨道必然相交），相位使二者
+  // 在交点相遇（实测 t≈0.8 yr 撞击）。
+  let customBodies = [
+    { name:'A', a:1.0, e:0.2, inc:0, raan:0, argp:0,   M0:0,   mass:3.0e-6, radius_km:6371 },
+    { name:'B', a:1.0, e:0.2, inc:0, raan:0, argp:180, M0:135, mass:3.0e-6, radius_km:6371 }
+  ];
+  // 这三个状态必须声明在这里（而不是和它们的函数放一起）：
+  // renderBodyTable() 在本文件靠上的位置就会被调用一次，而它会去读它们 ——
+  // 用 const/let 放在后面会直接 TDZ 抛错，整页脚本停在那里（实测就是这样）。
+  let uiMode = 'simple';     // 默认给普通人：开机就能玩，不必先懂开普勒根数
+  let bodyTypes = [];        // 内核回显的类型表（页面不自己抄任何物理）
+  let pendingType = null;    // 调色板里选中的类型
+  let primaryOverride = '';  // 预设指定的根数参考系（如地月系统里的"Earth"）
+  const typeByKey = k => bodyTypes.find(t => t.key === k) || null;
+  function renderBodyTable(){
+    const tb = $('bodytable');
+    let html = '<tr><th>名称</th><th>a (AU)</th><th>e</th><th>i (°)</th><th>Ω (°)</th>'
+      + '<th>ω (°)</th><th>M0 (°)</th><th>质量 (M☉)</th><th>半径 (km)</th>'
+      + '<th title="这一颗星自己的观测有效温度。留空 = 用类型表里这一类星的代表值">'
+      + 'T_eff (K)</th>'
+      + '<th title="这一颗星自己的观测光度。留空 = 用类型表里这一类星的代表值">'
+      + 'L (L☉)</th>'
+      + '<th></th></tr>';
+    const val = (i, k) => customBodies[i][k] === undefined ? '' : customBodies[i][k];
+    const cell = (i, k, w, step) =>
+      `<td><input data-i="${i}" data-k="${k}" type="number" step="${step}" `
+      + `value="${val(i, k)}" style="width:${w}px"></td>`;
+    // 可选格：空着 = "没给"，不是"给了 0"。占位符写清楚空着会发生什么。
+    const cellOpt = (i, k, w, step, ph, tip) =>
+      `<td><input data-i="${i}" data-k="${k}" type="number" step="${step}" `
+      + `value="${val(i, k)}" placeholder="${ph}" title="${tip}" `
+      + `style="width:${w}px"></td>`;
+    customBodies.forEach((b, i) => {
+      const ty = b.type ? typeByKey(b.type) : null;
+      // 要不要给这一行开 T_eff / L 两格？
+      //   有类型 —— 按内核回显的类型表判（不发光的天体给这两格没有意义）
+      //   没类型 —— 开着，由内核去拒。真实系统的宿主就是"没类型"的：
+      //             数据里没有光谱型，套一个类型名等于替用户编分类。
+      //             页面不自己判"它该不该发光"，内核的报错比页面猜得准。
+      const lit = ty ? ty.emits_light : true;
+      html += '<tr>'
+        + `<td><input data-i="${i}" data-k="name" value="${b.name.replace(/"/g,'')}" style="width:70px"`
+        + (ty ? ` title="类型：${ty.name_zh}"` : '') + '></td>'
+        + cell(i, 'a', 68, 0.1) + cell(i, 'e', 58, 0.01) + cell(i, 'inc', 50, 1)
+        + cell(i, 'raan', 50, 5) + cell(i, 'argp', 50, 5) + cell(i, 'M0', 55, 5)
+        + cell(i, 'mass', 92, 'any')
+        // 半径：声明了类型之后这一格变成"可选覆盖"。
+        //   留空 —— 内核按类型的半径公式推（黑洞半径要用 G 和 c，页面不自己算）
+        //   填了 —— 这是这一颗天体的**观测半径**，比模型推出来的更该被尊重。
+        //           真实系外行星的宿主走的就是"填"这一路：观测半径 0.1192 Rsun
+        //           和"类型表推出来的"差了 2.5 倍，不是一回事。
+        + (ty
+            ? cellOpt(i, 'radius_km', 78, 100, '自动',
+                '留空 = 由内核按类型 ' + ty.key + ' 的半径公式推；'
+                + '填了 = 这是这一颗天体的观测半径，内核会照用（不会被类型模型顶掉）')
+            : cell(i, 'radius_km', 78, 100))
+        // 观测 T / L。两项都可以单独给：
+        //   只给 T              → 内核用观测温度，光度仍走类型表
+        //   给 T 且填了半径      → 内核由这两个观测量推出 L（真实目录只有 M/R/T 三样）
+        // 页面对默认值不做镜像：空着就不发这个字段，让内核用它自己的口径。
+        + (lit
+            ? cellOpt(i, 'teff_K', 70, 50, ty ? '类型值' : '观测值',
+                '这一颗星自己的观测有效温度（K）。' + (ty
+                  ? '留空 = 用类型表 ' + ty.key + ' 的代表值'
+                  : '没声明类型时只能给观测值 —— 内核不会替你说这是某一类星'))
+              + cellOpt(i, 'lum_lsun', 82, 'any', ty ? '类型值' : '观测值',
+                '这一颗星自己的观测光度（L☉）。' + (ty
+                  ? '留空 = 用类型表 ' + ty.key + ' 的代表值；'
+                  : '')
+                + '填了半径又留空这一格时，内核会由 R 与 T 把 L 推出来')
+            : '<td class="stat" title="不发光的天体没有有效温度">—</td>'
+              + '<td class="stat" title="不发光的天体没有光度">—</td>')
+        + `<td><button data-del="${i}" style="font-size:11px;padding:3px 8px">删除</button></td>`
+        + '</tr>';
+    });
+    tb.innerHTML = html;
+    renderSimpleBodies();        // 两套编辑器永远同步：同一份 customBodies
+    paintUnplace();              // 撤销按钮的数字跟着天体表走（手动删掉的不该留在栈里）
+    tb.querySelectorAll('input[data-k]').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const b = customBodies[+inp.dataset.i], k = inp.dataset.k;
+        if (k === 'name'){ b[k] = inp.value.replace(/,/g, ''); return; }
+        // 清空一个"可选"格 = 收回这个观测值（删掉字段），不是"给了 0"。
+        // 半径只在声明了类型时才是可选的；没有类型时它必须有，清空按旧规矩落到 0。
+        const optional = (k === 'teff_K' || k === 'lum_lsun'
+                          || (k === 'radius_km' && !!b.type));
+        if (optional && inp.value.trim() === ''){ delete b[k]; return; }
+        b[k] = +inp.value || 0;
+      });
+    });
+    tb.querySelectorAll('button[data-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        customBodies.splice(+btn.dataset.del, 1);
+        renderBodyTable();
+        saveState();
+      });
+    });
+  }
+  $('addbody').addEventListener('click', () => {
+    if (customBodies.length >= 16) return;
+    customBodies.push({ name:'Planet' + (customBodies.length + 1), a:5.2, e:0.05,
+                        inc:3, raan:0, argp:0, M0:0, mass:1e-4, radius_km:6371 });
+    renderBodyTable();
+    saveState();
+  });
+  // ⚠ 这两行必须留在此处（在下面那次 renderBodyTable() **之前**）：
+  // 那个函数会调 paintUnplace()，而 `let` 在初始化之前是 TDZ ——
+  // 声明写在后面会让整个脚本在第一行调用处就抛 "Cannot access before initialization"，
+  // 而症状看着毫不相关（按钮点了没反应、行星表不长）。这条是真踩过的。
+  let ghost = null;       // 放置模式下光标落点的预览（判定与真正投放共用 placeCandidate()）
+  let placedStack = [];   // 本次会话里"点画面投放"放下的天体：撤销只撤这些（预设/存档来的不算）
+  let perpetual = false;  // 时长「永久」：算到末尾不停，把时长翻倍再算、并保住当前时刻
+  let extending = false;  // 正在为"永久"延长（防止在算的过程中重复触发）
+  let seekTAfterCompute = null;   // 延长之后要回到的那个时刻（年）；null = 回到开头
+  renderBodyTable();
+
+  let data = null;        // {bodies, frames, diagnostics, scenario, bio, sampling}
+  let playing = true, frameF = 0, lastTs = null;
+  let dir = 1;            // 播放方向：+1 正放 / −1 倒放
+  let placing = false;    // 「点画面放行星」模式
+  let sampling = null;    // 内核回显的输出采样标定（页面自己不推算周期）
+  const PAGE_SAMPLES_MAX = 2000;   // 本页愿意一次接收的帧数上限（与输入的 max 保持一致）
+
+  // ---- 演化数据的读取 ----
+  // 全部按天体在 bodies 里的下标对齐（内核保证 bio.bodies 与 bodies 同序同长）。
+  // 页面只做索引与显示：S、T_eq、T_surf、阶、判定、进度都是内核给的数。
+  function bioOf(b){
+    if (!data || !data.bio || !data.bio.bodies) return null;
+    const bioE = data.bio.bodies[b];
+    return (bioE && bioE.id === data.bodies[b].id) ? bioE : null;
+  }
+  // 取第 f 帧的演化状态；数组短于帧数时取末值（碎块出生晚、母体碎裂后冻结，
+  // 两种情况内核都已按"最后已知值"补齐，这里再兜一次防止索引越界）。
+  function bioAt(f, b){
+    const bioE = bioOf(b);
+    if (!bioE) return null;
+    const i = Math.min(f, (bioE.stage ? bioE.stage.length : 1) - 1);
+    return { stage: bioE.stage ? bioE.stage[i] | 0 : 0,
+             verdict: bioE.verdict ? bioE.verdict[i] | 0 : 0,
+             progress: bioE.progress ? bioE.progress[i] : 0,
+             insolation: bioE.insolation ? bioE.insolation[i] : 0,
+             t_eq: bioE.t_eq_K ? bioE.t_eq_K[i] : 0,
+             t_surf: bioE.t_surf_K ? bioE.t_surf_K[i] : 0,
+             reached: bioE.stage_reached_at_Y };
+  }
+
+  // 播放位置 frameF 是连续量（按真实时间推进），但帧号必须是整数：
+  // 小数索引取到的是 undefined（data.frames[0.64] → undefined），
+  // 下一句 .t 就会抛异常，而异常发生在 tick 里 → 链式 requestAnimationFrame 断掉 →
+  // 画面定格在第一帧、播放彻底不动。所以凡是把 frameF 当索引用，一律先过这里。
+  function frameIndex(){
+    const n = data.frames.length;
+    return Math.max(0, Math.min(n - 1, Number.isFinite(frameF) ? Math.floor(frameF) : 0));
+  }
+
+  // ---- 画布自适应 + 视图状态（平移 / 滚轮缩放） ----
+  // 视图状态：pan 为屏幕像素偏移；userScale 与缩放滑杆相乘。
+  const view = { panX: 0, panY: 0, userScale: 1 };
+
+  function resizeCanvas(){
+    const r = cv.getBoundingClientRect();
+    if (r.width < 10) return;
+    cv.width  = Math.round(r.width);
+    cv.height = Math.max(300, Math.round(r.height));
+    render.stars = null;   // 星空按新尺寸重生成
+  }
+  window.addEventListener('resize', resizeCanvas);
+  document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 60));
+
+  // 滚轮缩放：以光标为不动点。投影是仿射的，world = (mouse - center - pan)/scale，
+  // 缩放后令 world 落回原光标处即可解出新 pan。
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (!data) return;
+    const rect = cv.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const k = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const ns = Math.min(60, Math.max(0.05, view.userScale * k));
+    const applied = ns / view.userScale;
+    const cx = cv.width / 2, cy = cv.height / 2;
+    view.panX = mx - cx - applied * (mx - cx - view.panX);
+    view.panY = my - cy - applied * (my - cy - view.panY);
+    view.userScale = ns;
+    render();
+    saveState();
+  }, { passive: false });
+
+  // 拖拽平移 / 点击选中星体
+  // 单击与拖拽要分开：按下后移动超过 4px 就当成平移，否则算点击。
+  let drag = null;
+  cv.addEventListener('pointerdown', e => {
+    drag = { x: e.clientX, y: e.clientY, panX: view.panX, panY: view.panY, moved: 0 };
+    cv.setPointerCapture(e.pointerId);
+    cv.classList.add('dragging');
+    // 触屏没有 hover：按下的这一刻先把落点算出来，手指抬起来之前能看到它会落在哪。
+    if (placing) ghost = placeCandidate(e.clientX, e.clientY);
+  });
+  cv.addEventListener('pointermove', e => {
+    // 放置模式：光标走哪儿，落点预览就跟哪儿（鼠标端靠这条，触摸端靠上面 pointerdown 那一次）。
+    if (placing && !drag) ghost = placeCandidate(e.clientX, e.clientY);
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.moved = Math.max(drag.moved, Math.hypot(dx, dy));
+    if (drag.moved <= 4) return;          // 抖动阈值：防手抖误触
+    view.panX = drag.panX + dx;
+    view.panY = drag.panY + dy;
+    ghost = null;                         // 拖动时把预览收掉：不然它跟着手飘，像是在放
+    cam.follow = -1;                      // 手动平移 = 自己接管镜头，不再跟随
+    render();
+  });
+  // 光标离开画布就收掉预览，免得留一个"幽灵落点"在那儿骗人。
+  cv.addEventListener('pointerleave', () => { ghost = null; });
+  const endDrag = () => { drag = null; cv.classList.remove('dragging'); };
+  cv.addEventListener('pointerup', e => {
+    if (drag && drag.moved <= 4){
+      const hit = pickAt(e.clientX, e.clientY);
+      if (!hit && placing) placePlanetAt(e.clientX, e.clientY);
+    }
+    endDrag();
+    saveState();          // 平移量、点击选中的天体都算"上次的样子"
+  });
+  cv.addEventListener('pointercancel', endDrag);
+
+  // 命中判定：取屏幕上离光标最近、且在星体半径（至少 9px）内的天体。
+  function pickAt(clientX, clientY){
+    if (!data) return;
+    const rect = cv.getBoundingClientRect();
+    const mx = clientX - rect.left, my = clientY - rect.top;
+    let best = -1, bestD = Infinity;
+    for (const h of hits){
+      const d = Math.hypot(h.x - mx, h.y - my);
+      if (d <= h.r + 4 && d < bestD){ bestD = d; best = h.b; }
+    }
+    if (best < 0){                       // 点空白处：取消选中、停止跟随、回到黄道
+      cam.sel = -1; cam.follow = -1; setCam(0, 0); return false;   // 返回"没命中"，放置模式据此决定要不要放星球
+    }
+    if (best === cam.sel){               // 再点一次同一个 → 切回黄道（"切换"）
+      cam.sel = -1; cam.follow = -1; setCam(0, 0); return true;
+    }
+    cam.sel = best;
+    // 点谁，镜头就跟谁。只按轨道面摆相机（下面的 orbitView）对太阳系这种"几乎共面"的场面
+    // 是个空操作 —— 点一下看着像没反应；而且它转起来之后很快就跑出画面了。
+    cam.follow = best;
+    const e = elemsOf(data.bodies[best]);
+    if (e){
+      const v = orbitView(e[0], e[1]);   // 有轨道根数：相机摆到它的轨道面正对面
+      setCam(v[0], v[1]);
+    } else {                             // 太阳、figure8 的 A/B/C 没有轨道根数
+      setCam(0, 0);
+    }
+    toolNote('点中了 <b>' + data.bodies[best].id + '</b>：镜头已对准它 —— 它会一直待在画面中间（跟着它走），'
+      + '画面下方那张卡里就是它的数据，第一行是它的生命形态。'
+      + '再点一次它、点空白处、或按「⊙ 黄道复位」就回到全景。'
+      + '<span class="plainterm">这是显示层的事：镜头只做一次正交投影，不改变任何物理量。</span>');
+    return true;
+  }
+
+  $('resetview').addEventListener('click', () => {
+    cam.sel = -1; cam.follow = -1;
+    // "复位"就该真的回到原点：原来只复位了角度，平移量留着（拖走之后就回不来了）。
+    view.panX = 0; view.panY = 0;
+    setCam(0, 0); saveState();
+  });
+  // 「✕ 取消选中 · 回全景」：取消选中 + 松开跟随 + 平移量归零 + 回黄道。
+  // 为什么连平移量一起归零：跟随是"把它钉在画面正中"，松开之后如果留着平移量，
+  // 画面还是停在那一小块上，观众找不到回到整片系统的路（复位按钮的名字也说不清这件事）。
+  $('selclose').addEventListener('click', () => {
+    cam.sel = -1; cam.follow = -1;
+    view.panX = 0; view.panY = 0;
+    setCam(0, 0); saveState();
+  });
+  $('tilt').addEventListener('input', () => {
+    cam.pitch = cam.pitchTo = (+$('tilt').value) * D2R;   // 手动拖动时不缓动
+    cam.anim = false;
+  });
+
+  // 双击复位视图
+  cv.addEventListener('dblclick', () => {
+    view.panX = 0; view.panY = 0; view.userScale = 1;
+    render();
+  });
+
+  // 全屏切换
+  $('fs').addEventListener('click', () => {
+    const st = $('stage');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else st.requestFullscreen().catch(() => {});
+  });
+
+  // ---- 会话持久化：下次进来接着上一次退出 ----
+  // 只存「用户的选择」：场景、太阳系档位、行星表、碰撞/演化旋钮、视角、播放位置、播放/暂停。
+  // 一个字节的内核结果都不存 —— 重新打开时整份轨道与演化数值都现场调用内核重算，
+  // 所以不存在「缓存了过期轨道」这种事；保存的只是你上次把开关拨到了哪儿、时间轴停在哪一帧。
+  // 存储不可用（隐私模式 / 被策略禁用）时降级成「每次都从默认开始」，并在页面上说清楚，不装作已保存。
+  const STORE_KEY = 'starpivot.universe.session';
+  const STORE_SCHEMA = 1;
+  let storageOK = true, saveTimer = null, pending = null, lastSaveTs = 0;
+
+  try {                                   // 先探一次：写不进去就全程不再写
+    localStorage.setItem(STORE_KEY + '.probe', '1');
+    localStorage.removeItem(STORE_KEY + '.probe');
+  } catch (err) { storageOK = false; }
+
+  function snapshot(){
+    return {
+      schema: STORE_SCHEMA, saved_at: Date.now(),
+      scenario: $('scenario').value,
+      years: $('years').value, years_touched: !!$('years').dataset.touched,
+      perpetual: perpetual,
+      samples: $('samples').value, speed: $('speed').value,
+      playing: playing, frameF: frameF, dir: dir, uiMode: uiMode, pendingType: pendingType,
+      integ: $('integ') ? $('integ').value : 'leapfrog', primaryOverride: primaryOverride,
+      solarmode: $('solarmode').value,
+      bodies: customBodies.map(b => Object.assign({}, b)),
+      collide: $('collide').value, rscale: $('rscale').value,
+      nfrag: $('nfrag').value, disp: $('disp').value, fmin: $('fmin').value,
+      spray: $('spray').value,
+      starcollide: $('starcollide').checked,
+      bioon: $('bioon').checked,
+      bioyears: $('bioyears').value, albedo: $('albedo').value,
+      greenhouse: $('greenhouse').value,
+      greenhouse_touched: !!$('greenhouse').dataset.touched,
+      zoom: $('zoom').value, tilt: $('tilt').value,
+      view: { panX: view.panX, panY: view.panY, userScale: view.userScale },
+      cam: { yaw: cam.yaw, pitch: cam.pitch, sel: cam.sel, follow: cam.follow }
+    };
+  }
+  function writeStore(){
+    if (!storageOK || persistBlocked) return;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); }
+    catch (err) { storageOK = false; }
+  }
+  // 落盘分两种："只是看了一眼"（点逐帧、拖时间轴）不该认下一份别人的设定，
+  // 所以它走 saveStatePassive —— 不解除封锁；而改任何一项设定才走 saveState。
+  // （这条是实测出来的：最初 seekFrame 里调的就是 saveState，于是一打开分享链接、
+  //   随手点一下 ▶ 就把对方的宇宙写进了自己的存档。）
+  function saveStatePassive(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(writeStore, 250);
+  }
+  function saveState(){                   // 拖动滑杆时合并成一次写
+    persistBlocked = false;               // 你自己动手改了设定，这份会话就算认下了
+    saveStatePassive();
+  }
+  function flushSave(){                   // 关页面前把 debounce 里没落的那次补上
+    if (saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+    writeStore();
+  }
+  function readStore(){
+    if (!storageOK) return null;
+    try {
+      const o = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+      return (o && o.schema === STORE_SCHEMA) ? o : null;   // 版本不认：宁可丢掉重来
+    } catch (err) { return null; }
+  }
+  function clearStore(){ try { localStorage.removeItem(STORE_KEY); } catch (err) {} }
+
+  // 读回来的东西一律当不可信输入过一遍：手改过的 localStorage 或旧版本残留都可能给出畸形值。
+  // 这里只做「类型与范围」的收口，不做数值判断 —— 判断是内核的事。
+  const numOr = (v, d) => { const x = +v; return isFinite(x) ? x : d; };
+  // 可选的观测量：没有就是"没有"（undefined），**不补零**。
+  // 0 是一个合法的温度/光度（也是内核会拒绝的值），把"没给"当成 0，
+  // 等于替用户编了一个观测值 —— 而这正是本页最不该做的事。
+  const numOpt = v => {
+    if (v === undefined || v === null || v === '') return undefined;
+    const x = +v; return isFinite(x) ? x : undefined;
+  };
+  function sanitizeBody(b){
+    b = b || {};
+    const nm = String(b.name === undefined ? '' : b.name).replace(/[",]/g, '').slice(0, 24);
+    // type 必须一起留下来：丢了这个字段，恢复回来的黑洞会变成一颗"10 M☉ 但不声明类型"
+    // 的天体 —— 而按氢燃烧下限判，10 M☉ 是发光的，于是 L = 10^3.5 = 3162 L☉，
+    // 一颗黑洞会被算成全场最亮的灯。（这是真的踩过一次：判据把半径那一列问成 null 才暴露。）
+    //
+    // 字符类**必须包含大写**：内核 39 个类型键里有 21 个带大写（O_V / M_V / WR / G_III / M_0…）。
+    // 这里原先写的是 [a-z_]，于是光谱型的星一经过 sanitizeBody 就被静默降级成"没声明类型"：
+    // 半径跟着落回页面默认的 6371 km —— 一颗太阳被画成地球那么大，而且屏幕上不报任何错。
+    // （这一条是 2026-09-26 的链路判据抓到的：它把单个类型名塞进 sanitizeBody 再问回来。）
+    // 这里只收口"形状"（禁掉会破坏 name:type,mass 语法的字符：逗号、冒号、等号、空格），
+    // 键名到底存不存在由内核判 —— 页面不维护第二份类型表。
+    const ty = (typeof b.type === 'string'
+                && /^[A-Za-z_][A-Za-z0-9_]{0,31}$/.test(b.type)) ? b.type : '';
+    const out = { name: nm || 'Planet', type: ty,
+             a: numOr(b.a, 1), e: numOr(b.e, 0), inc: numOr(b.inc, 0),
+             raan: numOr(b.raan, 0), argp: numOr(b.argp, 0), M0: numOr(b.M0, 0),
+             mass: numOr(b.mass, 3e-6) };
+    // 半径这一格有两种含义，取决于有没有声明类型：
+    //   没类型 —— 必须有。页面填的默认值就是一个约定半径，内核没有别的来源。
+    //   有类型 —— "有没有"本身就是一句话：有 = 这是这一颗天体的观测半径，
+    //             没有 = 交给内核按类型的半径公式推（黑洞半径要用 G 和 c，
+    //             页面和网关都不该自己算）。所以这一支**不能**补 6371，
+    //             否则"我没给半径"会被变成"我给了个地球大小的观测值"。
+    const r = numOpt(b.radius_km);
+    if (ty) { if (r !== undefined) out.radius_km = r; }
+    else    { out.radius_km = numOr(b.radius_km, 6371); }
+    // 这一颗星自己的观测有效温度与光度（真实恒星才给得出）。没给就不带这个字段。
+    const t = numOpt(b.teff_K);  if (t !== undefined) out.teff_K = t;
+    const L = numOpt(b.lum_lsun); if (L !== undefined) out.lum_lsun = L;
+    return out;
+  }
+  const setVal = (id, v) => { const el = $(id); if (el && v !== undefined && v !== null) el.value = v; };
+
+  function restoreSession(s){
+    setVal('scenario', s.scenario);
+    setVal('years', s.years);
+    // years 的「用户改过」标记必须一起恢复：否则 figure8 的重算会把它按回整周期 6.3259…
+    if (s.years_touched) $('years').dataset.touched = '1';
+    // 时长「永久」也要跟着恢复（老存档没有这个字段 → false，行为不变）
+    perpetual = !!s.perpetual;
+    if ($('perpetual')) $('perpetual').checked = perpetual;
+    setVal('samples', s.samples);
+    setVal('speed', s.speed);
+    setVal('solarmode', s.solarmode);
+    if (Array.isArray(s.bodies) && s.bodies.length){
+      customBodies = s.bodies.slice(0, 16).map(sanitizeBody);
+      placedStack = [];   // 整份天体表被换掉了：之前"刚放下的"已经不是这一批
+    }
+    setVal('collide', s.collide); setVal('rscale', s.rscale);
+    setVal('nfrag', s.nfrag); setVal('disp', s.disp); setVal('fmin', s.fmin);
+    setVal('spray', s.spray);
+    $('starcollide').checked = !!s.starcollide;
+    $('bioon').checked = s.bioon !== false;
+    setVal('bioyears', s.bioyears); setVal('albedo', s.albedo);
+    setVal('greenhouse', s.greenhouse);
+    if (s.greenhouse_touched) $('greenhouse').dataset.touched = '1';
+    setVal('zoom', s.zoom); setVal('tilt', s.tilt);
+    dir = (s.dir === -1) ? -1 : 1;
+    $('dirbtn').textContent = dir < 0 ? '⟳ 正放' : '⟲ 倒放';
+    pendingType = (typeof s.pendingType === 'string' && s.pendingType) ? s.pendingType : null;
+    if (typeof s.integ === 'string' && /^(leapfrog|hermite|euler|kepler)$/.test(s.integ))
+      $('integ').value = s.integ;
+    primaryOverride = (typeof s.primaryOverride === 'string') ? s.primaryOverride : '';
+    applyMode(s.uiMode === 'pro' ? 'pro' : 'simple', false);   // 恢复模式但不落盘（还在恢复中）
+    if (s.view){
+      view.panX = numOr(s.view.panX, 0);
+      view.panY = numOr(s.view.panY, 0);
+      view.userScale = Math.min(60, Math.max(0.05, numOr(s.view.userScale, 1)));
+    }
+    if (s.cam){
+      cam.yaw = cam.yawTo = numOr(s.cam.yaw, 0);
+      cam.pitch = cam.pitchTo = Math.max(-Math.PI/2, Math.min(Math.PI/2, numOr(s.cam.pitch, 0)));
+      cam.anim = false;
+      cam.sel = Number.isInteger(s.cam.sel) ? s.cam.sel : -1;
+      // 有存档就恢复"镜头跟着谁"；老存档没有这个字段 → -1（不跟随），行为不变。
+      cam.follow = Number.isInteger(s.cam.follow) ? s.cam.follow : -1;
+    }
+    renderBodyTable();
+    syncPanels();
+  }
+
+  function ago(ms){
+    const m = Math.max(0, Math.round(ms / 60000));
+    if (m < 1) return '刚刚';
+    if (m < 60) return m + ' 分钟前';
+    const h = Math.round(m / 60);
+    if (h < 24) return h + ' 小时前';
+    return Math.round(h / 24) + ' 天前';
+  }
+  function showSessionNote(s, fromShare){
+    const el = $('sessionnote');
+    if (!el) return;
+    if (!storageOK){
+      el.innerHTML = '<span style="color:#f5c6a5">这个浏览器不允许本地存储（隐私模式或被策略禁用），'
+        + '本次会话不会被保存：下次打开会回到默认状态。</span>';
+      return;
+    }
+    const btn = ' <button id="forget" style="font-size:11px;padding:2px 8px">清除并回到默认</button>';
+    el.innerHTML = s
+      ? (fromShare
+          ? '<b>已按分享链接载入</b>这套设定。轨道与演化数值是在<b>你这台机器上现场重算</b>的 —— '
+            + '链接里带的只是选择，不是一段录像。你自己那份会话没有被覆盖，'
+            + '直到你改动任何一项设定（播放、拖时间轴这些只算浏览，不会写入）。'
+          : '已接着上一次退出继续（' + ago(Date.now() - (s.saved_at || 0)) + '）：'
+            + '场景、旋钮、视角、播放位置都恢复成你上次离开时的样子。'
+            + '轨道与演化数值是<b>重新调用内核现算</b>的 —— 保存的只是你的选择，不保存任何计算结果。')
+        + btn
+      : '第一次打开：已按默认状态开始，之后每次改动都会自动保存，下次进来接着这里。' + btn;
+    const f = $('forget');
+    if (f) f.addEventListener('click', () => { clearStore(); location.reload(); });
+  }
+
+  // ---- 脏标记：哪些控件改了不会自己重算，就得说出来 ----
+  // 实测行为是不一致的：场景 / 太阳系档位 / 演化开关 / 阶梯年数 / albedo / 温室 会自动重算，
+  // 而碰撞那一整组（模式、半径放大、碎块数、色散、碎裂阈值、恒星参与）和年数/帧数
+  // 改了之后一句话都没有 —— 玩家把"半径放大"从 450 调到 3000，以为更容易看到碰撞，
+  // 其实什么都没发生。这里不改"是否自动重算"（滑杆自动重算会把内核打爆），
+  // 只把"参数改了、还没算"这件事摆在按钮上。
+  let dirty = false;
+  // 改动计数：只用来回答一个问题 ——「这次重算的**路上**，用户又动过参数吗？」
+  // 动了的话，算完回来的那一版结果里没有他刚改的值（payload 是发出去那一刻抓的），
+  // 所以不能把「参数已改」清掉，否则等于骗他说"已经算过了"，而画面上还是旧结果。
+  let paramRev = 0;
+  const DIRTY_IDS = ['years', 'samples', 'collide', 'rscale', 'nfrag', 'disp',
+                     'fmin', 'spray', 'starcollide'];
+  function paintComputeBtn(){
+    const b = $('compute');
+    if (!b || b.disabled) return;      // 正在算的时候别把"积分中…"覆盖掉
+    b.textContent = dirty ? '重新计算（参数已改）' : '重新计算';
+    b.style.boxShadow = dirty ? '0 0 0 3px rgba(240,137,60,0.55)' : '';
+  }
+  function setDirty(v){
+    if (v) paramRev++;                 // 每次"标脏"记一次改动；setDirty(false) 不算改动
+    if (dirty === v) return;
+    dirty = v;
+    paintComputeBtn();
+    const h = $('dirtyhint');
+    if (h){
+      h.style.display = v ? 'block' : 'none';
+      h.innerHTML = v
+        ? '<span style="color:#f0893c">参数改过了，但还没重算 —— '
+          + '画面现在显示的仍是改之前的结果。</span>'
+        : '';
+    }
+  }
+
+  // ---- 时间导航 ----
+  // 数据本来就在手里（帧数组），但之前只能播放/暂停 + 拖一根没有刻度的滑杆。
+  // 演化面板会告诉你"第 4 阶在 23.5 年达到"，却点不过去 —— 这几个按钮就是把已有数据变可探索。
+  function seekFrame(i){
+    if (!data) return;
+    if (playing) togglePlay(false);     // 手动定位先停住，否则播放循环立刻把位置拽走
+    frameF = Math.max(0, Math.min(data.frames.length - 1, i));
+    render();
+    saveStatePassive();   // 只是换了帧，不算"改了设定"
+  }
+  // 按时间找"最接近的那一帧"。注意是找帧，不是插值出一个新状态：
+  // 页面不给任何物理量插值，插值只发生在两帧之间的绘制坐标上（见 render 里的 posAt）。
+  function seekTime(t){
+    if (!data) return;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < data.frames.length; i++){
+      const d = Math.abs(data.frames[i].t - t);
+      if (d < bd){ bd = d; best = i; }
+    }
+    seekFrame(best);
+  }
+  $('fr_first').addEventListener('click', () => seekFrame(0));
+  $('fr_last').addEventListener('click', () => data && seekFrame(data.frames.length - 1));
+  $('fr_prev').addEventListener('click', () => seekFrame(frameIndex() - 1));
+  $('fr_next').addEventListener('click', () => seekFrame(frameIndex() + 1));
+  // 事件行与演化表里的"达到时刻"都用委托监听：它们每帧都会被重建，
+  // 逐个绑定等于每帧挂一批新监听（内存和重复触发都很难查）。
+  $('eventlist').addEventListener('click', e => {
+    const el = e.target.closest('[data-jump-t]');
+    if (el) seekTime(+el.dataset.jumpT);
+  });
+  $('biotable').addEventListener('click', e => {
+    const el = e.target.closest('[data-jump-t]');
+    if (el) seekTime(+el.dataset.jumpT);
+  });
+
+  // ---- 分享链接 ----
+  // 把"你的选择"编码进 URL 的 hash（和会话持久化是同一份快照，都不含内核结果）。
+  // 对方打开后是自己那台机器现场重算，所以分享的是"一套设定"，不是"一段录像"。
+  const b64e = str => {
+    const b = new TextEncoder().encode(str);
+    let s = '';
+    for (const x of b) s += String.fromCharCode(x);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  const b64d = t => {
+    const s = atob(t.replace(/-/g, '+').replace(/_/g, '/'));
+    const b = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+    return new TextDecoder().decode(b);
+  };
+  function parseShareHash(){
+    const m = /[#&]s=([A-Za-z0-9_-]+)/.exec(location.hash || '');
+    if (!m) return null;
+    try {
+      const o = JSON.parse(b64d(m[1]));
+      return (o && o.schema === STORE_SCHEMA) ? o : null;
+    } catch (e) { return null; }
+  }
+  // 打开别人的分享链接，不该把你自己那份会话冲掉。所以从链接载入时先禁止写盘，
+  // 直到你自己动手改了任何一项（saveState 会解除封锁）—— 新会话才是你主动认下的。
+  let persistBlocked = false;
+  $('share').addEventListener('click', () => {
+    const snap = JSON.stringify(snapshot());
+    const url = location.origin + location.pathname + '#s=' + b64e(snap);
+    location.hash = 's=' + b64e(snap);
+    const el = $('sharenote');
+    const show = copied => {
+      el.style.display = 'block';
+      el.innerHTML = (copied ? '分享链接已复制到剪贴板。'
+                             : '浏览器不允许自动复制，请手动复制下面这条链接：')
+        + '<br><code style="word-break:break-all;font-size:11px">' + url + '</code>'
+        + '<br>对方打开就是你现在这套设定 —— 轨道与演化数值在他那台机器上<b>现场重算</b>，'
+        + '分享的只是选择，不是一段录像。';
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(url).then(() => show(true), () => show(false));
+    else show(false);
+  });
+
+  // ---- 一键开局：预设宇宙 ----
+  // 对标产品的共同做法：先给一个"马上能看"的开局，再让玩家改
+  // （Universe Sandbox 的场景库、Super Planet Crash 的模板下拉、NASA Eyes 的 150+ 任务）。
+  // 之前这里是一张空表 + 9 个裸数字框，玩家得先懂开普勒根数才能看到任何东西。
+  // 下面的质量一律用 M☉（和行星表同一套单位）；"相当于几个地球"由内核回显的
+  // earth_mass_msun 换算，页面不自己抄这个常数。
+  const PRESETS = [
+    { label:'太阳系九星', scenario:'solar', years:12, samples:2000,
+      note:'J2000 日心平根数；12 年 ≈ 木星正好走完一圈。' },
+    { label:'8 字三体', scenario:'figure8', years:6.32591398, samples:2000,
+      note:'Chenciner–Montgomery 周期解，一个整周期后闭合。' },
+    { label:'类地行星', scenario:'custom', solarmode:'sun', years:12, samples:2000,
+      bodies:[{ name:'Earth-like', a:1.0, e:0.017, inc:0, raan:0, argp:0, M0:0,
+                mass:3.0034896e-6, radius_km:6371 }],
+      note:'一颗地球放在 1 AU。看它能不能演化出东西、能走到第几阶。' },
+    { label:'热木星', scenario:'custom', solarmode:'sun', years:4, samples:2000,
+      bodies:[{ name:'HotJupiter', a:0.05, e:0.01, inc:0, raan:0, argp:0, M0:0,
+                mass:9.5479e-4, radius_km:69911 }],
+      note:'木星质量贴着恒星飞（0.05 AU）。它的演化判定应该直接是"灭菌"。' },
+    { label:'紧凑六行星', scenario:'custom', solarmode:'sun', years:4, samples:2000,
+      bodies:[
+        { name:'k11b', a:0.091, e:0.01, inc:0, raan:0, argp:0, M0:0,   mass:1.3e-5, radius_km:13000 },
+        { name:'k11c', a:0.107, e:0.01, inc:0, raan:0, argp:0, M0:60,  mass:4.3e-5, radius_km:17000 },
+        { name:'k11d', a:0.155, e:0.01, inc:0, raan:0, argp:0, M0:120, mass:1.0e-5, radius_km:12000 },
+        { name:'k11e', a:0.195, e:0.01, inc:0, raan:0, argp:0, M0:200, mass:2.6e-5, radius_km:15000 },
+        { name:'k11f', a:0.250, e:0.01, inc:0, raan:0, argp:0, M0:280, mass:7.8e-5, radius_km:20000 },
+        { name:'k11g', a:0.466, e:0.01, inc:0, raan:0, argp:0, M0:330, mass:6.0e-5, radius_km:19000 }],
+      note:'仿 Kepler-11：六颗全挤在 0.5 AU 以内（半长轴按公开值取近似）。' },
+    { label:'彗星掠日', scenario:'custom', solarmode:'sun', years:3, samples:2000,
+      bodies:[{ name:'Comet', a:3.0, e:0.95, inc:12, raan:0, argp:0, M0:0,
+                mass:1e-12, radius_km:5 }],
+      note:'a=3 AU、e=0.95 → 近日点只有 0.15 AU。看它一路上的辐照度与地表温怎么变。' },
+    { label:'双星系统', scenario:'custom', solarmode:'none', years:6, samples:2000,
+      bodies:[{ name:'StarA', a:1.0, e:0, inc:0, raan:0, argp:0,   M0:0, mass:1.0, radius_km:696340 },
+              { name:'StarB', a:1.0, e:0, inc:0, raan:0, argp:180, M0:0, mass:1.0, radius_km:696340 }],
+      note:'两颗等质量恒星互为引力源（不放太阳系）。这种系统里"谁照亮谁"没有定义，'
+        + '页面会如实标出 primary_tied。' },
+    { label:'地月系统', scenario:'custom', solarmode:'none', years:1, samples:2000,
+      primary:'Earth',
+      bodies:[{ name:'Earth', a:1, e:0, inc:0, raan:0, argp:0, M0:0,
+                mass:3.003489e-6, radius_km:6371, type:'rocky' },
+              { name:'Moon', a:0.00257, e:0.0549, inc:5.145, raan:0, argp:0, M0:0,
+                mass:3.694e-8, radius_km:1737, type:'rocky' }],
+      note:'地球 + 月球（a=0.00257 AU、e=0.0549、i=5.145° 都是真实值）。'
+        + '用「根数参考系」把地球当参照放在原点 —— 真实地月是两颗都绕共同质心转，'
+        + '这里以地球为参照，相对运动是一样的。算出来月球周期 ≈ 27.3 天。' },
+    { label:'轨道共振 1:2:4', scenario:'custom', solarmode:'sun', years:20, samples:2000,
+      bodies:[{ name:'P1', a:1.0000, e:0.02, inc:0, raan:0, argp:0, M0:0,   mass:3.0e-6, radius_km:6371 },
+              { name:'P2', a:1.5874, e:0.02, inc:0, raan:0, argp:0, M0:120, mass:3.0e-6, radius_km:6371 },
+              { name:'P3', a:2.5198, e:0.02, inc:0, raan:0, argp:0, M0:240, mass:3.0e-6, radius_km:6371 }],
+      note:'三颗行星的半长轴比 1 : 2^(2/3) : 4^(2/3) ⇒ 周期比正好 1 : 2 : 4。'
+        + '这是最稳的一种共振（拉普拉斯共振），木星的三大卫星就是这么排的。'
+        + '把某一颗的质量调大，看共振会不会散掉。' },
+    { label:'行星撞地球', scenario:'custom', solarmode:'sun', years:3, samples:2000,
+      collide:'fragment', rscale:'450',
+      nfrag:'4', disp:'0.3', fmin:'0.5', spray:'0.6',
+      bodies:[{ name:'A', a:1.0, e:0.2, inc:0, raan:0, argp:0,   M0:0,   mass:3.0e-6, radius_km:6371 },
+              { name:'B', a:1.0, e:0.2, inc:0, raan:0, argp:180, M0:135, mass:3.0e-6, radius_km:6371 }],
+      note:'那组"真会撞上"的初值（t≈0.8 年撞击）。这个预设会顺手把碰撞模式切成'
+        + '"撞击碎裂"、把阈值调到 0.5 km/s（内核默认值）、把喷流成束调到 0.6 —— '
+        + '否则默认是"关（质点互相穿过）"，一个叫"行星撞地球"的预设却什么都不撞，'
+        + '等于名字在骗人。阈值 0.5 会让碎屑接着互撞再碎（级联），'
+        + '想只看撞一次把阈值调高（调高到 3 以上就只剩一次碎裂）。' }
+  ];
+  function applyPreset(i, skipCompute){
+    const p = PRESETS[i];
+    $('scenario').value = p.scenario;
+    $('solarmode').value = p.solarmode || 'full';
+    $('years').value = p.years;   $('years').dataset.touched = '1';
+    $('samples').value = p.samples; $('samples').dataset.touched = '1';
+    // 预设可以指定算法的参考系（地月系统就是靠它把地球当成中心）
+    primaryOverride = p.primary || '';
+    if (p.bodies){
+      customBodies = p.bodies.map(sanitizeBody);
+      placedStack = [];      // 同上：预设换掉的是整份天体表
+      renderBodyTable();
+    }
+    // 碰撞设置也要能由预设指定：一个叫"行星撞地球"的预设，在默认"碰撞关"下什么都不撞。
+    //
+    // **反过来也必须复位。** 预设必须定义**完整**状态，不能靠"上次剩下的"：
+    // 玩完「行星撞地球」（collide=fragment、半径放大 450×）再点「真实：TRAPPIST-1」，
+    // 那 450 倍的缩放会跟着过去 —— 一颗真实行星会在你眼前被撞碎，
+    // 而按钮上写的是"真实数据"。实测过：不复位时碰撞模式确实是会残留的。
+    $('collide').value = p.collide !== undefined ? p.collide : 'off';
+    $('rscale').value = p.rscale !== undefined ? p.rscale : 450;
+    $('starcollide').checked = p.starcollide !== undefined ? !!p.starcollide : false;
+    // 碎裂那四个参数也一样要复位。它们原先**没有被预设管**：玩过「行星撞地球」把阈值
+    // 拖到 0 之后，再点别的预设，那个阈值还留着 —— 于是"这个预设算出来是这样"不成立。
+    // （同一类错，上面那段注释里为 collide/rscale 已经写过一次，这四个被漏掉了。）
+    $('nfrag').value = p.nfrag !== undefined ? p.nfrag : 4;
+    $('disp').value  = p.disp  !== undefined ? p.disp  : 0.3;
+    $('fmin').value  = p.fmin  !== undefined ? p.fmin  : 0.5;
+    $('spray').value = p.spray !== undefined ? p.spray : 0.6;
+    // 积分器同理：切到 hermite 之后按任何没写 integ 的预设，都应该回到默认的蛙跳，
+    // 否则"这个预设算出来是这样"这句话就不成立了（换个人点同一个按钮会得到别的数）。
+    if ($('integ')) $('integ').value = p.integ !== undefined ? p.integ : 'leapfrog';
+    setDirty(false);
+    syncPanels();
+    // 触屏路径：点按预设时把悬停那句话显示出来（同一个函数，同一段文字）。
+    showPresetNote(i);
+    if (!skipCompute) compute();
+  }
+  // 预设说明的**唯一**写法：悬停（鼠标）与点按（触摸）都走这里。
+  // 触屏没有 hover，如果只在 mouseenter 里写说明，iPad 上就永远看不到这段解释 ——
+  // 所以点按预设时也调同一个函数，两条路径给出的是同一段话。
+  function showPresetNote(i){
+    const p = PRESETS[i];
+    $('presetnote').textContent = p.note +
+      '（场景 ' + p.scenario + (p.solarmode ? ' · 太阳系 ' + p.solarmode : '') +
+      ' · ' + p.years + ' 年 / ' + p.samples + ' 帧）';
+  }
+  // 第一屏只摆前 6 个开局（就是 PRESETS 里的书写顺序，前几个最直观）；
+  // 其余收进折叠区，开合状态记住（否则重算一次就弹回去）。
+  let presetsOpen = false;
+  function buildPresets(){
+    const el = $('presets');
+    el.innerHTML = '';
+    const mkBtn = (p, i) => {
+      const b = document.createElement('button');
+      b.textContent = p.label;
+      b.style.fontSize = '12.5px';
+      b.addEventListener('click', () => applyPreset(i));
+      b.addEventListener('mouseenter', () => showPresetNote(i));
+      return b;
+    };
+    const HEAD = 6;
+    PRESETS.slice(0, HEAD).forEach((p, i) => el.appendChild(mkBtn(p, i)));
+    if (PRESETS.length > HEAD){
+      const det = document.createElement('details');
+      det.className = 'tyfold';
+      det.open = presetsOpen;
+      det.addEventListener('toggle', () => { presetsOpen = det.open; });
+      const sum = document.createElement('summary');
+      sum.textContent = '其它 ' + (PRESETS.length - HEAD) + ' 个开局';
+      det.appendChild(sum);
+      const box = document.createElement('div');
+      box.className = 'row';
+      box.style.cssText = 'gap:8px;align-items:flex-start;margin-top:8px';
+      PRESETS.slice(HEAD).forEach((p, i) => box.appendChild(mkBtn(p, HEAD + i)));
+      det.appendChild(box);
+      el.appendChild(det);
+    }
+    // 这句话被 _probe_play_modes.js 逐字断言（子串「把鼠标放到按钮上」）——
+    // 触屏替代路径只能是**追加**，不能改写或删掉它。
+    $('presetnote').textContent = '把鼠标放到按钮上看这个开局是什么'
+      + '（手机 / iPad 上直接点一下按钮，会出现同一段说明）。点一下就直接换成它，'
+      + '之后所有旋钮照旧可调。';
+  }
+
+  // ---- 真实系统：由 data/real_exoplanets.json 生成预设 ----
+  // 为什么不把这几个系统的数字抄进上面的 PRESETS 字面量：
+  // 抄一份就会有第二份。数据文件一更新，页面上还留着旧的 —— 而且**没人会注意到**，
+  // 因为两边都"能算"，只是数不一样。所以预设必须由数据文件生成，链上只有一个来源。
+  //
+  // 单位换算因子同样读数据文件里那一份（页面不自己写常数：写一份就多一份，
+  // 迟早出现两个只差一点的木星质量）。判据里有一条专门钉这个等式。
+  //
+  // 观测缺项（如 TOI-178 b 没有偏心率）一律**跳过这颗行星**，不补零 ——
+  // 补一个 e=0 会静默改变它的动力学，而屏幕上完全看不出来。
+  function realSystemPresets(ds){
+    const cv = ds.conversions || {};
+    const Mj = +cv.M_jup_to_Msun, Re = +cv.R_earth_to_km, Rs = +cv.R_sun_to_km;
+    if (!isFinite(Mj) || !isFinite(Re) || !isFinite(Rs)) return [];  // 换算因子缺失就没法拼，宁可没有
+    const out = [];
+    (ds.systems || []).forEach(s => {
+      const st = s.star || {};
+      if (!isFinite(+st.st_mass) || !isFinite(+st.st_rad)
+          || !isFinite(+st.st_teff)) return;
+      const bodies = [];
+      // 宿主：只给质量、观测半径、观测温度 —— **不给类型**。
+      // 数据里只有这三样，没有光谱型；套一个"某类星"的类型名就是替用户编分类。
+      // 而 (质量, 半径, 温度) 已经足够内核判定发光并由 R 与 T 推出光度。
+      // 页面上它会显示成"观测"，但那个结论来自内核回显的来源字符串，不是页面自己说的。
+      bodies.push({ name: s.hostname, a: 1, e: 0, inc: 0, raan: 0, argp: 0, M0: 0,
+                    mass: +st.st_mass,
+                    radius_km: +st.st_rad * Rs, teff_K: +st.st_teff });
+      let dropped = 0;
+      (s.planets || []).forEach(p => {
+        if (p.pl_orbsmax === null || p.pl_orbeccen === null
+            || p.pl_bmassj === null || p.pl_rade === null){ dropped++; return; }
+        bodies.push({ name: p.name, a: +p.pl_orbsmax, e: +p.pl_orbeccen,
+                      inc: 0, raan: 0, argp: 0, M0: 0,
+                      mass: +p.pl_bmassj * Mj, radius_km: +p.pl_rade * Re });
+      });
+      // 年数：最外那颗行星走完 3 圈（够看出轨道形状与相对位置），
+      // 夹在 0.5 ~ 60 年之间 —— 太短看不出结构，太长则帧数摊薄到每圈几个点。
+      const outer = (s.planets || []).reduce(
+        (m, p) => (p.pl_orbper != null && +p.pl_orbper > m ? +p.pl_orbper : m), 0);
+      const years = outer > 0 ? Math.min(60, Math.max(0.5, outer * 3 / 365.25)) : 5;
+      out.push({ label: '真实：' + s.hostname, scenario: 'custom', solarmode: 'none',
+                 // 宿主质量不是 1 M☉，按"日心约定"给的行星初速会把它甩掉，
+                 // 所以显式把宿主当参考系（内核的 --primary），而不是让页面猜。
+                 primary: s.hostname, years: +years.toFixed(4), samples: 2000,
+                 bodies,
+                 note: 'NASA Exoplanet Archive 的真实数据（' + s.hostname + '）：宿主的质量 / '
+                   + '半径 / 有效温度，以及 ' + (bodies.length - 1) + ' 颗行星的 '
+                   + 'a / e / 质量 / 半径，都是 Archive 的观测综合值，页面一个数都没改。'
+                   // 下面这两句不是客套：它们是这一组预设里"哪些是观测、哪些是我们假设的"的
+                   // 分界线，不写清楚，"全部用观测值"就会让人以为三维初始状态也是观测来的。
+                   + '两处必须说清楚 —— 它们是假设，不是观测：'
+                   + '① 轨道的朝向与相位（倾角 / 升交点 / 近心点方向 / 起算位置）'
+                   + 'Archive 这张表里没有，预设按共面、且都从近心点起算（这四个角全取 0）构造，'
+                   + '所以画面上看到的"行星排成一线"是我们摆的，不是观测到的；'
+                   + '② 行星质量那一列的性质随探测方法而异（视向速度给的是 m·sin i 下限，'
+                   + '凌星计时给的是拟合出的质量），本表未逐颗记录方法，'
+                   + '所以这里不把它当成精确测量值，也不能拿它去比谁更重。'
+                   + (dropped ? '另有 ' + dropped + ' 颗因观测缺项被排除（缺项不补零）。' : '')
+                   + ' ' + (s.star_note || '') });
+    });
+    return out;
+  }
+  function loadRealSystems(){
+    fetch('/api/dataset/real_exoplanets').then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(ds => {
+      const extra = realSystemPresets(ds);
+      if (!extra.length) return;
+      extra.forEach(p => PRESETS.push(p));
+      buildPresets();
+      // 这里**追加**而不是覆盖：buildPresets() 刚写下的那句"把鼠标放到按钮上看这个开局
+      // 是什么……"是预设区的使用说明，而这句话说的是数据来源 —— 是两件事，
+      // 得让人同时看到。覆盖过一次，_probe_play_modes.js 立刻就抓到了。
+      $('presetnote').textContent += '　另已从 data/real_exoplanets.json 追加 ' + extra.length
+        + ' 组真实系统预设 —— 里面的数字全部来自数据文件，页面一份都没抄。';
+    }).catch(() => {
+      // 直接用 file:// 打开、或没启本地服务时读不到数据：那就没有这几组预设。
+      // 不报错、不打断 —— 其余功能（含内置预设）照常可用。
+    });
+  }
+
+  // ---- 稳定性挑战 ----
+  // 对标 Super Planet Crash：给沙盒一个目标 + 分数 + 最佳成绩。
+  // 规则是编排的（玩法层，不是物理），判据只有两条，都从内核输出里读：
+  //   判据 1（内核事件）：内核报了合并/碎裂，且参与者里有你放的天体 → 失稳
+  //   判据 2（几何代理）：你放的天体到主星的距离超过 ARENA_AU → 失稳
+  //       这是几何代理，不是真正的逃逸判据 —— 页面不算能量、不算轨道根数，只量距离。
+  //   分数 = Σ(你放的天体质量 / 地球质量) × 存活年数（地球质量取内核回显的 earth_mass_msun）
+  const ARENA_AU = 5.0;
+  const CHALLENGE_SETUP = { scenario:'custom', solarmode:'sun', years:120, samples:1000,
+                            collide:'merge', rscale:'450' };
+  const CH_BEST_KEY = 'starpivot.challenge.best';
+  let challenge = null;        // 进行中：{ names:[], years:120 }
+  let chBest = null;
+  try { chBest = JSON.parse(localStorage.getItem(CH_BEST_KEY) || 'null'); } catch (e) { chBest = null; }
+
+  function chSaveBest(o){
+    chBest = o;
+    try { localStorage.setItem(CH_BEST_KEY, JSON.stringify(o)); } catch (e) {}
+  }
+  function renderChallenge(status){
+    const el = $('challengebox');
+    if (!el) return;
+    const bestLine = chBest
+      ? ' <b>最佳：' + chBest.score.toFixed(1) + ' 分</b>（' + chBest.summary + '）' : '';
+    if (!challenge){
+      el.innerHTML = '在给定范围里加天体，看这个系统能撑多久。'
+        + '<b>点「开始挑战」就直接进放置模式</b> —— 用「✛ 点画面放行星」在画面里点几下就行'
+        + '（每放一颗都会自动重算并判定）。'
+        + '规则（<b>编排的玩法层</b>，不是物理）：决定失稳的只有两条 —— '
+        + '内核报了碰撞/合并，或者你放的天体被甩到主星 ' + ARENA_AU + ' AU 之外（几何代理，'
+        + '页面不算能量）。分数 = Σ(你放的天体质量 ÷ 地球质量) × 存活年数。' + bestLine;
+      return;
+    }
+    el.innerHTML = '挑战进行中（' + challenge.years + ' 年）。'
+      + '点「✛ 点画面放行星」在画面里放几颗 —— <b>每放一颗都会自动重算并判定一次</b>，'
+      + '成绩直接出现在这一行下面（要改参数也可以到「更多设置 → 你的行星」里改）。'
+      + '天体放在 0.05–2 AU 之间最合适：内核会按最内轨道自动收缩步长，'
+      + '太靠里会跑得很慢、甚至被内核的步数上限直接挡下。' + bestLine;
+    if (status) el.innerHTML += '<br><br>' + status;
+  }
+  function judgeChallenge(){
+    if (!challenge || !data || !data.frames || !data.frames.length){ renderChallenge(); return; }
+    const mine = id => challenge.names.some(n => id === n || id.indexOf(n + '#') === 0);
+    const mineIdx = [];
+    data.bodies.forEach((b, i) => { if (mine(b.id)) mineIdx.push(i); });
+    if (!mineIdx.length){
+      renderChallenge('这次没有任何"你放的天体"参与（名字对不上），挑战没有判定。');
+      return;
+    }
+    let failT = null, why = '';
+    for (const ev of (data.events || [])){
+      const hit = [ev.a, ev.b].filter(Boolean).some(x => mine(x));
+      if (hit){ failT = ev.t; why = '发生了' + (ev.kind === 'fragment' ? '碎裂' : '合并吸积'); break; }
+    }
+    if (failT === null){
+      outer:
+      for (let f = 0; f < data.frames.length; f++){
+        for (const i of mineIdx){
+          const q = data.frames[f].p[i];
+          const r = Math.hypot(q[0], q[1], q[2]);
+          if (r > ARENA_AU){
+            failT = data.frames[f].t;
+            why = '有一颗被甩到 ' + r.toFixed(2) + ' AU（超过 ' + ARENA_AU + ' AU）';
+            break outer;
+          }
+        }
+      }
+    }
+    const survived = (failT === null) ? data.frames[data.frames.length - 1].t : failT;
+    const em = data.earth_mass_msun;
+    // 分数用的是"你放进来的那几颗"的声明质量，不是结束时存活天体的质量和：
+    // 碰撞之后碎块会从母体分出来，按存活体求和会把同一份质量重复计入（实测差 1.5 倍）。
+    const sum = challenge.masses.reduce((a, b) => a + b, 0);
+    const masses = em ? (sum / em) : sum;
+    unit = em ? ' 个地球质量' : ' M☉';
+    const score = masses * survived;
+    const summary = masses.toFixed(2) + unit + ' × ' + survived.toFixed(1) + ' 年';
+    if (!chBest || score > chBest.score) chSaveBest({ score, summary, at: Date.now() });
+    setDirty(false);
+    renderChallenge((failT === null ? '<b>撑住了</b>：' : '<b>失稳</b>：')
+      + (why || '')
+      + '<br>存活 ' + survived.toFixed(2) + ' 年 → <b>得分 ' + score.toFixed(1) + '</b>（' + summary + '）'
+      + (chBest && score >= chBest.score ? ' <b>新纪录</b>' : ''));
+  }
+  // ---- 导览 ----
+  // 参照 qunabu/Gravity 的做法：先讲清楚"为什么"，再放开自由探索；每一步都有 deep link
+  // （#step-xxx），可以直接把某一步发给别人。但内容必须是**这个引擎真能演示的东西** ——
+  // 我们的内核没有磁场、潮汐、洛希极限这些模型，所以不写那几步，宁可少也不要演假的。
+  const TOUR = [
+    // 第 0 步刻意**不改任何状态**：第一次打开的人应当先看到默认的太阳系，
+    // 而不是被导览直接换成一个双星系统（第一版就是这样，把"开机画面"劫持了，
+    // 而且顺手把那个场景写进了他的存档）。要让用户自己按下一步来换。
+    { id: 'welcome', title: '欢迎 · 这页能干什么',
+      body: '这是本机的一个物理内核（C++）在真的算 N 体引力，页面只负责画出来。' +
+            '按「下一步」会一步步讲：引力是什么 → 为什么地球不会掉进太阳 → 怎么用数值方法算它 → ' +
+            '换不同算法会差在哪 → 撞上会怎样 → 最后随便你玩。<br>' +
+            '<span class="plainterm">第 1 步不会改变你看到的东西；从第 2 步起每步都会换场景，' +
+            '随时可以「跳过」或「关闭」。</span>',
+      st: null },
+    { id: 'what-is-gravity', title: '引力是什么',
+      body: '万物之间有引力：<b>质量越大越大，离得越近越大</b>（F = GMm/r²）。' +
+            '这一条就是下面所有现象的全部来源。放两颗恒星试试 —— 它们会互相绕着一个共同的' +
+            '质心转，谁都不在中心。',
+      st: { preset: '双星系统' } },
+    { id: 'why-no-fall', title: '为什么地球不会掉进太阳',
+      body: '因为它<b>同时在横向飞</b>。引力把这条直线往下拉一点，地球就往下掉一点；' +
+            '但它飞得太快，掉的弧度刚好和太阳表面的弯曲对上 —— 于是永远在掉、永远掉不进去。' +
+            '<b>轨道就是"一直掉、但一直掉过头"</b>。速度再慢一点它会螺旋进去，再快一点它会飞走。',
+      st: { scenario: 'solar', solarmode: 'full', years: 12, samples: 2000, integ: 'leapfrog' } },
+    { id: 'figure8', title: '三个天体也能有稳定轨道',
+      body: '两个天体好办，三个就难了 —— 但 2000 年有人真的找出一条：三个等质量天体沿同一个' +
+            '8 字互相追逐，<b>严格周期</b>。这是 Chenciner–Montgomery 解，也是本页默认的"三体"场景。' +
+            '注意它极脆：任何扰动都会让它散掉。',
+      st: { preset: '8 字三体' } },
+    { id: 'methods', title: '怎么算这个问题：四种算法',
+      body: '真实天体没有公式可解（三体以上就没有），只能用<b>数值积分</b>一小步一小步往前推。' +
+            '不同的推法差别巨大，而差别可以<b>量出来</b>：看下面那条「能量误差曲线」。' +
+            '这一页内置四种算法：蛙跳（辛）、Hermite4（四阶）、半隐式欧拉（一阶）、' +
+            '开普勒解析（不做积分，只按公式摆位）。',
+      st: { scenario: 'solar', solarmode: 'full', years: 50, samples: 2000, integ: 'leapfrog' } },
+    { id: 'drift', title: '数值方法为什么会"漂"',
+      body: '物理定律说能量守恒。但数值方法不一定守 —— <b>有的算法会持续把能量偷偷加进去</b>。' +
+            '现在用的是「半隐式欧拉」：看曲线是不是在往上爬？换回「蛙跳」试试，' +
+            '曲线会立刻压成贴着底的一条带。<b>这就是辛积分器的意义：误差有界，不累积。</b>',
+      st: { scenario: 'solar', solarmode: 'full', years: 50, samples: 2000, integ: 'euler' } },
+    { id: 'higher-order', title: '阶数高 ≠ 长期更好',
+      body: '换成「Hermite4」：它是四阶方法，<b>单步比蛙跳准两个量级</b>，50 年的曲线比蛙跳还低。' +
+            '但它不是辛的 —— 误差会随时间累积。同一场景跑 20000 年，蛙跳的能量误差几乎不变（有界），' +
+            'Hermite4 会涨到几十倍并反超。<b>单步精度和长期稳定性是两件事。</b>',
+      st: { scenario: 'solar', solarmode: 'full', years: 200, samples: 2000, integ: 'hermite' } },
+    { id: 'kepler', title: '解析轨道 vs 真实扰动',
+      body: '换「开普勒解析」：它完全不积分，直接按每个天体自己的椭圆摆位置 —— ' +
+            '相当于"假设只有太阳在拉它"。这条曲线反而<b>不贴底</b>，因为真实系统里行星之间' +
+            '也在互相拉，总能量本来就不守恒。<b>两者位置的差，就是"互相扰动"本身。</b>',
+      st: { scenario: 'solar', solarmode: 'full', years: 50, samples: 2000, integ: 'kepler' } },
+    { id: 'collide', title: '撞上会发生什么',
+      body: '刚才那些都是有解的优雅情况。真撞起来就完全不同了：看这个场景，两颗行星在同一椭圆上' +
+            '反向跑，<b>t≈0.8 年撞上</b>。下面的事件时间线会列出每一次碎裂与合并 —— ' +
+            '点任意一行可以直接跳到那一刻。',
+      st: { preset: '行星撞地球' } },
+    { id: 'types', title: '想放什么就放什么',
+      body: '下面「放什么？」那一排是<b>天体类型</b>，按天文上常用的四个维度分好组：光谱型（温度）、光度与大小、' +
+            '演化阶段、特殊性质。点一个类型再点画面就能放一颗 —— 黑洞、红矮星、红超巨星、' +
+            '白矮星、造父变星都在里面。<b>半径不是查表来的</b>：内核按斯特藩–玻尔兹曼从温度和光度推。',
+      st: { scenario: 'solar', solarmode: 'full', years: 12, samples: 2000, integ: 'leapfrog' } },
+    { id: 'life', title: '哪一颗上可能有生命',
+      body: '每颗天体都在按<b>自己所在的位置</b>演化：内核算出它收到多少阳光、地表多少度，' +
+            '再用"液态水能不能存在"（0–100 °C）去推 9 级演化阶梯。' +
+            '<b>球体的颜色就是它现在的生命形态</b>：灰调 = 还没有生命，越往黄橙越高级；' +
+            '球外那圈细线是它的来源色（血缘）。' +
+            '点画面里任意一颗星，<b>画面下方</b>会出现它的数据卡 —— 第一行就是生命形态，' +
+            '镜头同时对准它。' +
+            '<b>注意这是编排的模型</b>，真实生物学没有可用公式 —— 页面上标注了哪层是真公式、哪层是编排。',
+      st: { scenario: 'solar', solarmode: 'full', years: 50, samples: 2000, integ: 'leapfrog' } },
+    { id: 'challenge', title: '轮到你：稳定性挑战',
+      body: '理论看完了，来一个<b>比一比</b>的玩法：点上面那一行的「🏁 稳定性挑战 → 开始挑战」——'
+            + '它会把你直接放进放置模式，你用「✛ 点画面放行星」在主星周围放几颗，'
+            + '<b>每放一颗都会自动重算并判定一次</b>，成绩就出现在那一行下面。'
+            + '主星质量越大、你放的天体越重、撑得越久，分数越高。'
+            + '<span class="plainterm">规则是<b>编排的玩法层</b>、不是物理：失稳只有两条判据，'
+            + '都从内核输出里读 —— 内核报了碰撞/合并，或者你放的天体被甩到主星 5 AU 之外。</span>',
+      st: { scenario: 'solar', solarmode: 'full', years: 12, samples: 2000, integ: 'leapfrog' } },
+    { id: 'share', title: '把它带走',
+      body: '「🔗 复制分享链接」把你这套设定编码进网址，对方打开就是同一个宇宙，' +
+            '而且<b>在他自己那台机器上现算</b>。' +
+            '「⧉ 复制等价 CLI 命令」给出一行命令行 —— 在终端跑它会得到与画面完全相同的数字，' +
+            '分享的是一个可复现的实验，不是一段录像。',
+      st: { scenario: 'solar', solarmode: 'full', years: 12, samples: 2000, integ: 'leapfrog' } },
+  ];
+  let tourIdx = -1;
+  function applyTourState(st){
+    if (!st) return;
+    if (st.preset){
+      const i = PRESETS.findIndex(p => p.label === st.preset);
+      if (i >= 0) applyPreset(i, true);           // 先套预设（不重算），下面统一算一次
+    }
+    if (st.scenario) $('scenario').value = st.scenario;
+    if (st.solarmode) $('solarmode').value = st.solarmode;
+    if (st.integ) $('integ').value = st.integ;
+    if (st.years){ $('years').value = st.years; $('years').dataset.touched = '1'; }
+    if (st.samples){ $('samples').value = st.samples; $('samples').dataset.touched = '1'; }
+    syncPanels();
+    compute();
+  }
+  function showTourStep(i, apply){
+    if (i < 0 || i >= TOUR.length) return;
+    tourIdx = i;
+    const s = TOUR[i];
+    $('tourcard').style.display = 'block';
+    $('tourcount').textContent = '第 ' + (i + 1) + ' / ' + TOUR.length + ' 步 · ' + s.title;
+    $('tourbody').innerHTML = s.body;
+    $('tour_prev').disabled = (i === 0);
+    $('tour_next').textContent = (i === TOUR.length - 1) ? '完成' : '下一步 →';
+    $('tourdeep').innerHTML = '这一步的链接：<code>#' + tourHashOf(s.id) + '</code>'
+      + '（复制网址就能把人带到这一步）';
+    if (location.hash !== '#' + tourHashOf(s.id)) location.hash = tourHashOf(s.id);
+    if (apply) applyTourState(s.st);
+    // 有些宿主（例如无头环境）没有 scrollIntoView —— 缺了它不该让整段逻辑抛掉。
+    const card = $('tourcard');
+    if (card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
+    // 第 0 步（欢迎）不动场景，也没必要把"我打开了导览"写进存档；
+    // 用户真正按了下一步改了设置，才轮到落盘。
+    if (apply && s.st) saveState();
+  }
+  const tourHashOf = id => 'step-' + id;
+  function startTour(idx){
+    showTourStep(typeof idx === 'number' ? idx : 0, true);
+    syncPanels();
+  }
+  $('tourstart').addEventListener('click', () => startTour(0));
+  $('tour_prev').addEventListener('click', () => showTourStep(tourIdx - 1, true));
+  $('tour_next').addEventListener('click', () => {
+    if (tourIdx >= TOUR.length - 1){ $('tourcard').style.display = 'none'; toolNote('导览结束 —— 现在随便玩。随时点「▶ 开始导览」重看。'); }
+    else showTourStep(tourIdx + 1, true);
+  });
+  $('tour_skip').addEventListener('click', () => {
+    $('tourcard').style.display = 'none';
+    toolNote('已退出导览。上面那些按钮都可以随便点，改坏了点「更多设置」里的「重新计算」就恢复。');
+  });
+  $('tour_close').addEventListener('click', () => { $('tourcard').style.display = 'none'; });
+
+  $('ch_start').addEventListener('click', () => {
+    challenge = { names: customBodies.map(b => b.name || 'Planet'),
+                  masses: customBodies.map(b => +b.mass || 0),
+                  years: CHALLENGE_SETUP.years };
+    Object.keys(CHALLENGE_SETUP).forEach(k => {
+      const el = $(k === 'scenario' ? 'scenario' : (k === 'solarmode' ? 'solarmode' : k));
+      if (!el) return;
+      el.value = CHALLENGE_SETUP[k];
+      el.dataset.touched = '1';
+    });
+    syncPanels();
+    compute();
+    // 融入主流程：开始挑战就直接进放置模式。挑战要的就是"你往系统里加天体"，
+    // 而加天体最自然的动作是点画面 —— 这里原先的提示是"先去下面的行星表里加好"，
+    // 而那张表现在收在「更多设置」里、普通人模式还看不到它：提示与流程早就对不上了。
+    setPlacing(true);
+    toolNote('挑战开始：在画面里点几下放天体（<b>0.05–2 AU</b> 最合适）。'
+      + '<b>每放一颗都会自动重算并判定一次</b>，成绩就在「稳定性挑战」那一行下面。'
+      + '放错了按「↩ 撤销上一颗」或 Ctrl+Z；按 Esc 退出放置模式。');
+    renderChallenge();
+  });
+  $('ch_quit').addEventListener('click', () => { challenge = null; renderChallenge(); });
+  buildPresets();
+  loadRealSystems();     // 真实系统预设是异步来的：到了就追加并重建按钮，没到也不挡路
+  renderChallenge();
+
+  // ---- 双模式：普通人 / 教授 ----
+  // 同一份数据、同一套内核、同一个 payload，只改"露多少"。切换仅动 body 上的类名，
+  // 所以两个模式不可能给出不同的计算结果 —— 这也正是判据要钉住的一点。
+  function applyMode(m, persist){
+    uiMode = (m === 'pro') ? 'pro' : 'simple';
+    document.body.classList.toggle('mode-simple', uiMode === 'simple');
+    document.body.classList.toggle('mode-pro', uiMode === 'pro');
+    $('mode_simple').classList.toggle('on', uiMode === 'simple');
+    $('mode_pro').classList.toggle('on', uiMode === 'pro');
+    renderSimpleBodies();      // 两套编辑器共用同一份 customBodies
+    selKey = '';               // 信息卡的两套措辞不同，强制重建
+    if (data) render();
+    if (persist !== false) saveState();
+  }
+  $('mode_simple').addEventListener('click', () => applyMode('simple'));
+  $('mode_pro').addEventListener('click', () => applyMode('pro'));
+
+  // ---- 天体类型：调色板 ----
+  // 类型表整份来自内核回显（key / 中文名 / 质量范围 / 半径公式 / 是否发光 / 口径说明）。
+  // 页面一个物理常数都不存 —— "黑洞半径是 2GM/c²"这句话是内核说的，页面只负责转述。
+  function showTypeNote(t){
+    if (!t){ $('typenote').textContent = '把鼠标放到类型上看它的质量范围、温度、光度与公式'
+      + '（手机 / iPad 上直接点一下类型，会出现同一段说明）。'; return; }
+    let html = '<b>' + t.name_zh + '</b>（<code>' + t.key + '</code>）';
+    if (t.example) html += '　代表天体：' + t.example;
+    html += '　<span class="plainterm">' + (GROUP_LABEL[t.group] || t.group)
+      + (t.also_in ? '；' + t.also_in : '') + '</span>';
+    html += '<br>质量 ' + fmt(t.mass_min) + '–' + fmt(t.mass_max) + ' M☉（默认 '
+      + fmt(t.mass_default) + '）';
+    if (t.t_eff_K > 0) html += ' · 有效温度 <b>' + fmt(t.t_eff_K) + ' K</b>';
+    html += ' · ' + (t.emits_light ? '<span style="color:#f5b942">自己发光（能照亮别人）</span>'
+                                   : '不发光（照不亮别人）');
+    html += '<br>半径：<code>' + t.radius_formula + '</code>';
+    if (t.lum_formula) html += '　光度：<code>' + t.lum_formula + '</code>';
+    html += '<br><span class="plainterm">' + t.source + '</span>';
+    if (t.variability && t.variability.on){
+      html += '<br><span style="color:#f5b942">变星：周期 ' + fmt(t.variability.period_days)
+        + ' 天，星等振幅 ' + t.variability.amplitude_mag + '（' + t.variability.kind + '）'
+        + ' —— 亮度按正弦脉动，行星的辐照度会跟着振荡。</span>';
+    }
+    html += '<br>' + t.note;
+    $('typenote').innerHTML = html;
+  }
+  // 分类维度。内核按这四组给类型分组，页面照它的顺序显示 —— 页面不自己编分类体系。
+  const GROUP_LABEL = {
+    spectral:   '1 · 按光谱型（表面温度）',
+    luminosity: '2 · 按光度与大小',
+    evolution:  '3 · 按演化阶段',
+    special:    '4 · 按特殊性质',
+  };
+  // 把"被折叠区收着的东西"露出来时，顺手把它的折叠区打开 ——
+  // 否则脚本说"给你看这个"，用户看到的却是一个没展开的标题，而**页面上看不出来这是错的**。
+  function revealInDetails(el){
+    for (let n = el; n; n = n.parentElement){
+      if (n.tagName === 'DETAILS') n.open = true;
+    }
+  }
+  // 常用的 8 种：按"普通人最先想放的"挑 —— 两颗行星、两颗主序星（太阳 / 红矮星）、
+  // 三种恒星遗迹与黑洞。**这是编辑口径、不是天文分类**，所以明写在这里。
+  // 其余 31 种一个都没删，收在下面「其余 N 种 · 按内核的四类分」里。
+  const POPULAR = ['rocky', 'gas_giant', 'brown_dwarf', 'G_V', 'M_V',
+                   'white_dwarf', 'neutron_star', 'black_hole'];
+  // 记住折叠区的开合：点一次类型就会重建整个调色板，不记住的话它会立刻弹回去。
+  let paletteOpen = false;
+  function buildPalette(){
+    const el = $('palette');
+    if (!el) return;
+    if (!bodyTypes.length){
+      el.innerHTML = '<span class="stat">还没拿到内核的类型表（等内核回过一次）。</span>';
+      return;
+    }
+    el.innerHTML = '';
+    const mkChip = (t) => {
+      const b = document.createElement('button');
+      b.className = 'tychip' + (pendingType === t.key ? ' on' : '');
+      b.dataset.key = t.key;
+      b.innerHTML = (t.emits_light ? '☀ ' : '● ') + t.name_zh;
+      b.addEventListener('click', () => selectType(t.key));
+      b.addEventListener('mouseenter', () => showTypeNote(t));
+      // 触屏路径：点一下类型（选中后）也把它那段说明显示出来。
+      // selectType 会重建 palette，所以这里只在"确实选中了"时复述一次。
+      b.addEventListener('click', () => { if (pendingType === t.key) showTypeNote(t); });
+      return b;
+    };
+    const mkHead = (text) => {
+      const h = document.createElement('div');
+      h.className = 'stat';
+      h.style.cssText = 'font-size:12px;color:#8fa5cf;margin:2px 0 5px';
+      h.textContent = text;
+      return h;
+    };
+    const mkRow = (items) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.cssText = 'gap:7px;align-items:flex-start';
+      items.forEach(t => row.appendChild(mkChip(t)));
+      return row;
+    };
+    // ① 常用的那几个 —— 第一屏就看得见
+    const pop = bodyTypes.filter(t => POPULAR.indexOf(t.key) >= 0);
+    if (pop.length){
+      const box = document.createElement('div');
+      box.style.marginBottom = '8px';
+      box.appendChild(mkHead('常用的 ' + pop.length + ' 种'));
+      box.appendChild(mkRow(pop));
+      el.appendChild(box);
+    }
+    // ② 其余全部 —— 默认收起。按内核给的 group 分组显示；四个维度互相交叉，
+    //    所以每颗还带 also_in 说明它在别的维度里算什么。
+    const rest = bodyTypes.filter(t => POPULAR.indexOf(t.key) < 0);
+    if (rest.length){
+      const det = document.createElement('details');
+      det.className = 'tyfold';
+      det.open = paletteOpen;
+      det.addEventListener('toggle', () => { paletteOpen = det.open; });
+      const sum = document.createElement('summary');
+      sum.textContent = '其余 ' + rest.length + ' 种 · 按内核的四类分';
+      det.appendChild(sum);
+      const inner = document.createElement('div');
+      inner.style.marginTop = '8px';
+      const order = ['spectral', 'luminosity', 'evolution', 'special'];
+      for (const g of order){
+        const items = rest.filter(t => t.group === g);
+        if (!items.length) continue;
+        const box = document.createElement('div');
+        box.style.marginBottom = '8px';
+        box.appendChild(mkHead(GROUP_LABEL[g] || g));
+        box.appendChild(mkRow(items));
+        inner.appendChild(box);
+      }
+      det.appendChild(inner);
+      el.appendChild(det);
+    }
+    showTypeNote(pendingType ? typeByKey(pendingType) : null);
+  }
+  // 选中类型 → 同时进入放置模式。少一步操作：普通人不需要先明白"放置模式"是什么。
+  function selectType(key){
+    pendingType = (pendingType === key) ? null : key;
+    buildPalette();
+    if (pendingType) setPlacing(true);
+  }
+
+  // ---- 简单模式的天体卡片：只露两个旋钮 ----
+  // 其余参数（i / Ω / ω / M0）取 0，质量取类型的默认值、半径交给内核算。
+  // 这不是"藏起来不给" —— 教授模式里全都在，而且用的是同一份 customBodies。
+  function renderSimpleBodies(){
+    const el = $('simplebodies');
+    if (!el) return;
+    if (!customBodies.length){
+      el.innerHTML = '<div class="note">还没有天体。上面点一个类型，再点画面空白处。</div>';
+      return;
+    }
+    el.innerHTML = '';
+    customBodies.forEach((b, i) => {
+      const t = typeByKey(b.type);
+      // 带了观测值的星标一个"观测"：一颗真实恒星和一颗"点了类型随便放的"星在卡片上
+      // 长得一模一样，但一个用的是这一颗星的数据、一个用的是这一类星的代表值 ——
+      // 两者可以差 2.5 倍。不标出来，用户没有别的办法分辨。
+      const hasObs = b.teff_K !== undefined || b.lum_lsun !== undefined
+                     || !!(t && t.emits_light && b.radius_km !== undefined);
+      const card = document.createElement('div');
+      card.className = 'bodycard';
+      card.innerHTML =
+        '<h4><i class="dot" style="background:' + colorOf(b.name, i) + '"></i>'
+        + (b.name || ('第 ' + (i + 1) + ' 颗'))
+        + (t ? ' · ' + t.name_zh : '') 
+        + (hasObs ? ' <span class="plainterm" title="这颗星用的是它自己的观测值'
+            + '（温度 / 光度 / 半径），不是类型表里这一类星的代表值">观测</span>' : '')
+        + '<button data-del="' + i + '" style="margin-left:auto;font-size:11px">删掉</button></h4>'
+        + '<div class="knobs">'
+        + '<div><label>离恒星多远 <span class="plainterm">a（AU）</span></label>'
+        + '<input type="range" data-i="' + i + '" data-k="a" min="0.05" max="40" step="0.01"'
+        + ' value="' + (+b.a || 1) + '" style="width:200px">'
+        + '<span class="stat" data-out="a">' + (+b.a || 1).toFixed(2) + ' AU</span></div>'
+        + '<div><label>轨道有多扁 <span class="plainterm">e（0 = 正圆）</span></label>'
+        + '<input type="range" data-i="' + i + '" data-k="e" min="0" max="0.95" step="0.005"'
+        + ' value="' + (+b.e || 0) + '" style="width:150px">'
+        + '<span class="stat" data-out="e">' + (+b.e || 0).toFixed(3) + '</span></div>'
+        + '</div>';
+      el.appendChild(card);
+    });
+    el.querySelectorAll('input[type=range]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const i = +inp.dataset.i;
+        customBodies[i][inp.dataset.k] = +inp.value;
+        const out = inp.parentElement.querySelector('[data-out="' + inp.dataset.k + '"]');
+        if (out) out.textContent = inp.dataset.k === 'a'
+          ? (+inp.value).toFixed(2) + ' AU' : (+inp.value).toFixed(3);
+        setDirty(true);
+      });
+    });
+    el.querySelectorAll('button[data-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        customBodies.splice(+btn.dataset.del, 1);
+        renderBodyTable();          // 会一并刷新这里
+        setDirty(true);
+      });
+    });
+  }
+
+  // ---- H-R 图（赫罗图）----
+  // 把恒星分类的前两个维度画出来：横轴表面温度（光谱型 O→M，注意是反的，天文惯例），
+  // 纵轴光度。每颗发光天体按**内核回显的** T_eff 与 L 落一个点，页面不推任何温度。
+  //
+  // 图上的分区线（主序带、巨星支、超巨星带）是**教科书上的示意区域**，不是内核算出来的，
+  // 所以画的是示意框而不是精确边界 —— 这一点写在图下面的说明里。
+  function drawHR(){
+    const cv2 = $('hr');
+    if (!cv2 || !data) return;
+    const g = cv2.getContext('2d');
+    const W = cv2.width, H = cv2.height;
+    g.clearRect(0, 0, W, H);
+    const mL = 78, mR = 26, mT = 40, mB = 52;
+    const pw = W - mL - mR, ph = H - mT - mB;
+    // 坐标范围：T 从 60000 K 到 2000 K（对数、反向），L 从 1e-6 到 1e7 L☉
+    const T0 = Math.log10(60000), T1 = Math.log10(2000);
+    const L0 = -6, L1 = 7;
+    const X = T => mL + (T0 - Math.log10(T)) / (T0 - T1) * pw;
+    const Y = L => mT + (L1 - Math.log10(Math.max(1e-30, L))) / (L1 - L0) * ph;
+
+    // 网格 + 纵轴刻度
+    g.font = '11px ui-monospace,Menlo,Consolas,monospace';
+    for (let e = L0; e <= L1; e++){
+      const y = Y(Math.pow(10, e));
+      g.strokeStyle = (e === 0) ? 'rgba(122,150,200,0.55)' : 'rgba(122,150,200,0.16)';
+      g.beginPath(); g.moveTo(mL, y); g.lineTo(mL + pw, y); g.stroke();
+      g.fillStyle = 'rgba(160,180,215,0.85)';
+      g.fillText('1e' + e, 8, y + 4);
+    }
+    g.fillStyle = 'rgba(180,200,230,0.9)';
+    g.fillText('光度 L / L☉', 8, mT - 14);
+    // 光谱型分界（典型有效温度）
+    const SPEC = [['O', 40000], ['B', 20000], ['A', 9000], ['F', 6800],
+                  ['G', 5778], ['K', 4500], ['M', 3200]];
+    const bounds = [60000, 30000, 10000, 7500, 6000, 5200, 3700, 2400];
+    for (let i = 0; i < SPEC.length; i++){
+      const xa = X(bounds[i]), xb = X(bounds[i + 1]);
+      g.strokeStyle = 'rgba(122,150,200,0.20)';
+      g.beginPath(); g.moveTo((xa + xb) / 2, mT); g.lineTo((xa + xb) / 2, mT + ph); g.stroke();
+      g.fillStyle = 'rgba(200,215,240,0.95)';
+      g.font = 'bold 13px ui-monospace,Menlo,Consolas,monospace';
+      g.fillText(SPEC[i][0], (xa + xb) / 2 - 5, mT - 10);
+      g.font = '10px ui-monospace,Menlo,Consolas,monospace';
+      g.fillStyle = 'rgba(140,165,205,0.9)';
+      g.fillText(SPEC[i][1] + 'K', (xa + xb) / 2 - 16, mT + ph + 16);
+    }
+    // 示意分区（教科书上的区域，不是内核算的）
+    const band = (t1, t2, l1, l2, label, col) => {
+      const x1 = X(t1), x2 = X(t2), y1 = Y(l2), y2 = Y(l1);
+      g.fillStyle = col;
+      g.fillRect(x1, y1, x2 - x1, y2 - y1);
+      g.strokeStyle = 'rgba(160,190,235,0.30)';
+      g.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      g.fillStyle = 'rgba(200,220,245,0.75)';
+      g.font = '11px ui-monospace,Menlo,Consolas,monospace';
+      g.fillText(label, x1 + 6, y1 + 14);
+    };
+    band(30000, 2400, 1e-4, 1e0, '主序带（V）', 'rgba(74,144,226,0.13)');
+    band(6000, 3000, 30, 3000, '巨星支（III）', 'rgba(240,137,60,0.13)');
+    band(30000, 3000, 1e4, 1e7, '超巨星 / 特超巨星（I / 0）', 'rgba(232,116,107,0.13)');
+    band(6000, 2000, 1e-5, 1e-1, '白矮星', 'rgba(127,178,229,0.15)');
+
+    // 天体：发光才画
+    const t0 = data.frames[frameIndex()].t;
+    let nStable = 0, nVar = 0;
+    data.bodies.forEach((b, i) => {
+      if (!b.emits_light || !(b.t_eff_K > 0)) return;
+      let L = b.luminosity_Lsun;
+      if (b.variability && b.variability.on && Array.isArray(b.lum_series)){
+        const j = Math.min(i, b.lum_series.length - 1);
+        L = b.lum_series[Math.max(0, Math.min(j, b.lum_series.length - 1))];
+        nVar++;
+      } else nStable++;
+      const x = X(b.t_eff_K), y = Y(L);
+      g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2);
+      g.fillStyle = colorOf(b.id, i); g.fill();
+      g.strokeStyle = '#0a0f1e'; g.lineWidth = 2; g.stroke();
+      g.fillStyle = 'rgba(232,236,246,0.95)';
+      g.font = '11px ui-monospace,Menlo,Consolas,monospace';
+      g.fillText(b.id + (b.type ? ' · ' + b.type : ''), x + 9, y + 4);
+      if (b.born_at > 0) g.fillText('（t=' + fmt(b.born_at) + ' 出生）', x + 9, y + 17);
+    });
+    // 太阳参照点
+    {
+      const x = X(5778), y = Y(1);
+      g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2);
+      g.strokeStyle = 'rgba(255,235,150,0.75)'; g.lineWidth = 1.5; g.setLineDash([3, 3]);
+      g.stroke(); g.setLineDash([]);
+    }
+    const note = $('hrnote');
+    if (note){
+      let s = '当前有 <b>' + (nStable + nVar) + '</b> 颗发光天体落在图上';
+      if (nVar) s += '（其中 <b>' + nVar + '</b> 颗是变星，点会随脉动上下移动）';
+      s += '　·　虚线圈是太阳的位置（5778 K，1 L☉）';
+      s += '<br>四个色块是<b>教科书上的示意区域</b>（主序带 / 巨星支 / 超巨星带 / 白矮星区），'
+         + '不是内核算出来的边界；横轴 1e0 那条横线是太阳光度。'
+         + '<br>横轴按天文惯例<b>从热到冷</b>（左 O → 右 M）。';
+      if (uiMode === 'simple'){
+        s += '<br><b>怎么看</b>：右上角是又亮又热的（超巨星），左下是又暗又冷的（红矮星），'
+           + '中间那条斜带是主序星 —— 太阳就在那条带上，'
+           + '而"红巨星"和"白矮星"分别落在斜带的右上和左下。';
+      }
+      note.innerHTML = s;
+    }
+  }
+
+  // ---- 能量误差曲线 ----
+  // 数据是内核逐帧回显的 energy_series（相对误差）。页面只做两件事：
+  // 取对数、映射到像素。这一层不做任何数值计算。
+  function drawEnergy(){
+    const cv3 = $('ecv');
+    if (!cv3) return;
+    const g = cv3.getContext('2d');
+    const W = cv3.width, H = cv3.height;
+    g.clearRect(0, 0, W, H);
+    const mL = 66, mR = 20, mT = 18, mB = 30;
+    const pw = W - mL - mR, ph = H - mT - mB;
+    const es = (data && Array.isArray(data.energy_series)) ? data.energy_series : [];
+    const note = $('enote');
+    if (!es.length){
+      if (note) note.textContent = '还没有数据。';
+      return;
+    }
+    const nz = es.filter(v => v > 0);
+    const lo = Math.max(-18, Math.log10(Math.min(...(nz.length ? nz : [1e-19]))));
+    const hi = Math.max(lo + 2, Math.log10(Math.max(...es)));
+    const X = i => mL + i / Math.max(1, es.length - 1) * pw;
+    const Y = v => mT + (hi - Math.log10(Math.max(1e-19, v))) / (hi - lo + 1e-9) * ph;
+    // 网格 + 纵轴量级
+    g.font = '11px ui-monospace,Menlo,Consolas,monospace';
+    for (let e = Math.ceil(hi); e >= Math.floor(lo); e--){
+      const y = Y(Math.pow(10, e));
+      g.strokeStyle = (e === Math.floor(hi)) ? 'rgba(122,150,200,0.45)' : 'rgba(122,150,200,0.14)';
+      g.beginPath(); g.moveTo(mL, y); g.lineTo(mL + pw, y); g.stroke();
+      g.fillStyle = 'rgba(160,180,215,0.85)';
+      g.fillText('1e' + e, 8, y + 4);
+    }
+    g.fillStyle = 'rgba(180,200,230,0.85)';
+    g.fillText('|E−E₀| / |E₀|', 8, mT - 5);
+    g.fillText('0', mL - 8, mT + ph + 18);
+    g.fillText('t = ' + (data.frames[data.frames.length - 1].t).toFixed(1) + ' 年', mL + pw - 76, mT + ph + 18);
+    // 曲线 + 当前帧游标
+    g.beginPath();
+    es.forEach((v, i) => { const x = X(i), y = Y(v); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.strokeStyle = '#4a90e2'; g.lineWidth = 1.6; g.stroke();
+    const fi = frameIndex();
+    g.strokeStyle = 'rgba(240,137,60,0.85)'; g.setLineDash([4, 3]); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(X(fi), mT); g.lineTo(X(fi), mT + ph); g.stroke(); g.setLineDash([]);
+    g.fillStyle = 'rgba(232,236,246,0.9)';
+    g.fillText('当前 t = ' + data.frames[fi].t.toFixed(2) + ' 年', X(fi) + 5, mT + 12);
+    if (note){
+      const key = data.integrator_key || 'leapfrog';
+      const isKepler = key === 'kepler';
+      note.innerHTML = '算法：<b>' + (data.integrator || '') + '</b>　'
+        + (isKepler
+            ? '这条曲线**不会贴底**：解析解只考虑二体，' +
+              '所以全系统的总能量本来就不守恒 —— 这个"不守恒"正是互相扰动的大小。'
+            : (key === 'leapfrog'
+                ? '能量误差在一个**有界的上下限内振荡**、不随时间累积 —— 这就是辛积分器的意义。'
+                : (key === 'hermite'
+                    ? '单步精度很高，所以曲线起点很低；但它不是辛的，误差会**随时间累积**，' +
+                      '跨度拉长到几千年就会反超蛙跳。'
+                    : '一阶方法，能量被持续注入 —— 曲线一路往上爬，轨道会缓慢外扩。')))
+        + (uiMode === 'simple' ? '<br><b>怎么看</b>：这条线越低越平，说明算得越准。' : '');
+    }
+  }
+  let eKey = '', eTs = 0;
+  function maybeDrawEnergy(){
+    const fi = data ? frameIndex() : 0;
+    const key = dataStamp + ':' + fi + ':' + uiMode;
+    const now = Date.now();
+    if (key === eKey && now - eTs < 300) return;
+    eKey = key; eTs = now;
+    drawEnergy();
+  }
+
+  // H-R 图的重绘节流：变星每帧都在变，但这张图不需要 60fps。
+  let hrKey = '', hrTs = 0;
+  function maybeDrawHR(fi){
+    const card = $('hrcard');
+    if (!card || !data) return;
+    const nb = data.bodies.filter(b => b.emits_light && b.t_eff_K > 0);
+    card.style.display = nb.length ? 'block' : 'none';
+    if (!nb.length) return;
+    const key = dataStamp + ':' + fi + ':' + uiMode + ':' + nb.map(b => b.id).join(',');
+    const now = Date.now();
+    if (key === hrKey && now - hrTs < 700) return;    // 同一帧、且不到 0.7 秒就不重画
+    hrKey = key; hrTs = now;
+    drawHR();
+  }
+
+  // ---- 工具行：放置 / 导出 ----
+  function toolNote(html){
+    const el = $('toolnote');
+    if (!el) return;
+    el.style.display = html ? 'block' : 'none';
+    el.innerHTML = html || '';
+  }
+  function paintPlaceBtn(){
+    const b = $('placemode');
+    const t = pendingType ? typeByKey(pendingType) : null;
+    b.textContent = placing
+      ? (t ? '✛ 放置中：点画面放一颗' + t.name_zh + '（再点这里取消）'
+           : '✛ 放置中：点画面就加一颗（再点这里取消）')
+      : '✛ 点画面放行星';
+    b.classList.toggle('primary', placing);
+    cv.classList.toggle('placing', placing);   // 光标变十字：不用看按钮也知道自己在放置模式
+    if (placing)
+      toolNote('放置模式：在画面空白处点一下，就在那个位置放一颗'
+        + (t ? '<b>' + t.name_zh + '</b>（质量默认 ' + fmt(t.mass_default) + ' M☉）' : '行星')
+        + ' —— 位置是<b>把屏幕坐标反解回黄道面</b>得到的（纯几何，不是物理）。'
+        + '点已有的星体仍然是"选中它"，不会放新的。'
+        + '鼠标移到哪儿，画面上会先显示<b>落点与距离</b>（放下去之前就能看清）。'
+        + '放错了按 <b>↩ 撤销上一颗</b>（或 Ctrl+Z），按 <b>Esc</b> 退出放置模式。'
+        // 碰撞模式在「更多设置」里，而"关"的时候两颗星会**互相穿过** ——
+        // 那看起来像页面坏了。所以进放置模式的这一刻就说清楚，而不是让人自己去找。
+        + ($('collide').value === 'off'
+            ? '<br><b>提醒：碰撞模式现在是「关」</b>，两颗星碰到一起会<b>互相穿过</b>。'
+              + '想看到撞上，就把「更多设置 → 碰撞模式」改成「合并」。'
+            : ''));
+  }
+
+  // 屏幕坐标 → 黄道面（z=0）上的世界坐标。
+  // 投影是仿射的，直接反解：
+  //   sx = cx + xr·scale,  sy = cy − yr·cos(pitch)·scale,  (xr,yr) = Rz(yaw)·(x,y)
+  // 侧视到底（cos pitch → 0）时黄道面在屏幕上退化成一条线，反解不出深度，只能拒绝。
+  function unprojectToEcliptic(mx, my){
+    const scale = fitScale() * (+$('zoom').value) / 100 * view.userScale;
+    const cx = cv.width/2 + view.panX, cy = cv.height/2 + view.panY;
+    const ct = Math.cos(cam.pitch);
+    if (!(Math.abs(ct) > 0.05) || !(scale > 0)) return null;
+    const xr = (mx - cx) / scale;
+    const yr = (cy - my) / (scale * ct);
+    const cw = Math.cos(cam.yaw), sw = Math.sin(cam.yaw);
+    return [xr * cw + yr * sw, -xr * sw + yr * cw];
+  }
+
+  const PLACE_MIN_AU = 0.02, PLACE_MAX_AU = 60;
+  // ---- 落点判定：**预览与真正投放共用这一处** ----
+  // 为什么必须只写一份：分成两份迟早会出现"预览显示 2.7 AU、点下去落在 3.1 AU"，
+  // 或者更常见的"预览是绿的、点下去却被拒绝" —— 而用户没有任何办法分辨哪个是真的。
+  // 所以：能不能放、为什么不能、离中心多远、方位多少，都只在这里算一次。
+  const PLACE_MAX_BODIES = 16;   // 内核 --body 的上限
+  function placeCandidate(clientX, clientY){
+    if (!data)
+      return { ok:false, why:'还没有算过任何数据，先让内核算一次。' };
+    const rect = cv.getBoundingClientRect();
+    const p = unprojectToEcliptic(clientX - rect.left, clientY - rect.top);
+    if (!p)
+      return { ok:false, side:true,
+               why:'现在接近正侧视（俯仰 ±90°），黄道面在屏幕上看成一条线，'
+                 + '没法判断你点的是多远。把俯仰调回 0 附近再放。' };
+    const r = Math.hypot(p[0], p[1]);
+    let deg = Math.atan2(p[1], p[0]) * 180 / Math.PI;
+    if (deg < 0) deg += 360;
+    if (!(r >= PLACE_MIN_AU) || r > PLACE_MAX_AU)
+      return { ok:false, p, r, deg, short:'超出范围',
+               why:'这个位置离中心 ' + r.toFixed(3) + ' AU —— 超出可放置范围（'
+                 + PLACE_MIN_AU + '–' + PLACE_MAX_AU + ' AU）。太靠里内核要缩很小的步长，'
+                 + '太靠外画面上也看不见。' };
+    if (customBodies.length >= PLACE_MAX_BODIES)
+      return { ok:false, p, r, deg, short:'已达上限',
+               why:'行星表最多 16 行（内核 <code>--body</code> 的上限），已经到顶了。'
+                 + '要再加就先删几行。' };
+    return { ok:true, p, r, deg };
+  }
+  function placePlanetAt(clientX, clientY){
+    const c = placeCandidate(clientX, clientY);
+    if (!c.ok){ toolNote(c.why); return; }
+    const p = c.p, r = c.r, deg = c.deg;
+    // 有选中的类型就按类型放（质量取该类型的默认质量，半径交给内核算）；
+    // 没选类型就退回"一颗地球"——地球质量取内核回显，页面不自己抄这个常数。
+    const t = pendingType ? typeByKey(pendingType) : null;
+    const m = t ? t.mass_default : (data.earth_mass_msun || 3.0e-6);
+    // 名字一律 ASCII：天体名会走进 CLI 的 argv，而 Windows 的 argv 不是一条可靠的
+    // Unicode 通道 —— 实测把"黑洞3"传过去会让整条请求的连接被断开。
+    // 缩写真名从类型键推出来（black_hole → BH），不是另抄一份对照表；
+    // 显示时页面把内核回显的 type_name 拼在旁边，中文名照样看得见。
+    const tag = t ? t.key.split('_').map(w => w[0].toUpperCase()).join('') : 'P';
+    let nm = tag + (customBodies.length + 1);
+    while (customBodies.some(b => b.name === nm)) nm = tag + (parseInt(nm.slice(tag.length), 10) + 1);
+    const row = { name: nm,
+                  a: +r.toFixed(4), e: 0, inc: 0, raan: 0, argp: 0,
+                  M0: +deg.toFixed(3), mass: m,
+                  type: t ? t.key : '' };
+    // 半径：选了类型就**不给**这一格 —— 留空本身就是一句话"交给内核按类型公式推"。
+    // 这里曾经无条件写 6371，与上面那句"半径交给内核算"的注释直接矛盾：
+    // sanitizeBody 那一支只认"字段在不在"，于是"我没给半径"被变成了
+    // "我给了个地球大小的观测半径"，点一颗黑洞会得到半径 6371 km 的黑洞
+    // （真值是按 G 和 c 算出来的史瓦西半径 29.53 km）。页面不自己算这个数，
+    // 但更不能替用户把一个假的观测值填进去。
+    if (!t) row.radius_km = 6371;
+    customBodies.push(row);
+    // 记进撤销栈：只记"用户点画面放下的"。预设与存档恢复来的不算 —— 那些不是"刚放下的"，
+    // 撤销它们会让人莫名其妙（而且用户没做过那个动作）。
+    placedStack.push({ name: nm, a: +r.toFixed(4) });
+    // 挑战进行中时，用鼠标放下的天体也得算进挑战 —— 否则"在挑战里点画面加行星"
+    // 这条最自然的操作路径下，加的天体全部不计分（挑战开始时已经把名单定死了）。
+    if (challenge){
+      challenge.names.push(nm);
+      challenge.masses.push(m);
+    }
+    // 放下一颗恒星 = 开始搭自己的系统。做两件必须一起做的事，并且说出来：
+    //  1) 把背景太阳系收起来 —— 否则"我的行星绕我的红矮星"这件事会被另一颗恒星搅乱；
+    //  2) 其余天体的轨道以它为参考（见 buildPayload 里的 primary）。
+    // 这两件都是可见、可改的（背景选择器就在下面），不是偷偷改。
+    let starNote = '';
+    if (t && t.emits_light){
+      if ($('solarmode').value !== 'none'){
+        $('solarmode').value = 'none';
+        starNote = '<br>你放的是<b>会发光的恒星</b>，所以背景太阳系已自动收起'
+          + '（否则会有第二颗恒星一起搅动这些轨道）—— 想放回来就在下面的背景选择器里改。'
+          + '<br>之后放的天体会以<b>' + nm + '</b>为参考，按"绕它转"来给初速度'
+          + '（它的质量是 ' + fmt(m) + ' M☉，不是太阳的 1 M☉，这一步以前是错的）。';
+      } else {
+        starNote = '<br>之后放的天体会以<b>' + nm + '</b>为参考。';
+      }
+    }
+    renderBodyTable();
+    toolNote('在 <b>' + r.toFixed(3) + ' AU</b>、方位 ' + deg.toFixed(0) + '° 放了一颗'
+      + (t ? '<b>' + t.name_zh + '</b>（' + fmt(t.mass_default) + ' M☉，半径由内核按类型算出）' : '')
+      + '：a=' + r.toFixed(4) + ' AU、e=0（正圆）、M0=' + deg.toFixed(1)
+      + '° 就是它现在这个方位角 —— 这样它一出生就停在<b>你点的那个位置</b>。'
+      + starNote
+      + '<br>想改就到「更多设置」里的行星表改；想挪位置：按 <b>↩ 撤销上一颗</b>（或 Ctrl+Z）撤掉这颗，再点别处放一次。');
+    ghost = null;                       // 放完了就把预览收掉（那儿已经有真天体了）
+    compute();
+  }
+
+  // ---- 撤销"刚才投下去的那颗" ----
+  // 之前唯一的办法是"删了重放"（页面提示自己就是这么写的），而表里的删除按钮对普通人
+  // 不好找、也不清楚删的是哪一颗。撤销只针对**用户刚点画面放下的**那些。
+  function undoPlace(){
+    if (!placedStack.length){
+      toolNote('没有可撤销的投放 —— 只能撤销你刚点画面放下的那些（预设和上次存档恢复来的不算）。');
+      return;
+    }
+    const last = placedStack.pop();
+    const i = customBodies.findIndex(b => b.name === last.name);
+    if (i >= 0) customBodies.splice(i, 1);
+    if (challenge){
+      const ci = challenge.names.indexOf(last.name);
+      if (ci >= 0){ challenge.names.splice(ci, 1); challenge.masses.splice(ci, 1); }
+    }
+    if (selKey === last.name){ selKey = ''; $('selcard').style.display = 'none'; }
+    renderBodyTable();                  // 里面会顺带刷新撤销按钮
+    toolNote('已撤销：刚才在 <b>' + last.a.toFixed(3) + ' AU</b> 放下的那颗（' + last.name + '）。'
+      + '其余天体照旧 —— 想再放就点一下画面。');
+    compute();
+  }
+  function paintUnplace(){
+    const b = $('unplace');
+    if (!b) return;
+    // 手动删掉的天体不该留在栈里，否则按钮上的数字是虚的。
+    placedStack = placedStack.filter(x => customBodies.some(y => y.name === x.name));
+    b.disabled = !placedStack.length;
+    b.textContent = placedStack.length
+      ? '↩ 撤销上一颗（' + placedStack.length + '）' : '↩ 撤销上一颗';
+  }
+  $('unplace').addEventListener('click', undoPlace);
+
+  // ---- 选中天体的信息卡 ----
+  // 之前点一颗星只知道"视角切到它的轨道平面"，它的质量、半径、现在多远、多少度一概不知道 ——
+  // 数据其实全在手里。这些数一律取自内核回显；页面只做两件显示层的算术：
+  // 减出相对位置、开一次模长（和画布缩放用的 Math.hypot 是同一类），以及"几个地球"的除法。
+  function primaryIndex(){
+    if (!data) return -1;
+    if (data.bio && data.bio.primary){
+      const i = data.bodies.findIndex(b => b.id === data.bio.primary);
+      if (i >= 0) return i;
+    }
+    return data.bodies.length ? 0 : -1;
+  }
+  let selKey = '';
+  let dataStamp = 0;               // 每次重算成功自增：用来把"数据换了"也算进刷新键
+  function updateSelCard(fi){
+    const card = $('selcard');
+    if (!card) return;
+    if (!data || cam.sel < 0 || !data.bodies[cam.sel]){
+      card.style.display = 'none'; selKey = ''; return;
+    }
+    card.style.display = 'block';
+    // 刷新键必须带上 dataStamp：只看 (选中编号, 帧号) 的话，
+    // "同一颗星、停在同一帧、改了参数重算"这一路会命中缓存，卡片上留着上一版数据。
+    const key = dataStamp + ':' + cam.sel + ':' + fi;
+    if (key === selKey) return;      // 同一份数据的同一帧不必重建
+    selKey = key;
+    const b = data.bodies[cam.sel];
+    const em = data.earth_mass_msun;
+    const ip = primaryIndex();
+    let dist = null;
+    if (ip >= 0 && ip !== cam.sel){
+      const q = data.frames[fi].p[cam.sel], w = data.frames[fi].p[ip];
+      dist = Math.hypot(q[0] - w[0], q[1] - w[1], q[2] - w[2]);
+    } else if (ip === cam.sel){
+      dist = 0;
+    }
+    const a = bioAt(fi, cam.sel);
+    const v = a ? VERDICT[Math.max(0, Math.min(3, a.verdict))] : null;
+    const B = data.bio;
+    // 同一份数据，两套说法：普通人看"多重 / 多大 / 离恒星多远 / 阳光强度"，
+    // 教授看符号与单位。值本身完全一样，没有任何一项是"简化后换了个数"。
+    const L2 = (simple, pro) => uiMode === 'simple' ? simple : pro;
+    // 卡片第一行就是它的**生命形态** —— 那一轮用户要的就是这个：球体在画布上是什么颜色，
+    // 这里给出同一个颜色 + 那个颜色的名字。颜色走 lifeColorOf（与画布同一个函数，
+    // 所以两边不可能走散）；名字是内核回显的 stage_names。
+    // 这一轮再加一条：「物质」也占一个可见通道 —— 球体的**底色**是物质基调色
+    // （由内核的 type / t_eff_K / density_g_cm3 决定），生命只是在它上面染色。
+    // 所以卡片必须把这两层分开说清，否则用户会以为这个颜色只有一种含义。
+    const fillCol = lifeColorOf(cam.sel, fi);
+    const fam = matFamilyOf(b);
+    const toneCol = matTone(b, cam.sel);
+    const srcOf = '（族与深浅取自内核回显的 type'
+      + (b.t_eff_K > 0 ? ' + 表面温度 ' + fmt(b.t_eff_K) + ' K' : '')
+      + (b.density_g_cm3 > 0 ? ' + 密度 ' + (b.density_g_cm3).toFixed(3) + ' g/cm³' : '') + '）';
+    let lifeBox = '';
+    if (b.emits_light){
+      lifeBox = '<div style="margin-bottom:6px">'
+        + '<i class="dot" style="width:13px;height:13px;background:' + fillCol + '"></i>'
+        + '<b>发光天体</b><span class="stat">（它自己不参与生命演化 —— 它是照亮别人的那一颗）'
+        + '</span></div>'
+        + '<div class="note" style="margin:0 0 6px">'
+        + '它在画布上的球体本色 = <b>它的物质基调色</b>，这里就是 <b>' + MAT_ZH[fam] + '</b>'
+        + srcOf + '。' + (b.t_eff_K > 0
+          ? '色相由 <b>表面温度</b>按黑体色推（' + fmt(b.t_eff_K) + ' K → ' + toneCol
+            + '）：冷星偏红、热星偏蓝白。'
+          : '⚠ 内核把这一类天体的表面温度记 0（它对这个模型的辐照度可忽略），'
+            + '没有温度就推不出色相 —— <b>这个颜色是页面定的</b>，不是从内核数据推出来的。')
+        + '外面那圈光晕的颜色也取它，大小跟它自己的光度走。镜头已经对准了它。</div>';
+    } else if (a){
+      const nm = (B && B.stage_names ? (B.stage_names[a.stage] || a.stage) : a.stage);
+      const nmax = STAGE_COLORS.length - 1;
+      const frac = a.stage >= 1
+        ? '有生命：往那一阶的阶色上染了 ' + Math.round(lifeTintW(a.stage) * 100) + '%，阶越高染得越重'
+        : '死寂：往"死寂岩石"的灰里压了 ' + Math.round(LIFE_DEAD_MIX * 100) + '%，而且没有柔光';
+      lifeBox = '<div style="margin-bottom:6px">'
+        + '<i class="dot" style="width:13px;height:13px;background:' + fillCol + '"></i>'
+        + '<b style="color:' + fillCol + '">' + nm + '</b>'
+        + '<span class="stat">' + L2('（生命演化的第 ' + a.stage + ' 步，一共 ' + nmax + ' 步　',
+                                     '（阶 ' + a.stage + '/' + nmax + '　')
+        + (a.progress * 100).toFixed(1) + '%）</span>'
+        + (v ? '　<span style="color:' + v.col + '">' + verdictText(v) + '</span>' : '')
+        + '</div>'
+        + '<div class="note" style="margin:0 0 6px">'
+        + '画布上那颗球的颜色 = <b>物质 × 生命</b>两层：底色是它的<b>物质基调色</b>'
+        + '（<i class="dot" style="background:' + toneCol + '"></i>' + toneCol + '，'
+        + MAT_ZH[fam] + '，' + MAT_SHAPE[fam] + '）' + srcOf
+        + '，上面染生命色（' + frac + '）。'
+        + (a.stage >= 1 ? '活着的天体外面还有<b>一圈同色柔光</b>，死寂的没有 —— '
+                        + '所以"有没有生命"不用从色调深浅去猜。' : '')
+        + '它的<b>来源色</b>（血缘：碎片、合并）是球外那圈细线。镜头已经对准了它。</div>';
+    }
+    const rows = [
+      [L2('名字', '编号'), b.id + (b.type_name ? '　<span class="plainterm">' + b.type_name
+        + '（' + b.type + '）</span>' : '')],
+      // 物质这一行 = 球体**底色**的来历。族是页面从内核的 type 归并出来的说法，
+      // 色块是该族基调色在它身上的实际取值（与画布同一处取值），不是另配一个颜色。
+      [L2('什么做的', '物质'), '<i class="dot" style="background:' + toneCol + '"></i>'
+        + MAT_ZH[fam] + (b.type ? '　<span class="plainterm">' + b.type + '</span>' : '')
+        + '　<span class="stat">' + MAT_SHAPE[fam] + '</span>'],
+      [L2('多重', '质量'), fmt(b.mass_msun) + ' M☉'
+        + (em ? '（' + (b.mass_msun / em).toFixed(3) + ' 个地球）' : '')],
+      [L2('多大', '半径'), fmt(b.radius_km) + ' km' + (b.density_g_cm3 !== undefined
+        ? '　密度 ' + (b.density_g_cm3).toFixed(3) + ' g/cm³' : '')],
+      // 画上的半径**必须与真实半径并排给** —— 不然"球画得小"会被读成"它真的小"。
+      // 这一格是页面自己的映射结果（对数压缩），不是内核给的量。
+      [L2('画上多大', '画面半径'), sizeR(b).toFixed(1) + ' px'
+        + '　<span class="stat">对数压缩（2.2–13 px），不是一比一</span>'],
+      [L2('离恒星多远', '到主星距离'), dist === null ? '（它自己就是光源）' : fmt(dist) + ' AU'
+        + (ip >= 0 ? '　← 相对 <b>' + data.bodies[ip].id + '</b>' : '')],
+    ];
+    // 恒星的两项属性**必须带来源**。类型表给的是"某一类星"的代表值，观测给的是
+    // "这一颗星"的值 —— 两者可以差 2.5 倍，而 S=L/r² 直接决定行星在不在可居带。
+    // 不标注来源，用户就分不清屏幕上这个温度是"这一颗星的"还是"这一类星的"。
+    // 来源字符串是内核回显的，页面只翻译，不自己判断。
+    if (b.emits_light){
+      if (b.t_eff_K > 0){
+        rows.push([L2('表面温度', 'T_eff'),
+          fmt(b.t_eff_K) + ' K' + (b.t_eff_src
+            ? L2('（' + srcZh(b.t_eff_src) + '）', '　来源 ' + b.t_eff_src) : '')]);
+      }
+      rows.push([L2('自己发光吗', '是否发光'),
+        '会，' + fmt(b.luminosity_Lsun) + ' L☉' + (b.luminosity_src
+          ? L2('（' + srcZh(b.luminosity_src) + '）', '　来源 ' + b.luminosity_src) : '')]);
+    } else {
+      rows.push([L2('自己发光吗', '是否发光'), '不会（照不亮别人）']);
+    }
+    if (a){
+      rows.push([L2('阳光强度', '辐照度 S'), fmt(a.insolation) + '（地球 = 1）']);
+      rows.push([L2('温度', '平衡温 / 地表温'),
+        uiMode === 'simple' ? ('地表 <b>' + fmt(a.t_surf) + ' K</b>')
+                            : (fmt(a.t_eq) + ' K / <b>' + fmt(a.t_surf) + ' K</b>')]);
+      rows.push([L2('有没有可能有生命', '演化判定'),
+        v ? '<span style="color:' + v.col + '">' + verdictText(v) + '</span>' : '-']);
+      rows.push([L2('演化到第几步', '当前阶 / 进度'),
+        (B && B.stage_names ? (B.stage_names[a.stage] || a.stage) : a.stage)
+        + '（' + a.stage + '/8）　' + (a.progress * 100).toFixed(1) + '%'
+        + '　达到该阶 ' + (a.stage === 0 ? '—' : fmt(a.reached) + ' 年')]);
+    }
+    if (b.born_at) rows.push(['出生', fmt(b.born_at) + ' 年' + (b.merged_from ? '（来自 ' + b.merged_from + '）' : '')]);
+    if (b.died_at !== undefined && b.died_at !== null)
+      rows.push(['消亡', fmt(b.died_at) + ' 年' + (b.merged_into ? '（并入 ' + b.merged_into + '）' : '')]);
+    card.querySelector('#selbody').innerHTML = lifeBox
+      + '<table style="width:100%">' + rows.map(r =>
+        '<tr><td style="color:var(--ink2);white-space:nowrap">' + r[0] + '</td>'
+        + '<td style="text-align:right">' + r[1] + '</td></tr>').join('')
+      + '</table>'
+      + '<div class="note">再点一次同一颗星（或点空白处、按「✕ 取消选中 · 回全景」）取消选中。'
+      + '距离是内核给的位置相减取模，其余全部是内核回显的原值。</div>';
+  }
+
+  // ---- 把屏幕上的设定翻译成一行等价的 CLI 命令 ----
+  // 这一条是同类产品基本没有的：他们是"画面就是这个产品"，我们是"页面只是内核的前端"。
+  // 把 payload 原样拼成命令行，玩家就能离开页面、在自己的机器上复现同一套宇宙，
+  // 也能直接拿去喂别的工具。拼的是同一个 payload，所以不可能和页面发的不一致。
+  // 注意不要在这里用"含双引号的正则字面量"：页面判据里有一个"剥掉字符串再找物理常量"的检查，
+  // 它的剥串器不认识正则字面量，会把正则里的那个引号当成字符串开头，后面整段错位
+  // （实测就这样误报过一次"页面自己算 273/373"）。用 split/join 代替 replace 就没事。
+  function shellQuote(s){
+    if (!/[^A-Za-z0-9_.,=:/-]/.test(s)) return s;
+    return '"' + s.split('"').join('\\"') + '"';
+  }
+  // --body 的字段拼法。规则与网关 tools/webapp.py 里那一段**逐条对应**：
+  //   第 8 字段 mass | type:mass
+  //   第 9 字段 半径 —— 只在"没声明类型"或"页面声明这个半径是观测值"时才带
+  //   之后才是 key=value 观测覆盖（teff_K=.. / lum_lsun=..）
+  // 抽成一处是因为它有两个读者（这里显示命令、网关拼 argv）。各拼一遍迟早会走散，
+  // 而这类走散最难发现：命令看着对，参数已经不一样了。
+  function bodySpec(b){
+    const tkey = String(b.type || '').trim();
+    const f = [b.name, b.a, b.e, b.inc, b.raan, b.argp, b.M0,
+               (tkey ? tkey + ':' : '') + (+b.mass)];
+    if (b.radius_km !== undefined && b.radius_km !== null
+        && (tkey === '' || b.radius_given)) f.push(String(b.radius_km));
+    if (b.teff_K !== undefined)   f.push('teff_K=' + b.teff_K);
+    if (b.lum_lsun !== undefined) f.push('lum_lsun=' + b.lum_lsun);
+    return f.join(',');
+  }
+  function cliCommand(){
+    const pl = buildPayload();
+    const a = ['starpivot', 'nbody', '--scenario', pl.scenario];
+    if (pl.solar && pl.scenario === 'custom') a.push('--solar', pl.solar);
+    if (pl.years != null) a.push('--years', String(pl.years));
+    if (pl.samples != null) a.push('--samples', String(pl.samples));
+    if (pl.collide){ a.push('--collide', pl.collide, '--radius-scale', String(pl.radius_scale)); }
+    if (pl.star_collide) a.push('--star-collide');
+    if (pl.collide === 'fragment'){
+      a.push('--fragments', String(pl.fragments),
+             '--dispersion-kms', String(pl.dispersion_kms),
+             '--frag-min-speed-kms', String(pl.frag_min_speed_kms));
+      if (pl.spray != null) a.push('--spray', String(pl.spray));
+    }
+    if (pl.bio === false) a.push('--no-bio');
+    else {
+      if (pl.bio_years != null) a.push('--bio-years', String(pl.bio_years));
+      if (pl.albedo != null) a.push('--albedo', String(pl.albedo));
+      if (pl.greenhouse != null) a.push('--greenhouse', String(pl.greenhouse));
+    }
+    (pl.bodies || []).forEach(b => a.push('--body', shellQuote(bodySpec(b))));
+    return a.join(' ');
+  }
+  // CSV 导出：把当前这份轨迹写成表格（每行一帧，每颗天体三列坐标）。
+  // 数据全部来自内核回显，页面只是把它排成表格 —— 和"导出等价 CLI 命令"是同一条原则：
+  // 你算出来的东西要能带走，不能被关在页面里。
+  $('exportcsv').addEventListener('click', () => {
+    if (!data){ toolNote('还没有数据，先让内核算一次。'); return; }
+    const ids = data.bodies.map(b => b.id);
+    const head = ['t_years'].concat(ids.flatMap(id => [id + '_x_AU', id + '_y_AU', id + '_z_AU']));
+    const lines = [head.join(',')];
+    data.frames.forEach(f => {
+      lines.push([f.t.toFixed(6)].concat(
+        f.p.flatMap(q => [q[0].toFixed(6), q[1].toFixed(6), q[2].toFixed(6)])).join(','));
+    });
+    if (Array.isArray(data.energy_series) && data.energy_series.length){
+      lines[0] += ',energy_rel_err';
+      data.energy_series.forEach((v, i) => { lines[i + 1] += ',' + Number(v).toExponential(6); });
+    }
+    try {
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'starpivot-' + $('scenario').value + '-' + ($('integ').value) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      toolNote('已导出 ' + (lines.length - 1) + ' 行 × ' + head.length + ' 列（含逐帧能量误差）的 CSV。');
+    } catch (e) {
+      toolNote('导出 CSV 失败：' + e.message + '（某些环境不允许创建下载）。');
+    }
+  });
+
+  $('exportcl').addEventListener('click', () => {
+    const cmd = cliCommand();
+    const put = copied => toolNote('<b>这一行就是刚才那次计算的等价命令</b>'
+      + (copied ? '（已复制）' : '（浏览器不允许自动复制，请手动选）') + '：'
+      + '<br><code style="display:block;margin-top:4px;padding:8px;background:#0f172a;'
+      + 'color:#d8e2f2;border-radius:6px;overflow:auto;font-size:11.5px">' + cmd
+      + '</code>直接在终端跑它，会得到与画面完全相同的 JSON（页面发的是同一份 payload）。');
+    if (navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(cmd).then(() => put(true), () => put(false));
+    else put(false);
+  });
+  $('exportpng').addEventListener('click', () => {
+    try {
+      const url = cv.toDataURL('image/png');
+      // 先验再用：某些环境（例如没有实现 toDataURL 的宿主）会"不抛异常但返回空数据"，
+      // 那样照样说"已导出"就是在撒谎。成功必须验过。
+      if (!/^data:image\/png;base64,/.test(url) || url.length < 200)
+        throw new Error('画布没有给出有效的 PNG 数据（返回长度 ' + (url ? url.length : 0) + '）');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'starpivot-' + $('scenario').value + '-t'
+        + (data && data.frames ? data.frames[frameIndex()].t.toFixed(3) : '0') + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      toolNote('已导出画面 PNG（只含画布，不含面板）。');
+    } catch (e) {
+      toolNote('导出 PNG 失败：' + e.message + '（某些环境不允许读取画布像素）。');
+    }
+  });
+
+  // ---- 内核报错的人话解释 ----
+  // 内核的错是给机器看的（"--body e must be in [0,1)"），玩家不知道 e≥1 意味着什么。
+  // 这里只做翻译，不加新结论：每条都对应内核真实会说的那句话。
+  const ERR_HELP = [
+    [/--body e must be in/, 'e 是偏心率：0 是正圆，越接近 1 轨道越扁。'
+      + 'e 到 1 就变成抛物线、超过 1 是双曲线 —— 这两种轨道<b>不再闭合</b>，'
+      + '这颗星会一去不回，所以内核不接受。想让它回来，把 e 调到 1 以下。'],
+    [/--body a_AU must be > 0/, 'a 是半长轴（平均轨道半径），必须是正数。'
+      + '负的 a 在开普勒轨道里没有对应形状。'],
+    [/needs at least one --body/, '自定义场景里至少要有一个天体 —— 一个都没有的话，'
+      + '这个宇宙里没有引力源，也就没有任何东西可以算。'],
+    [/at most 16 --body/, '行星表最多 16 行，这是内核 --body 的上限。'],
+    [/--samples must be in/, '输出帧数要落在内核允许的区间里。'],
+    [/would need .* steps/, '这次的时间跨度 × 步长需要太多步：内核不是做不到，'
+      + '而是会跑很久（这条限制就是防止一次调用把机器占死）。'
+      + '把年数调小、或者让内核自己选步长（清空帧数让它用默认 dt）都能解决。'],
+    [/--years must be > 0/, '积分年数必须是正数。'],
+    [/--dt must be > 0/, '步长必须是正数；0 步长会让积分原地不动、一帧都出不来。'],
+    [/--radius-scale must be > 0/, '半径放大倍数必须是正数。'],
+    [/--fragments must be in/, '碎块数有上下限（太小不成碎片、太大算不动）。'],
+    [/--albedo must be in/, '反照率是"反射掉多少阳光"，只能落在 0 和 1 之间。'],
+    [/--greenhouse must be/, '温室增温不能是负数（负的等于凭空制冷，没有对应的物理）。']
+  ];
+  function explainError(msg){
+    for (const [re, help] of ERR_HELP) if (re.test(msg)) return '<br><span style="color:#f5c6a5">'
+      + '为什么：' + help + '</span>';
+    return '';
+  }
+
+  // 一个天体在 payload 里的形态 —— 页面 → 网关只有这一处。
+  // 抽成具名函数是为了让判据能把这段**原文**抠出去跑：判据测的必须是产品代码，
+  // 不是它的副本。副本会跟着时间漂移，而漂移的那一天两边都还是"绿的"。
+  function payloadBody(b){
+    const o = { name: b.name || 'Planet', a: b.a, e: b.e, inc: b.inc,
+                raan: b.raan || 0, argp: b.argp || 0, M0: b.M0 || 0, mass: b.mass,
+                // 类型透传给内核：有了它，半径/光度由内核按类型算，页面不碰物理。
+                // 没类型就不带这个字段（真实系统的宿主就是这样：数据里没有光谱型）。
+                type: b.type || undefined };
+    // 半径一旦出现，就是页面在说"这个数是我给的观测值"（radius_given）。
+    // 声明了类型的天体本来由内核推半径，网关也只在这个标记下发这个字段 ——
+    // 一句话写在两个文件里，措辞不同，但规则是同一个。
+    if (b.radius_km !== undefined && b.radius_km !== null) {
+      o.radius_km = b.radius_km;
+      o.radius_given = true;
+    }
+    // 这一颗星自己的观测值：没给就不带这个字段（不是给 0）。给 0 是"我观测到 0 K"，
+    // 内核会明确拒绝它 —— 那比页面替用户把这个数悄悄删掉要诚实。
+    if (isFinite(+b.teff_K))   o.teff_K = +b.teff_K;
+    if (isFinite(+b.lum_lsun)) o.lum_lsun = +b.lum_lsun;
+    return o;
+  }
+
+  // 页面发给内核的那一份 payload。抽成函数是为了让「复制等价 CLI 命令」拼的是
+  // 同一份数据 —— 各拼一遍迟早会走散，而这类走散最难发现（命令看着对，参数已经不一样了）。
+  function buildPayload(){
+    const sc = $('scenario').value;
+    const payload = { scenario: sc,
+                      integrator: $('integ') ? $('integ').value : 'leapfrog',
+                      years: +$('years').value || null,
+                      samples: +$('samples').value || 400 };
+    if (sc === 'custom') {
+      // 太阳系三档都走 custom 场景（内核的 --solar），这样"只放太阳"和
+      // "全不放"与本来的自定义行星共用同一条 IC 管线，不必再开第三个场景。
+      payload.solar = $('solarmode').value;
+      // 根数的参考系。自定义根数的历史约定是"绕原点、原点假定一颗 1 M☉"，
+      // 而用户放的可能是 0.2 M☉ 的红矮星 —— 那时按 1 M☉ 给的初速会把行星甩掉
+      // （实测 0.05 AU 的行星两年飞到 41.7 AU）。所以：当列表里**恰好只有一颗**
+      // 会发光的天体时，把其余天体的轨道解释为绕它。有两颗以上（比如双星）时不猜，
+      // 交给用户自己去「教授」模式判断 —— 猜错比不猜更糟。
+      // 只在"背景里没有太阳"时才用 primary：primary 会把那颗星放到原点，
+      // 而背景太阳系的太阳也在原点 —— 两个天体同点会让 1/r² 爆掉（内核会拒绝，
+      // 页面则会看到一条告警条）。背景有太阳时，日心根数本来就是对的约定，不必用 primary。
+      const stars = customBodies.filter(b => {
+        const t = typeByKey(b.type);
+        // 有类型：按内核回显的类型表判它发不发光。
+        // 没类型：只认"用户自己说了这是颗星"（填了观测温度或光度）。
+        //   页面拿不到"质量 → 发不发光"的判据（那是内核的物理：氢燃烧下限），
+        //   所以不按质量猜 —— 真实系统的宿主就没有类型，靠这一条才被认出来。
+        return t ? t.emits_light
+                 : (b.teff_K !== undefined || b.lum_lsun !== undefined);
+      });
+      if (stars.length === 1 && payload.solar === 'none') payload.primary = stars[0].name;
+      // 预设可以显式指定参考系（地月系统：把地球当中心，月球绕它转）。
+      // 它优先于上面那条自动判断，而且不要求那颗星"会发光"。
+      if (primaryOverride) payload.primary = primaryOverride;
+      payload.bodies = customBodies.map(payloadBody);
+    }
+    // 生物演化。开关关掉时只发 bio:false；三个旋钮留空就不发，
+    // 让内核用它自己 bio.hpp 里的默认值 —— 页面不镜像内核的默认值，
+    // 否则两个 100 迟早会走散（回显回来后会填进输入框，见 syncBioFromEcho）。
+    if (!$('bioon').checked) {
+      payload.bio = false;
+    } else {
+      if ($('bioyears').value !== '') payload.bio_years = +$('bioyears').value;
+      if ($('albedo').value !== '')    payload.albedo    = +$('albedo').value;
+      // 温室滑杆只有在你真拖过之后才下发。没拖过就不发，让内核用它自己的默认值，
+      // 回显里的 defaults_used 才能如实写「未改动，用的是内核默认」，
+      // 而不是因为页面无条件下发就一律报「被本次请求改写」。
+      if ($('greenhouse').dataset.touched) payload.greenhouse = +$('greenhouse').value;
+    }
+    // 碰撞设置（solar / custom 场景都可用）
+    if (sc !== 'figure8' && $('collide').value !== 'off') {
+      payload.collide = $('collide').value;
+      payload.radius_scale = +$('rscale').value || 1;
+      payload.star_collide = $('starcollide').checked;
+      if (payload.collide === 'fragment') {
+        payload.fragments = +$('nfrag').value || 4;
+        payload.dispersion_kms = +$('disp').value || 0;
+        payload.frag_min_speed_kms = +$('fmin').value || 0;
+        // 喷流成束：0 = 各向同性的气团，>0 = 碎屑朝撞击来向成束抛出去（内核的模型参数）。
+        // 夹到 [0,1] —— 内核也会拒，但这里先夹住可以少一次白跑的往返。
+        payload.spray = Math.max(0, Math.min(1, +$('spray').value || 0));
+      }
+    }
+    return payload;
+  }
+
+  async function compute(){
+    const btn = $('compute');
+    btn.disabled = true; btn.textContent = '积分中…';
+    const payload = buildPayload();
+    // 发请求这一刻的改动计数。这类 payload 可能要算十几秒（custom + 太阳系全带 +
+    // 碎裂 → 两百多颗、回执二十多 MB），拖滑杆完全可能落在"算的路上"。
+    const revSent = paramRev;
+    try {
+      const r = await fetch('/api/nbody', { method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload) });
+      const js = await r.json();
+      if (!r.ok) throw new Error(js.error || ('HTTP ' + r.status));
+      // 内核契约守卫：status:"ok" 却给回 0 帧（--dt 0 或极小 dt 就会这样），
+      // 照单全收的话 render() 里 data.frames[0] 是 undefined，下一句 .t 抛异常，
+      // 而异常发生在 tick 里 → 链式 rAF 断掉 → 整页冻死。宁可在这里明确报错。
+      if (!Array.isArray(js.frames) || js.frames.length === 0)
+        throw new Error('内核回了 status="' + js.status + '" 但帧数为 ' +
+          (Array.isArray(js.frames) ? js.frames.length : '(不是数组)') +
+          '。页面需要至少 1 帧才能绘制，这属于内核契约问题。');
+      data = js; frameF = 0; lastTs = null;
+      rebuildLineageColors();     // 颜色按来源聚合：碎片继承母体、合并按质量混合
+      rebuildImpactIndex();       // 撞击点索引：闪光与碎屑喷流都画在它上面
+      // 时长「永久」：延长之后要把观众正看的那个时刻找回来（不跳回开头）
+      if (seekTAfterCompute !== null){
+        const want = seekTAfterCompute; seekTAfterCompute = null;
+        let best = 0, bd = Infinity;
+        js.frames.forEach((f, i) => { const d = Math.abs(f.t - want); if (d < bd){ bd = d; best = i; } });
+        frameF = best;
+      }
+      dataStamp++;
+      sampling = js.sampling || null;
+      // 类型表随每次响应一起到（同一次回显，不存在版本错位）
+      if (Array.isArray(js.body_types) && js.body_types.length){
+        bodyTypes = js.body_types;
+        buildPalette();
+      }
+      uses_kernel_ic = false;  // 重新按这份数据判定根数来自内核还是兜底表
+      if (data.scenario === 'figure8' && !$('years').dataset.touched)
+        $('years').value = 6.32591398;
+      // 恢复会话时把选中态接回来（先确认这个编号在新数据里还在）：
+      // 平时重算一律清空 —— 天体数量可能变了，旧编号没有意义。
+      const wantSel = (pending && pending.cam && Number.isInteger(pending.cam.sel)
+                       && pending.cam.sel >= 0 && pending.cam.sel < data.bodies.length)
+                      ? pending.cam.sel : -1;
+      cam.sel = wantSel;
+      buildLegend();
+      buildEvents();
+      buildBio();
+      syncBioFromEcho();
+      samplingBadge();
+      verdict();
+      if (challenge) judgeChallenge();   // 挑战进行中时，每次重算都判定一次
+      // 手动重算后照旧继续播放；恢复会话时尊重上次退出时的播放/暂停。
+      const wantPlay = pending ? pending.playing !== false : true;
+      if (playing !== wantPlay) togglePlay(false);   // 重算后恢复播放，同样不算改设定
+      if (pending){
+        frameF = Math.max(0, Math.min(numOr(pending.frameF, 0), data.frames.length - 1));
+        pending = null;                    // 只对接这一次，之后都是正常重算
+      }
+      flushSave();
+      clearError();
+      // 这版参数已经真的生效了 —— **除非**算的路上用户又改过（那样标记要留着）。
+      setDirty(paramRev !== revSent);
+    } catch (e) {
+      showError(e.message);     // 失败时不消脏标记：参数确实还没生效
+    }
+    extending = false;          // 成功失败都要清：否则"永久"延长只会发生一次
+    btn.disabled = false;
+    paintComputeBtn();
+  }
+
+  // ---- 时长「永久」：算到末尾不停，把时长翻倍再算一遍，并**保住当前时刻** ----
+  // 为什么不一次给个很大的年数：那样碰撞那一下会被稀释到看不见
+  // （2000 帧要铺满几十万年，撞的那 0.8 年连一帧都占不到）。
+  // 翻倍 + 找回当前时刻，才是"一直演化下去"又看得清的做法；上限取输入框的上限。
+  const PERPETUAL_MAX_YEARS = 100000;
+  function extendRun(){
+    if (!perpetual || !data || !Array.isArray(data.frames) || data.frames.length < 2) return false;
+    if (extending) return false;                    // 正在算，别叠着发
+    const yrs = +$('years').value || 50;
+    if (yrs >= PERPETUAL_MAX_YEARS){
+      perpetual = false;
+      $('perpetual').checked = false;
+      toolNote('已经算到 <b>' + PERPETUAL_MAX_YEARS + ' 年</b>（本页的上限），不再自动延长了，'
+        + '"永久"已关掉。想接着看就把年数改小一点，或者换个场景。');
+      return false;
+    }
+    const fi = Math.max(0, Math.min(data.frames.length - 1, Math.floor(frameF)));
+    seekTAfterCompute = data.frames[fi].t;           // 观众正看的那个时刻，算完要回来
+    const next = Math.min(PERPETUAL_MAX_YEARS, Math.max(yrs * 2, yrs + 1));
+    $('years').value = next; $('years').dataset.touched = '1';
+    extending = true;
+    compute();
+    return true;
+  }
+
+  // ---- 失败必须留在屏幕上 ----
+  // 写进 #statline 是不行的：render() 每帧都重写那一行，错误提示在屏幕上活不到 16 ms。
+  // 实测（jsdom 试玩）：把自定义行星的 e 改成 1.5 → 内核明确拒绝 → 错误提示 1 帧内被覆盖，
+  // 而画面继续显示上一次成功的轨道、t 还是旧值 —— 玩家会以为新参数已经生效了。
+  // 这与本项目"明确拒绝而不是返回一个看起来对的数"的定位正好相反，所以单独开一条 render() 不碰的告警条。
+  function showError(msg){
+    const bar = $('errbar');
+    if (!bar) return;
+    bar.style.display = 'block';
+    const stillShowing = (data && Array.isArray(data.frames) && data.frames.length)
+      ? '（画面上现在还是<b>上一次成功</b>的结果，t = ' + data.frames[frameIndex()].t.toFixed(3) + ' 年）'
+      : '（目前画面上没有任何结果）';
+      bar.innerHTML = '<b>这次重算失败了，画面没有跟着变。</b>' + stillShowing
+      + '<br>内核说：' + msg + explainError(msg);
+  }
+  function clearError(){
+    const bar = $('errbar');
+    if (bar){ bar.style.display = 'none'; bar.innerHTML = ''; }
+  }
+
+  function buildLegend(){
+    let html = '';
+    // 图例要说清**三个**颜色通道各管什么 —— 这是用户唯一能知道"这颜色是什么意思"的地方。
+    // 第 1 行：球体颜色 = 物质 × 生命。物质族的色块**从真实天体上取**（这一类第一颗的
+    // matTone 结果），所以图例与画布上的球不可能走散；每一族的画法写在 title 里。
+    const FAM_ORDER = ['star','remnant','gas','ice','rock','brown','none'];
+    const byFam = {};
+    (data.bodies || []).forEach((b, i) => { const f = matFamilyOf(b); if (!byFam[f]) byFam[f] = { i, b }; });
+    const shownFams = FAM_ORDER.filter(f => byFam[f]);
+    if (shownFams.length){
+      html += '<span class="stat" style="font-size:11.5px"><b>球体颜色 = 物质 × 生命</b>'
+            + '（先看它是什么做的 —— 悬浮看画法）：</span>';
+      shownFams.forEach(f => {
+        const o = byFam[f];
+        html += '<span style="font-size:11.5px" title="' + MAT_SHAPE[f] + '">'
+              + '<i class="dot" style="background:' + matTone(o.b, o.i) + '"></i>'
+              + MAT_ZH[f] + '</span>';
+      });
+    }
+    // 第 2 行：生命形态 —— 在物质色上染的阶色，外加一圈同色柔光。
+    // 名字与格数都取自内核回显的 stage_names，页面不自己抄一份阶梯名
+    // （这也是 _check_bio_page.js 在管的）。
+    html += '<span style="flex-basis:100%;height:0"></span>';
+    if (data.bio && data.bio.stage_names){
+      html += '<span class="stat" style="font-size:11.5px"><b>生命形态</b>'
+            + '（在物质色上染的阶色 + 同色柔光；灰调<b>且没有柔光</b> = 还没生命）：</span>';
+      data.bio.stage_names.forEach((n, s) => {
+        html += '<span style="font-size:11.5px"><i class="dot" style="background:'
+          + stageColor(s) + '"></i>' + n + '</span>';
+      });
+    }
+    // 第 3 行：来源 / 血缘色 —— 球外那圈细环，以及下面这些小圆点。
+    // 这一行是"颜色按来源聚合"这条功能的落点：碎片与母体同色系、合并按质量混色。
+    html += '<span style="flex-basis:100%;height:0"></span>';
+    html += '<span class="stat" style="font-size:11.5px"><b>球外细环 = 来源色</b>'
+          + '（谁是谁的碎片、谁吸收过谁）：</span>';
+    data.bodies.forEach((b, i) => {
+      const dead = (b.died_at !== undefined && b.died_at !== null);
+      const tag = dead ? (b.merged_into ? ' → ' + b.merged_into : ' 💥') : '';
+      html += '<span style="opacity:' + (dead ? 0.45 : 1) + '">'
+            + '<i class="dot" style="background:' + colorOf(b.id, i) + '"></i>'
+            + b.id + tag + '</span>';
+    });
+    // 第 4 行：大小。**必须同时说清「对数压缩」和「不是一比一」** —— 不然"看起来小"会被读成"真的小"。
+    html += '<span class="stat" style="font-size:11.5px;flex-basis:100%">'
+          + '<b>球的大小 = 内核给的真实半径，但画成对数压缩的</b>（约 2.2–13 px，<b>不是一比一</b>）：'
+          + '真按比例画，地球和太阳摆在同张图里地球会小到看不见（半径只有太阳的 1/109）。'
+          + '压缩只保住"大的看起来更大"这个次序；某颗到底多大，点它一下看数据。</span>';
+    html += '<span class="stat" style="font-size:11.5px;flex-basis:100%">'
+          + '想分清哪颗是哪颗、想知道它为什么是这个颜色 —— <b>点它一下</b>：'
+          + '画面下方会出它的数据（第一行就是生命形态），镜头同时对准它。</span>';
+    $('legend').innerHTML = html;
+  }
+
+  // 碰撞/碎裂/重聚事件时间线（数据来自内核 events 数组，页面只做展示）
+  function buildEvents(){
+    const ev = data.events || [];
+    $('eventcard').style.display = ev.length ? 'block' : 'none';
+    if (!ev.length) return;
+    let html = '<table style="font-size:12.5px"><tr><th>t (yr)</th><th>类型</th>'
+      + '<th>参与者</th><th style="text-align:right">间距 (AU)</th>'
+      + '<th style="text-align:right">相对速度 (km/s)</th>'
+      + '<th style="text-align:right">ΔE</th><th style="text-align:right">碎块</th></tr>';
+    for (const e of ev.slice(0, 200)) {
+      const kind = e.kind === 'fragment' ? '💥 碎裂' : '🪐 合并/吸积';
+      html += '<tr data-jump-t="' + e.t + '" style="cursor:pointer" title="跳到这一帧">'
+        + '<td>' + e.t.toFixed(4) + '</td><td>' + kind + '</td><td>'
+        + e.a + (e.b ? ' + ' + e.b : '') + '</td>'
+        + '<td style="text-align:right">' + e.distance_AU.toExponential(2) + '</td>'
+        + '<td style="text-align:right">' + (e.rel_speed_AU_per_yr * 4.74057).toFixed(3) + '</td>'
+        + '<td style="text-align:right">' + e.energy_delta.toExponential(2) + '</td>'
+        + '<td style="text-align:right">' + (e.fragments || '-') + '</td></tr>';
+    }
+    html += '</table>';
+    if (ev.length > 200) html += '<div class="note">仅显示前 200 条，共 ' + ev.length + ' 条。</div>';
+    const dead = data.bodies.filter(b => b.died_at !== undefined && b.died_at !== null).length;
+    const born = data.bodies.filter(b => (b.born_at || 0) > 0).length;
+    html += '<div class="note">共 ' + ev.length + ' 次事件：消亡 ' + dead
+      + ' 个天体、新生碎块 ' + born + ' 个；最终存活 '
+      + data.bodies.filter(b => b.died_at === undefined || b.died_at === null).length
+      + ' 个。动量漂移 ' + data.diagnostics.momentum_drift.toExponential(2)
+      + '（碰撞严格守恒动量，这个数应始终在数值噪声量级）。</div>';
+    $('eventlist').innerHTML = html;
+  }
+
+  const fmt = v => (v === undefined || v === null) ? '-' :
+    (Math.abs(v) >= 1000 || (v !== 0 && Math.abs(v) < 0.01)
+      ? Number(v).toExponential(2) : Number(v).toFixed(Math.abs(v) < 1 ? 3 : 1));
+
+  // ---- 演化面板 ----
+  // 静态部分（每颗星的 S / T_eq / 阈值 / 分层声明）建一次；动态部分（判定、
+  // 地表温、当前阶、进度）每帧只改文本节点，避免整表 innerHTML 反复重排。
+  function buildBio(){
+    const B = data.bio;
+    $('biocard').style.display = B ? 'block' : 'none';
+    if (!B) return;
+    $('biowarn').innerHTML = B.primary_tied
+      ? '<div class="okbox" style="background:rgba(245,198,165,0.12);border-color:#f5c6a5">'
+        + '<b>这个场景里"谁照亮谁"没有定义</b>：系统中有多颗等质量天体（'
+        + (B.primary || '(无光源)') + ' 只是按索引挑出来的第一个）。等质量系统没有主控星，'
+        + '恒星也算行星也算，所以下表的判定只能当参照，不要当结论。</div>'
+      : '';
+    const vn = B.verdict_names || ['no_light','frozen','evolving','sterilized'];
+    let html = '<table style="width:100%;font-size:12.5px"><tr>'
+      + '<th style="text-align:left">天体</th><th style="text-align:left">判定</th>'
+      + '<th style="text-align:right">S (地球=1)</th><th style="text-align:right">T_eq K</th>'
+      + '<th style="text-align:right">T_surf K</th>'
+      + '<th style="text-align:left">当前阶</th><th style="text-align:left">进度</th>'
+      + '<th style="text-align:right">达到该阶 (年)</th></tr>';
+    data.bodies.forEach((bd, b) => {
+      const e = bioOf(b);
+      if (!e){
+        html += '<tr><td>' + bd.id + '</td><td colspan="7" class="stat">无演化数据</td></tr>';
+        return;
+      }
+      const dead = (bd.died_at !== undefined && bd.died_at !== null);
+      html += '<tr data-row="' + b + '"' + (dead ? ' style="opacity:0.5"' : '') + '>'
+        + '<td><i class="dot" style="background:' + colorOf(bd.id, b) + '"></i>' + bd.id
+        + (dead ? ' （已消亡，演化冻结）' : '') + '</td>'
+        + '<td data-cell="v"></td>'
+        + '<td style="text-align:right">' + fmt(e.insolation_final) + '</td>'
+        + '<td style="text-align:right">' + fmt(e.t_eq_final) + '</td>'
+        + '<td style="text-align:right" data-cell="ts"></td>'
+        + '<td data-cell="st"></td>'
+        + '<td data-cell="pr" style="min-width:110px"></td>'
+        + '<td style="text-align:right" data-cell="re"></td></tr>';
+    });
+    html += '</table>';
+    $('biotable').innerHTML = html;
+    $('biolayer').innerHTML = layerNote(B);
+    updateBio(frameIndex());
+  }
+
+  function layerNote(B){
+    return '<b>这里哪些是真的、哪些是我编的：</b>'
+      + '<br>· 第 1 层（真公式）：' + B.layer1_physics
+      + '<br>· 第 2 层（编排）：' + B.layer2_stylized
+      + '<br>· 已知局限：' + B.caveats
+      + '<br><br>本次生效的常量（内核回显，页面不自己抄一套）：'
+      + 'albedo = ' + B.albedo + '，温室增温 = ' + B.greenhouse_K + ' K'
+      + (B.defaults_used ? '（未改动，用的是内核默认）' : '（被本次请求改写）')
+      + '，走完全条阶梯 = ' + B.full_ladder_years + ' 年，冰点 ' + B.freezing_K
+      + ' K、沸点 ' + B.sterilization_K + ' K，速率峰 ' + B.rate_peak_K
+      + ' K、半宽 ' + B.rate_sigma_K + ' K，主星 <code>' + (B.primary || '-')
+      + '</code>，L = ' + fmt(B.luminosity_Lsun) + ' L☉（' + B.luminosity_model + '）。';
+  }
+
+  function updateBio(fi){
+    const B = data && data.bio;
+    if (!B) return;
+    data.bodies.forEach((bd, b) => {
+      const cell = sel => document.querySelector('#biotable tr[data-row="' + b + '"] [data-cell="' + sel + '"]');
+      const a = bioAt(fi, b);
+      if (!a) return;
+      const v = VERDICT[Math.max(0, Math.min(3, a.verdict))];
+      const vc = cell('v'); if (vc) vc.innerHTML =
+        '<span style="color:' + v.col + '">' + v.name + '</span>';
+      const ts = cell('ts'); if (ts) ts.textContent = fmt(a.t_surf);
+      const st = cell('st'); if (st) st.innerHTML =
+        '<i class="dot" style="background:' + stageColor(a.stage) + '"></i>'
+        + (B.stage_names[a.stage] || a.stage) + '（' + a.stage + '/8）';
+      const pr = cell('pr'); if (pr) pr.innerHTML =
+        '<span style="display:inline-block;width:64px;height:7px;border-radius:4px;'
+        + 'background:rgba(255,255,255,0.14);vertical-align:middle">'
+        + '<span style="display:block;height:100%;border-radius:4px;width:'
+        + Math.round(Math.max(0, Math.min(1, a.progress)) * 100) + '%;background:'
+        + stageColor(a.stage) + '"></span></span> '
+        + (a.progress * 100).toFixed(1) + '%';
+      // "达到该阶的时刻"做成可点的：数据本来就有，之前只是摆在表里点不过去
+      const re = cell('re'); if (re) re.innerHTML =
+        a.stage === 0 ? '—'
+        : (a.reached === undefined || a.reached === null ? '-'
+           : '<span data-jump-t="' + a.reached + '" style="cursor:pointer;'
+             + 'text-decoration:underline dotted" title="跳到这一刻">'
+             + a.reached.toFixed(2) + '</span>');
+    });
+  }
+
+  function verdict(){
+    const d = data.diagnostics || {};
+    const drift = d.energy_drift;
+    $('verdict').innerHTML =
+      '<div class="okbox">能量漂移 |ΔE/E| = <b>' + drift.toExponential(2) + '</b>，'
+      + '动量漂移 = <b>' + d.momentum_drift.toExponential(2) + '</b>（全程 '
+      + data.frames[data.frames.length-1].t + ' 年）。'
+      + '辛积分器的能量误差有界振荡——这就是它适合长期演化、而 Hermite 适合中短程高精度的原因。'
+      + '这些数字由内核在积分结束时实测输出，不是装饰。</div>';
+  }
+
+  // 投影：先绕世界 z 轴转 yaw，再绕 x 轴压 pitch，然后正交投影。
+  // pitch = 0 → 正俯视（竖轴是 y）；pitch = ±90° → 竖轴是 ∓z（侧视）。
+  // yaw = 0 时与原来的实现逐位相同，所以老的用法一条都没变。
+  function project(p, yaw, pitch, scale, cx, cy){
+    const cw = Math.cos(yaw), sw = Math.sin(yaw);
+    const xr = p[0]*cw - p[1]*sw, yr = p[0]*sw + p[1]*cw;
+    const ct = Math.cos(pitch), st = Math.sin(pitch);
+    return [ cx + xr*scale, cy - (yr*ct - p[2]*st)*scale ];
+  }
+
+  // ---- 相机 ----
+  // cam.pitch / cam.yaw 是当前值，*To 是目标值；每帧向目标缓动，切换才有过渡。
+  const cam = { pitch: 0, yaw: 0, pitchTo: 0, yawTo: 0, anim: false, sel: -1, follow: -1 };
+  let hits = [];          // 最近一帧的天体屏幕位置，供点击命中判定
+  const D2R = Math.PI/180, R2D = 180/Math.PI;
+
+  // 把 yaw 的差值折到 [-π, π]，否则从 179° 转到 -179° 会绕远路。
+  function angDiff(from, to){
+    let d = (to - from) % (2*Math.PI);
+    if (d >  Math.PI) d -= 2*Math.PI;
+    if (d < -Math.PI) d += 2*Math.PI;
+    return d;
+  }
+  function setCam(yaw, pitch){
+    cam.yawTo   = yaw;
+    cam.pitchTo = pitch;
+    cam.anim = true;
+    $('tilt').value = Math.round(pitch * R2D);
+  }
+  function stepCam(){
+    if (!cam.anim) return;
+    cam.yaw   += angDiff(cam.yaw, cam.yawTo)   * 0.16;
+    cam.pitch += (cam.pitchTo - cam.pitch) * 0.16;
+    if (Math.abs(angDiff(cam.yaw, cam.yawTo)) < 2e-4 &&
+        Math.abs(cam.pitchTo - cam.pitch) < 2e-4){
+      cam.yaw = cam.yawTo; cam.pitch = cam.pitchTo; cam.anim = false;
+    }
+    $('tilt').value = Math.round(cam.pitch * R2D);
+  }
+
+  // 轨道平面 → 相机角度。
+  // 轨道法向 n̂（Kepler） = (sin i·sin Ω, −sin i·cos Ω, cos i)。
+  // 令 yaw = −Ω 可把 m = Rz(yaw)·n̂ 的水平分量消掉，剩 (0, −sin i, cos i)；
+  // 再取 pitch = −i 就使视线方向 d = (0, sin p, cos p) 与 n̂ 平行 ——
+  // 也就是正对该轨道平面。i=0（黄道）时退化为 yaw=0、pitch=0 的正俯视。
+  function orbitView(inc_deg, raan_deg){
+    const i = inc_deg * D2R, om = raan_deg * D2R;
+    let yaw = -om;
+    let pitch = -i;
+    while (yaw <= -Math.PI) yaw += 2*Math.PI;
+    while (yaw >  Math.PI) yaw -= 2*Math.PI;
+    while (pitch < -Math.PI/2) pitch += Math.PI;
+    while (pitch >  Math.PI/2) pitch -= Math.PI;
+    return [yaw, pitch];
+  }
+
+  // 内置行星的根数（i°, Ω°）。正常路径是从 JSON 的 ic_heliocentric 读；
+  // 两份同时存在时以内核那份为准——这份只是旧二进制的兜底，见下方 uses_kernel_ic。
+  const FALLBACK_IC = {
+    Mercury:[7.00498, 48.33077], Venus:[3.39468, 76.67984],
+    Earth:[-0.00002, 0.0],       Mars:[1.84969, 49.55954],
+    Jupiter:[1.30440, 100.47391],Saturn:[2.48599, 113.66242],
+    Uranus:[0.77264, 74.01693], Neptune:[1.77004, 131.78423],
+    Pluto:[17.14001, 110.30394]
+  };
+  let uses_kernel_ic = false;   // 命中内核 ic_heliocentric 的天体数 > 0 时为真
+
+  function elemsOf(b){
+    const ic = b.ic_heliocentric;
+    if (ic && typeof ic.inc_deg === 'number' && typeof ic.raan_deg === 'number'){
+      uses_kernel_ic = true;
+      return [ic.inc_deg, ic.raan_deg];
+    }
+    const f = FALLBACK_IC[b.id];
+    return f ? [f[0], f[1]] : null;
+  }
+
+  function fitScale(){
+    if (!data) return 10;
+    let m = 0;
+    for (const f of data.frames) for (const p of f.p)
+      m = Math.max(m, Math.hypot(p[0], p[1], p[2]));
+    m = Math.max(m, 0.5);
+    return Math.min(cv.width, cv.height) * 0.46 / m;
+  }
+
+  function render(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.fillStyle = '#070b16'; ctx.fillRect(0,0,cv.width,cv.height);
+
+    // 星空背景（固定伪随机种子，避免闪烁）。
+    // 这一层占"画面像不像真的"的比重比看起来大得多，三处改过：
+    //   ① 数量：160 → 320（够密才有深空感）；
+    //   ② **亮度不是均匀的** —— 真实星场里绝大多数是暗星、只有少数几颗亮，
+    //      所以用 u = rnd()^2.2 把大部分压暗。均匀随机看着像撒了一层味精，假就假在这里；
+    //   ③ **带色温**：用 bbColor（与恒星同一个渲染映射，数据卡里已注明
+    //      "色温→颜色是渲染映射、不是物理量"），且色温分布偏红 —— 真实星场本来就以红矮星为主。
+    // ⚠ 这里的填充一律是 **rgba 字符串**而不是十六进制：判据里"球体"认的是
+    //   "十六进制 + alpha 0.9"，星空要是用十六进制就会混进去被当球。
+    if (!render.stars){
+      let s = 7; const rnd = () => (s = (s*16807) % 2147483647) / 2147483647;
+      render.stars = [];
+      for (let i = 0; i < 320; i++){
+        const u = Math.pow(rnd(), 2.2);
+        const T = 2600 + Math.pow(rnd(), 1.6) * 14000;
+        const c = bbColor(T) || '#ffffff';
+        const R = parseInt(c.slice(1,3), 16), G = parseInt(c.slice(3,5), 16), B = parseInt(c.slice(5,7), 16);
+        render.stars.push([rnd()*cv.width, rnd()*cv.height, 0.35 + u*1.75,
+                           'rgba(' + R + ',' + G + ',' + B + ',' + (0.26 + u*0.70).toFixed(3) + ')']);
+      }
+    }
+    for (const st of render.stars){
+      ctx.fillStyle = st[3];
+      ctx.beginPath(); ctx.arc(st[0], st[1], st[2], 0, Math.PI*2); ctx.fill();
+    }
+
+    if (!data) return;
+    stepCam();
+    const yaw = cam.yaw, pitch = cam.pitch;
+    const zoom = (+$('zoom').value) / 100 * view.userScale;
+    const scale = fitScale() * zoom;
+    // cx/cy 用 let：下面"镜头跟随"那一段会把 pan 挪一点，然后要重算中心（投影是仿射的，
+    // 一次修正就到位，不需要迭代）。
+    let cx = cv.width/2 + view.panX, cy = cv.height/2 + view.panY;
+    const fi = frameIndex();
+    // 帧间插值：frameF 是连续量（按真实时间推进），但 frames 只有整数帧的位置。
+    // 不插值的话，内行星在采样稀时会一步跳到轨道对面（实测默认参数下水星单帧最大转角
+    // 179.8°，一圈只有 2 个采样点）。插值只是把两个内核采样点连起来 —— 和"把点连成线"
+    // 是同一件事，纯属显示层；它不产生任何新的物理量，演化面板与时间轴用的仍是整数帧上的内核值。
+    const ff = Math.max(0, Math.min(data.frames.length - 1,
+                      Number.isFinite(frameF) ? frameF : 0));
+    const iA = Math.floor(ff), iB = Math.min(iA + 1, data.frames.length - 1);
+    const wI = ff - iA;
+    const interpOn = $('interp') ? $('interp').checked : true;
+    const posAt = b => {
+      const a = data.frames[iA].p[b];
+      if (!interpOn || iA === iB || wI === 0) return a;
+      const c = data.frames[iB].p[b];
+      return [a[0] + (c[0] - a[0]) * wI, a[1] + (c[1] - a[1]) * wI, a[2] + (c[2] - a[2]) * wI];
+    };
+    const nB = data.bodies.length;
+    const now = data.frames[fi].t;   // alive() 用它裁剪"尚未出生 / 已消亡"的轨迹
+
+    // 完整轨道（暗）+ 已走过（亮）。碰撞会改变天体"存在区间"，按 born/died 裁剪。
+    const alive = b => (b.born_at || 0) <= now + 1e-9 &&
+                       (b.died_at === undefined || b.died_at === null || b.died_at >= now - 1e-9);
+
+    // ---- 镜头跟随选中的天体 ----
+    // 起因是一条使用反馈："点击一颗行星自动调整视角"。原来点一下只按它的轨道面摆相机
+    // （yaw=−Ω、pitch=−i），而太阳系的行星几乎共面 —— 对它们这是个空操作，点一下像没反应；
+    // 就算摆对了，天体几秒后就转出画面。现在把它一直钉在画面中心。
+    // 纯投影层：只挪 view.panX/panY（与拖拽平移同一对量），不碰任何物理量。
+    // ⚠ 这一段必须排在 `alive` 之后 —— 它用 alive()，而 const 在定义前是 TDZ（真踩过两次）。
+    if (cam.follow >= 0 && data.bodies[cam.follow] && alive(data.bodies[cam.follow])){
+      const [fx, fy] = project(posAt(cam.follow), yaw, pitch, scale, cx, cy);
+      view.panX += cv.width/2 - fx;
+      view.panY += cv.height/2 - fy;
+      cx = cv.width/2 + view.panX; cy = cv.height/2 + view.panY;
+    }
+    for (let b = 0; b < nB; b++){
+      const col = colorOf(data.bodies[b].id, b);
+      const body = data.bodies[b];
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.16; ctx.lineWidth = 1;
+      ctx.beginPath();
+      let pen = false;
+      for (let f = 0; f < data.frames.length; f++){
+        const ft = data.frames[f].t;
+        const on = (body.born_at || 0) <= ft + 1e-9 &&
+                   (body.died_at === undefined || body.died_at === null || body.died_at >= ft - 1e-9);
+        if (!on) { pen = false; continue; }
+        const [x,y] = project(data.frames[f].p[b], yaw, pitch, scale, cx, cy);
+        pen ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+        pen = true;
+      }
+      ctx.stroke();
+
+      // 已走过的轨迹：有演化数据时按"当时的阶"分段着色，否则维持原本的单色。
+      // 分段而不是逐帧描边 —— 阶很少变，所以每颗星通常只有几条路径，代价很低。
+      const bioB = bioOf(b);
+      ctx.globalAlpha = 0.9; ctx.lineWidth = 1.8;
+      if (bioB && bioB.stage){
+        let runStage = -2, runPen = false, lastPt = null;
+        const flush = () => { if (runPen) { ctx.stroke(); runPen = false; } };
+        for (let f = 0; f <= fi; f++){
+          const ft = data.frames[f].t;
+          const on = (body.born_at || 0) <= ft + 1e-9 &&
+                     (body.died_at === undefined || body.died_at === null || body.died_at >= ft - 1e-9);
+          if (!on){ flush(); runStage = -2; lastPt = null; continue; }
+          const sc = bioB.stage[Math.min(f, bioB.stage.length - 1)] | 0;
+          const [x,y] = project(data.frames[f].p[b], yaw, pitch, scale, cx, cy);
+          if (sc !== runStage){        // 换阶：收掉上一段，用新颜色起一段
+            flush();
+            runStage = sc;
+            ctx.strokeStyle = stageColor(sc);
+            ctx.beginPath();
+            // 从上一帧接上，不留断口。这里必须同时把 runPen 置真，
+            // 否则紧接着的 moveTo(x,y) 会把这句 moveTo(lastPt) 覆盖掉 —— 接不上。
+            if (lastPt) { ctx.moveTo(lastPt[0], lastPt[1]); runPen = true; }
+          }
+          runPen ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+          runPen = true;
+          lastPt = [x,y];
+        }
+        flush();
+      } else {
+        ctx.strokeStyle = col;
+        ctx.beginPath();
+        pen = false;
+        for (let f = 0; f <= fi; f++){
+          const ft = data.frames[f].t;
+          const on = (body.born_at || 0) <= ft + 1e-9 &&
+                     (body.died_at === undefined || body.died_at === null || body.died_at >= ft - 1e-9);
+          if (!on) { pen = false; continue; }
+          const [x,y] = project(data.frames[f].p[b], yaw, pitch, scale, cx, cy);
+          pen ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+          pen = true;
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // 放置模式下画几圈距离标尺。没有它，玩家点下去之前不知道自己点的是 0.5 AU 还是 20 AU，
+    // 只能等放下后从文字里看（而且已经放错了）。这些圈画在黄道面（z=0）上，
+    // 所以斜视时它们本来就是椭圆 —— 这恰好也把"俯仰在做什么"顺手讲清楚了。
+    if (placing){
+      const halfAU = Math.min(cv.width, cv.height) * 0.5 / scale;
+      const base = Math.pow(10, Math.floor(Math.log10(Math.max(halfAU, 0.02) / 3)));
+      // 必须把 10 的幂往下一档也带上：只取 [base, 2base, 5base, 10base…] 的话，
+      // 视野在 3–30 AU 这一段时最小的一圈就是 10 AU，"在 1 AU 附近放一颗"完全没有刻度可用
+      // （实测就是这样：只画出了 10/20/50 AU）。1/2/5 这一档一定要在里面。
+      const rings = [base / 10, base / 5, base / 2, base, base * 2, base * 5, base * 10,
+                     base * 20, base * 50];
+      ctx.save();
+      ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(122,150,200,0.50)';
+      ctx.fillStyle = 'rgba(180,200,230,0.80)';
+      ctx.font = '11px ui-monospace,Menlo,Consolas,monospace';
+      for (const rr of rings){
+        if (!(rr > 0) || rr > halfAU * 1.05) continue;   // 大部分跑到屏幕外的就不画了
+        ctx.beginPath();
+        for (let k = 0; k <= 72; k++){
+          const th = k / 72 * Math.PI * 2;
+          const [x, y] = project([rr * Math.cos(th), rr * Math.sin(th), 0],
+                                 yaw, pitch, scale, cx, cy);
+          k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.closePath(); ctx.stroke();
+        const [lx, ly] = project([rr, 0, 0], yaw, pitch, scale, cx, cy);
+        ctx.fillText(rr + ' AU', lx + 5, ly - 5);
+      }
+      // ---- 光标落点预览 ----
+      // 以前点下去之前只能看那几圈标尺，落在 1.2 还是 1.8 AU 全靠眼估；放错了要"删了重放"。
+      // 这里把**同一处判定**（placeCandidate）的结果画出来：十字 + 距离/方位读数；
+      // 越界时画成警示色并写明原因 —— 所见即所得，点下去就是它。
+      if (ghost && ghost.p){
+        const [gx, gy] = project([ghost.p[0], ghost.p[1], 0], yaw, pitch, scale, cx, cy);
+        ctx.setLineDash([]);
+        const col = ghost.ok ? 'rgba(122,220,180,0.95)' : 'rgba(255,150,130,0.95)';
+        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        if (ghost.ok){
+          ctx.moveTo(gx - 10, gy); ctx.lineTo(gx - 3, gy);
+          ctx.moveTo(gx + 3, gy);  ctx.lineTo(gx + 10, gy);
+          ctx.moveTo(gx, gy - 10); ctx.lineTo(gx, gy - 3);
+          ctx.moveTo(gx, gy + 3);  ctx.lineTo(gx, gy + 10);
+          ctx.stroke();
+          ctx.beginPath(); ctx.arc(gx, gy, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.font = '12px ui-monospace,Menlo,Consolas,monospace';
+          ctx.fillText(ghost.r.toFixed(3) + ' AU · 方位 ' + Math.round(ghost.deg) + '°',
+                       gx + 13, gy - 11);
+        } else {
+          ctx.beginPath(); ctx.arc(gx, gy, 7, 0, Math.PI * 2); ctx.stroke();
+          ctx.font = '12px ui-monospace,Menlo,Consolas,monospace';
+          ctx.fillText(ghost.short + '：' + ghost.r.toFixed(3) + ' AU', gx + 13, gy - 11);
+        }
+      }
+      ctx.restore();
+    }
+
+    // ---- 碎屑喷流：从**撞击点**朝每一块碎屑拉一条渐隐的线 ----
+    // 全部碎屑的线都从同一点出发、那一组线段就自然形成一个"扇" ——
+    // 而内核把碎屑云沿撞击来向摆好并沿轴拉长（见 collision.cpp 的 spray），
+    // 所以这个扇是指着来向的。这是"成束溅射"在画面上看得见的那一半；
+    // 另一半（碎屑真的往那个方向飞）在内核里，由 _probe_collide.py 的 C2 节钉住。
+    // 画在天体之前，免得线压在小球上。
+    const tWin = impactWindow();
+    if (tWin > 0 && impactPts.length){
+      for (let b = 0; b < nB; b++){
+        const bd = data.bodies[b];
+        if (!(bd.born_at > 0)) continue;          // 只有碎屑有"出生时刻"
+        if (!alive(bd)) continue;
+        const age = now - bd.born_at;
+        if (age < 0 || age > tWin) continue;
+        const ip = impactAtT[bd.born_at];
+        if (!ip) continue;
+        const [jx, jy] = project(ip.p, yaw, pitch, scale, cx, cy);
+        const [bx, by] = project(posAt(b), yaw, pitch, scale, cx, cy);
+        ctx.save();
+        ctx.globalAlpha = (1 - age / tWin) * 0.55;
+        ctx.strokeStyle = colorOf(bd.id, b);
+        ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.moveTo(jx, jy); ctx.lineTo(bx, by); ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // 天体
+    hits = [];
+    // 天体一多，名字会糊成一片（碎屑级联能滚出两百多块 —— 那是内核的行为，不是画法该改的）。
+    // 所以只在天体不多时才逐颗写名字；否则只留"本体"（id 里没有 #）与选中的那一颗。
+    // 这是**可读性**上的取舍，不是隐藏数据：点它一下，下面那张卡里照样有全部信息。
+    let nAlive = 0;
+    for (let b = 0; b < nB; b++) if (alive(data.bodies[b])) nAlive++;
+    const labelAll = nAlive <= 40;
+
+    // ---- 标签排版：**先算好位置，再回到各自的循环里就地写** ----
+    // 为什么不能"把球都画完再统一写名字"：判据是从绘制日志里按
+    // [球外细环 stroke] → [球体 fill] → [写名字 fillText] 这个**相邻序列**还原
+    // "哪一笔属于哪颗"的（_probe_tools.js §11）。名字一旦挪到所有球画完之后，
+    // 那道还原就会把最后那颗球的填充认给前一颗 —— 判据会红，而且是红得有道理。
+    // 所以：位置在这里一次性算好，写还是在每颗球自己那一段里写。
+    //
+    // 要解决的是**内太阳系挤在中心那一小块**的问题（真比例下 8 颗行星里 4 颗
+    // 挤在几十像素内），原来的做法是每颗都往右写 4 px —— 名字直接叠成一团。
+    const textW = t => {
+      let w = 0;
+      try {
+        ctx.font = '11px -apple-system,Segoe UI,PingFang SC,sans-serif';
+        const m = ctx.measureText && ctx.measureText(t);
+        if (m && m.width > 0) w = m.width;
+      } catch (e) { /* 桩可能没有 measureText —— 退到按字数估 */ }
+      return w > 0 ? w : t.length * 6.2;   // 11px 下汉字约 11px、拉丁约 6px，取偏保守的 6.2
+    };
+    const labelPos = (() => {
+      const items = [];
+      for (let b = 0; b < nB; b++){
+        const bd = data.bodies[b];
+        if (!alive(bd)) continue;
+        if (!(labelAll || b === cam.sel || String(bd.id).indexOf('#') < 0)) continue;
+        const [x, y] = project(posAt(b), yaw, pitch, scale, cx, cy);
+        // rr 与下面正式绘制那处**同一个式子**（含变星的脉动因子）——
+        // 这里要是少乘一项，排版时的半径就跟画出来的对不上，白算。
+        let glow = 1;
+        if (bd.variability && bd.variability.on && Array.isArray(bd.lum_series) && bd.lum_series.length){
+          const k = Math.max(0, Math.min(fi, bd.lum_series.length - 1));
+          const base = bd.luminosity_Lsun > 0 ? bd.luminosity_Lsun : 1;
+          glow = Math.sqrt(Math.max(0.02, Math.min(50, bd.lum_series[k] / base)));
+        }
+        const rr = sizeR(bd) * (glow === 1 ? 1 : Math.max(0.7, Math.min(2.2, glow)));
+        items.push({ id: String(bd.id), x, y, rr });
+      }
+      // 画得大的先占位（主星、巨行星留住最自然的位置），小的再往外让。
+      // 同尺寸时按 id 排 —— 不引入随机，同一个场景每次排版结果必须一样。
+      items.sort((p, q) => (q.rr - p.rr) || (p.id < q.id ? -1 : 1));
+      const boxes = [], out = {};
+      const hit = (ax, ay, aw, ah) => boxes.some(q =>
+        !(ax + aw < q.x - 3 || ax > q.x + q.w + 3 || ay + ah < q.y - 3 || ay > q.y + q.h + 3));
+      for (const it of items){
+        const t = it.id, w = textW(t), h = 13;
+        const nat = it.x + it.rr + 4;                 // 原来的位置（球的右边 4 px）
+        // ⚠ 行的间距必须 ≥ 20 px。名字框高 13、上下各留 3 px 余量 → 两行要 19 px 才不会
+        //   被判重叠。原来只有 -6 / +10 两行（间距 16），于是**每一对都恰好差 3 px 判为相撞**
+        //   —— 排版实际退化成"一行"，内太阳系五颗的名字全挤在一条线上（截图里 Sun 被 Mercury 压住）。
+        //   间距给够，行本身才是可用的。
+        const ROWS = [-6, 14, -26, 34];
+        const cands = [];
+        for (let k = 0; k <= 4; k++){                 // 一圈一圈往外推；k=0 就是球右/左的原位
+          const g = 13 * k;
+          for (const dy of ROWS){
+            cands.push([nat + g, it.y + dy]);
+            cands.push([it.x - it.rr - 4 - w - g, it.y + dy]);
+          }
+        }
+        let pick = cands[0];
+        for (const c of cands) if (!hit(c[0] - 3, c[1] - h + 4, w + 6, h)) { pick = c; break; }
+        // 不许跑出画布：挤到边上就往回夹一下
+        pick = [Math.max(2, Math.min(cv.width - w - 2, pick[0])), pick[1]];
+        boxes.push({ x: pick[0] - 3, y: pick[1] - h + 4, w: w + 6, h });
+        // 被挤远了的补一根细引线：不然"这个名字指哪颗"就成了猜谜。
+        // 横向和纵向都算 —— 只有横向才算的话，被挤到上一/下一行的名字会悬空、看不出属于谁。
+        const lead = (Math.abs(pick[0] - nat) > 11 || Math.abs(pick[1] - it.y) > 20)
+          ? [it.x, it.y, it.rr, pick[0] < it.x] : null;
+        out[t] = { x: pick[0], y: pick[1], lead };
+      }
+      return out;
+    })();
+
+    for (let b = 0; b < nB; b++){
+      if (!alive(data.bodies[b])) continue;   // 已合并/未生成的不画
+      const p = posAt(b);
+      const [x,y] = project(p, yaw, pitch, scale, cx, cy);
+      const id = data.bodies[b].id, col = colorOf(id, b);
+      const bd = data.bodies[b];
+      const fam = matFamilyOf(bd);
+      // 变星的光晕按**内核给的逐帧光度**缩放（area ∝ L，所以线性映射 sqrt(L/L_base)）。
+      // 这不是页面在算物理：L(t) 来自内核的 lum_series，页面只把它映射成像素。
+      let glow = 1;
+      if (bd.variability && bd.variability.on && Array.isArray(bd.lum_series) && bd.lum_series.length){
+        const k = Math.max(0, Math.min(fi, bd.lum_series.length - 1));
+        const base = bd.luminosity_Lsun > 0 ? bd.luminosity_Lsun : 1;
+        glow = Math.sqrt(Math.max(0.02, Math.min(50, bd.lum_series[k] / base)));
+      }
+      // 大小：内核的 radius_km 对数压缩（见 sizeR）。变星再多乘一个脉动因子。
+      const rr = sizeR(bd) * (glow === 1 ? 1 : Math.max(0.7, Math.min(2.2, glow)));
+      const lp = labelPos[id];   // 名字的落点（上面统一排过版；没排上就是 undefined）
+      // 光从哪来（只给球面明暗用）：从这颗天体指向**主星**，用内核逐帧坐标在屏幕上相减。
+      // 所以"亮面朝哪边"是真的跟着恒星转的，不是写死的一个斜对角。
+      let lx = -0.55, ly = -0.55;
+      {
+        const ipi = primaryIndex();
+        if (ipi >= 0 && ipi !== b && data.frames && data.frames[fi]){
+          const [qx, qy] = project(posAt(ipi), yaw, pitch, scale, cx, cy);
+          const dx = qx - x, dy = qy - y, L = Math.hypot(dx, dy);
+          if (L > 1e-6){ lx = dx / L; ly = dy / L; }
+        }
+      }
+      // ---- 表现形态之一：自发光晕 ----
+      // 色相取这颗星自己的**物质基调色**（黑体色），大小跟它自己的**光度**走 ——
+      // 一个超巨星的晕本来就该比红矮星大得多。L(t) 与 L 都是内核的原值，页面只映射成像素。
+      if (bd.emits_light){
+        const tone = matTone(bd, b);
+        const lum = Math.max(0, +bd.luminosity_Lsun || 0);
+        const cor = Math.max(1.7, Math.min(5.0, (1.35 + 0.75 * Math.log10(1 + lum)) * glow));
+        const g = ctx.createRadialGradient(x, y, rr * 0.55, x, y, rr * cor);
+        g.addColorStop(0, tone + 'cc');
+        g.addColorStop(0.34, tone + '55');
+        g.addColorStop(1, tone + '00');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr * cor, 0, Math.PI*2); ctx.fill();
+      } else if (fam === 'remnant'){
+        if (String(bd.type) === 'black_hole'){
+          // 黑洞：视界以内不发光（内核记 L=0、t_eff_K=0）。画面上能看见的只有外面那圈吸积辉光。
+          // ⚠ 用**径向渐变填充**而不是描边 —— 描边会被"球外细环 = 来源色"那条判据认成来源色环。
+          const g = ctx.createRadialGradient(x, y, rr * 0.90, x, y, rr * 3.0);
+          g.addColorStop(0.00, 'rgba(255,196,110,0.00)');
+          g.addColorStop(0.24, 'rgba(255,196,110,0.45)');
+          g.addColorStop(0.58, 'rgba(255,150,70,0.16)');
+          g.addColorStop(1.00, 'rgba(255,120,60,0.00)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr * 3.0, 0, Math.PI*2); ctx.fill();
+        } else {
+          // 中子星/脉冲星/磁星：内核把 t_eff_K 记 0（它的热辐射在 X 射线波段、
+          // 对行星的辐照度可忽略 —— 这是内核的取舍）。没有温度就推不出色相，这一档
+          // 用页面固定色，数据卡里写明了它是页面定的。给一圈极淡的冷色微光，
+          // 免得画面上只剩一个 2 px 的点什么也看不出。
+          const g = ctx.createRadialGradient(x, y, rr * 0.45, x, y, rr * 3.2);
+          g.addColorStop(0, MAT_DENSE_TONE + 'aa');
+          g.addColorStop(0.40, MAT_DENSE_TONE + '33');
+          g.addColorStop(1, MAT_DENSE_TONE + '00');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr * 3.2, 0, Math.PI*2); ctx.fill();
+        }
+      }
+      // ---- 标签引线 ----
+      // 被排挤出去的名字，补一根细引线连回自己那颗球。
+      // ⚠ 两个刻意的地方：① 用 rgba 而不是十六进制 —— "喷流"那条判据认的是**十六进制描边**
+      // （轨道拖尾也是靠这个才没被误认成喷流）；② 画在**细环之前** —— 判据要读那圈细环，
+      // 而它读的是"写名字之前最后一次 stroke"，引线要是排在后面就会把它顶掉。
+      if (lp && lp.lead){
+        ctx.save();
+        ctx.strokeStyle = 'rgba(150,162,184,0.55)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const sx = lp.lead[3] ? lp.lead[0] - lp.lead[2] - 1 : lp.lead[0] + lp.lead[2] + 1;
+        const ex = lp.lead[3] ? lp.x + 2 : lp.x - 2;
+        ctx.moveTo(sx, lp.lead[1]);
+        ctx.lineTo(ex, lp.y - 4);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // 球外那圈细环 = **来源 / 血缘色**（col 就是 colorOf：颜色按来源聚合那一层）。
+      // 球体本色的位置让给了物质与生命（见 matTone / lifeColorOf），血缘就搬到这圈细环上：
+      // 碎片与母体同色系、合并过的幸存者带着吸收进来的颜色，画布上照样看得见。
+      // 只在"有演化数据、且本体不发光"时画 —— 那时球体颜色才不是来源色，环才有信息量。
+      const bi = bioAt(fi, b);
+      if (bi && !data.bodies[b].emits_light){
+        ctx.save();
+        ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.9;
+        ctx.beginPath(); ctx.arc(x, y, rr + 3, 0, Math.PI*2); ctx.stroke();
+        if (bi.stage >= 1){
+          // 表现形态之二：**活着的天体才有的那圈阶色柔光**。
+          // 这是"有生命"的第二个可见通道（第一个是球体被阶色染色）——
+          // 死寂的天体是灰调**且没有柔光**，两个信号一起说"这里没有生命"，
+          // 不必指望用户从色调深浅去猜。亮度与半径都随阶增长。
+          const a2 = Math.round(lifeHaloA(bi.stage) * 255).toString(16).padStart(2, '0');
+          const R2 = rr + 9 + 3 * bi.stage;
+          const g2 = ctx.createRadialGradient(x, y, rr, x, y, R2);
+          g2.addColorStop(0, stageColor(bi.stage) + a2);
+          g2.addColorStop(1, stageColor(bi.stage) + '00');
+          ctx.fillStyle = g2;
+          ctx.beginPath(); ctx.arc(x, y, R2, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.restore();
+      }
+      if (b === cam.sel){    // 选中标记：虚线圆环
+        ctx.save();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.9;
+        ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.arc(x, y, rr + 6, 0, Math.PI*2); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+      }
+      // 球体本色 = 物质 × 生命（见 lifeColorOf：在物质基调色上染一层阶色，死寂往灰里压）。
+      // 这一笔是判据读的那一笔 —— 形状与半径都是 rr，球外那圈细环画在 rr+3。
+      const baseCol = lifeColorOf(b, fi);
+      ctx.fillStyle = baseCol; ctx.beginPath(); ctx.arc(x,y,rr,0,Math.PI*2); ctx.fill();
+      // 再叠一层**明暗与物质族质感**（全部用渐变，不是另画一笔本色）。
+      shadeSphere(x, y, rr, baseCol, fam, lx, ly);
+      // ---- 行星环（gas / ice 族）----
+      // 四颗巨行星确实都有环，画上它是往"真实"走。但必须说清楚：**环是页面的装饰** ——
+      // 内核不提供环参数（没有环宽、环密、倾角这些量），所以宽度/倾角/亮度全是页面定的。
+      // 这一点在图例与数据卡的「什么做的/物质」那一行都写明了，不让它冒充仿真输出。
+      // ⚠ 三个刻意的地方：① 用 **ellipse** 而不是 arc（画布桩不记 ellipse，也不会污染
+      //   lastArc）；② 用**渐变填充**而不是描边 —— 描边会被"球外细环 = 来源色"认走；
+      //   ③ 不用 translate/rotate（桩里它们是空操作，绝对坐标更稳）。
+      if ((fam === 'gas' || fam === 'ice') && rr >= 3){
+        const tilt = 0.26;                                   // 环的扁度 = 画出来的倾角
+        // 环带要**窄**：内缘留得远一些，外缘收得紧一些 —— 真实的环是薄薄一圈，
+        // 不是把球包住的盘子。四颗巨行星里只有土星的环肉眼可辨，别的都很淡，
+        // 所以统一压淡，不做"哪颗更亮"的区分（那需要环的参数，内核没有）。
+        const rIn = rr * 1.46, rOut = rr * (fam === 'gas' ? 1.94 : 1.72);
+        const ringCol = fam === 'gas' ? '214,190,140' : '150,190,215';
+        const gRing = ctx.createRadialGradient(x, y, rIn, x, y, rOut);
+        gRing.addColorStop(0.00, 'rgba(' + ringCol + ',0)');
+        gRing.addColorStop(0.26, 'rgba(' + ringCol + ',0.30)');
+        gRing.addColorStop(0.58, 'rgba(' + ringCol + ',0.13)');
+        gRing.addColorStop(1.00, 'rgba(' + ringCol + ',0)');
+        ctx.fillStyle = gRing;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rOut, rOut * tilt, -0.42, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (lp){
+        ctx.fillStyle = 'rgba(232,236,246,0.85)';
+        ctx.font = '11px -apple-system,Segoe UI,PingFang SC,sans-serif';
+        ctx.fillText(id, lp.x, lp.y);
+      }
+      // 选中的那一颗：把它的生命形态直接写在它旁边。"点一下出数据"的第一行
+      // 就落在它自己身上 —— 卡片在画面下方，这里给一个不用挪眼的读数。
+      // 文字用浅色而不是阶色：阶色是给"面"用的（球体、轨迹），拿它写 11px 小字
+      // 在深底上只有 4.0:1（第 0 阶更暗），而文字要 4.5:1 —— 颜色本身就在字旁边那颗球上。
+      if (b === cam.sel && bi){
+        const nm = (data.bio && data.bio.stage_names ? data.bio.stage_names[bi.stage] : '') || '';
+        const txt = bi.stage >= 1
+          ? nm + '（' + bi.stage + '/8 · ' + (bi.progress * 100).toFixed(0) + '%）'
+          : nm + '（还没有生命）';
+        ctx.fillStyle = 'rgba(232,236,246,0.95)';
+        ctx.fillText(txt, lp ? lp.x : x + rr + 4, (lp ? lp.y : y + 4) + 14);
+      }
+      hits.push({ b, x, y, r: Math.max(rr, 9) });
+    }
+
+    // ---- 撞击的那一下：闪光 + 扩散的冲击环 ----
+    // 这一段回答的需求是"撞的时候画布上什么都没发生"。它也是**显示层**：
+    // 位置与时刻都从内核的 events 来（见 rebuildImpactIndex），
+    // 唯一由页面定的是"淡出用多久"（tWin）。画在天体**之后**，所以闪光压在小球上。
+    // 碎裂用暖色（打碎了，飞出去），合并用冷色（吞掉了）—— 与事件时间线里的
+    // 💥 / 🪐 两个记号对应，不额外发明一套语言。
+    if (tWin > 0 && impactPts.length){
+      for (const ip of impactPts){
+        const age = now - ip.t;
+        if (age < 0 || age > tWin) continue;
+        const u = age / tWin;                      // 0 → 1
+        const [fx, fy] = project(ip.p, yaw, pitch, scale, cx, cy);
+        const grow = 7 + u * 40;                   // 冲击环的半径（像素）：纯显示
+        const a = (1 - u);
+        const frag = ip.kind === 'fragment';
+        ctx.save();
+        // 冲击环：一圈往外扩的细环
+        ctx.globalAlpha = a * 0.9;
+        ctx.strokeStyle = frag ? 'rgba(255,196,120,1)' : 'rgba(176,214,255,1)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(fx, fy, grow, 0, Math.PI*2); ctx.stroke();
+        // 闪光：中心的径向渐变，随 age 衰减
+        const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, grow * 0.85);
+        g.addColorStop(0, 'rgba(255,246,214,' + (a * 0.85) + ')');
+        g.addColorStop(0.5, (frag ? 'rgba(255,190,110,' : 'rgba(170,210,255,') + (a * 0.30) + ')');
+        g.addColorStop(1, frag ? 'rgba(255,150,80,0)' : 'rgba(140,190,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(fx, fy, grow * 0.85, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // 视角说明行：把"当前在看哪个平面"写清楚，而不是让人猜
+    let viewInfo = '';
+    if (cam.sel >= 0 && data.bodies[cam.sel]){
+      const bd = data.bodies[cam.sel], e = elemsOf(bd);
+      if (e){
+        viewInfo = ' · 视角 = <b>' + bd.id + '</b> 的轨道平面（i = ' + e[0].toFixed(3)
+          + '°, Ω = ' + e[1].toFixed(2) + '° → yaw ' + (cam.yawTo*R2D).toFixed(2)
+          + '°, 俯仰 ' + (cam.pitchTo*R2D).toFixed(2) + '°）';
+      } else {
+        viewInfo = ' · ' + bd.id + ' 没有轨道根数（太阳/figure8），点击只会回到黄道';
+      }
+    } else {
+      viewInfo = ' · 视角 = 黄道平面（俯仰 0°）';
+    }
+
+    $('tlabel').textContent = 't = ' + now.toFixed(3) + ' 年'
+      + '  （帧 ' + (fi+1) + '/' + data.frames.length + '）';
+    $('statline').innerHTML = '积分器 leapfrog（辛）· 能量漂移 '
+      + data.diagnostics.energy_drift.toExponential(2)
+      + ' · 滚轮缩放 / 拖拽平移 / 双击复位 / <b>点击星体：出它的数据 + 镜头对准它</b>'
+      + (perpetual ? ' · <b>时长：永久</b>（已算 ' + (+$('years').value) + ' 年，到末尾自动延长）' : '')
+      + viewInfo + ' · 本页零计算，全部数据来自 C++ 内核。'
+      + (uses_kernel_ic ? '' : ' <span style="color:#f5c6a5">（当前二进制未回显 ic_heliocentric，'
+        + '内置行星用的是页面内置的兜底根数，重新编译内核后自动改读内核值）</span>');
+    if (data.bio) updateBio(fi);   // 演化面板跟着帧走（判定/地表温/阶/进度都是逐帧量）
+    updateSelCard(fi);
+    maybeDrawHR(fi);
+    maybeDrawEnergy();
+    $('scrub').value = Math.round(fi / (data.frames.length-1) * 1000);
+  }
+
+  function tick(ts){
+    if (playing && data){
+      const fps = +$('speed').value;
+      if (lastTs != null){
+        frameF += dir * (ts - lastTs) / 1000 * fps;
+        const n = data.frames.length;
+        if (frameF >= n - 1){
+          // 时长「永久」：到末尾不回头，先把时长翻倍再算一遍（时刻会被找回来）。
+          // 算的过程中停在末尾这一帧，不算"卡住" —— 新数据一到就接着播。
+          //
+          // ⚠ 这里原来写的是 `if (!(perpetual && extendRun())) frameF = 0;`。
+          //   `extendRun()` 在"延长已经在算"时会返回 false（它有 extending 守卫），
+          //   于是**延长期间每帧都把 frameF 归零** —— 画面在等的这半秒里闪回到开头，
+          //   与上面那句"停在末尾这一帧"正好相反。实测（jsdom 端到端）就是这条抓到的：
+          //   连做三次延长时，读到的 t 是 0 而不是末尾。
+          const held = perpetual && (extending || extendRun());
+          if (!held) frameF = 0;   // 到上限/extendRun 已关掉"永久" → 才无缝循环（figure8 为整周期）
+        }
+        if (frameF < 0) frameF = n - 1;            // 倒放到头 → 从末尾接上，同样是循环
+      }
+      lastTs = ts;
+      // 播放位置每帧都在动，按 ~2s 节流落盘：中途直接关掉也能接得上这一帧。
+      if (ts - lastSaveTs > 2000){ lastSaveTs = ts; writeStore(); }
+    } else lastTs = ts;
+    render();
+    requestAnimationFrame(tick);
+  }
+
+  // persist=false 是给"程序内部顺手切换播放态"用的（定位帧、重算后恢复播放）：
+  // 那些不算"你改了设定"，所以只落盘、不解除分享链接的只读封锁。
+  function togglePlay(persist){
+    playing = !playing;
+    $('play').textContent = playing ? '⏸ 暂停' : '▶ 播放';
+    (persist === false ? saveStatePassive : saveState)();
+  }
+
+  $('play').addEventListener('click', () => togglePlay(true));   // 这个是玩家自己按的，算改设定
+  $('dirbtn').addEventListener('click', () => {
+    dir = -dir;
+    $('dirbtn').textContent = dir < 0 ? '⟳ 正放' : '⟲ 倒放';
+    saveState();
+  });
+  // 放置模式。抽成函数是因为"点类型"也要进这个模式 —— 两处各写一遍必然走散。
+  function setPlacing(v){
+    if (v && $('scenario').value === 'figure8'){
+      toolNote('三体场景的初值就是那个 8 字周期解本身，往里加天体会把解破坏掉，'
+        + '所以那个场景不接受自定义天体。先切到「自定义」再放。');
+      return false;
+    }
+    placing = !!v;
+    if (placing && $('scenario').value !== 'custom'){
+      // 太阳系场景会忽略行星表：不先切场景的话，点了半天一颗也放不进去（"点了没反应"）
+      $('scenario').value = 'custom';
+      syncPanels();
+      compute();
+    }
+    paintPlaceBtn();
+    return true;
+  }
+  $('placemode').addEventListener('click', () => setPlacing(!placing));
+  // 换算法必须重算（内核换了一条积分路径），所以这里直接算，不走脏标记
+  $('integ').addEventListener('change', () => { setDirty(false); compute(); });
+  // 时长「永久」只是个播放策略（真正下发给内核的是年数），所以不进脏标记、不重算。
+  $('perpetual').addEventListener('change', () => {
+    perpetual = $('perpetual').checked;
+    saveState();
+    toolNote(perpetual
+      ? '时长设为<b>永久</b>：算到末尾不会回头 —— 会把年数翻倍再算一遍，'
+        + '并把你正看的那个时刻接上（上限 ' + PERPETUAL_MAX_YEARS + ' 年）。'
+      : '时长改回<b>有限</b>：算到末尾就从头无缝循环（回到开头）。');
+  });
+  // 普通人模式给一句"这个选项意味着什么"，省得在一堆术语里瞎选
+  const INTEG_PLAIN = {
+    leapfrog: '最稳，长期不跑偏',
+    hermite: '单步最准，久了会漂',
+    euler: '最省事，但会越算越飘',
+    kepler: '只按公式摆位置，不含互相影响',
+  };
+  $('integ').addEventListener('change', () => {
+    $('integplain').textContent = INTEG_PLAIN[$('integ').value] || '';
+  });
+  // 键盘：空格播放/暂停、← → 逐帧、Shift+←/→ 首尾。
+  // 输入框里打字时一律不接管 —— 否则在年数框里按空格会把播放切掉，很难查。
+  document.addEventListener('keydown', e => {
+    const t = e.target;
+    if (t && (/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || t.isContentEditable)) return;
+    if (e.code === 'Space'){ e.preventDefault(); togglePlay(true); return; }
+    if (e.key === 'ArrowLeft'){ e.preventDefault(); seekFrame(frameIndex() - (e.shiftKey ? 1e9 : 1)); return; }
+    if (e.key === 'ArrowRight'){ e.preventDefault(); seekFrame(frameIndex() + (e.shiftKey ? 1e9 : 1)); return; }
+    // 放置模式下的两个快捷键：Esc 退出（免得忘了自己在放置模式、想平移却放了一颗），
+    // Ctrl/Cmd+Z 撤销刚才放下的那颗（"放错了"以前只能到表里找删除按钮）。
+    if (e.key === 'Escape' && placing){ e.preventDefault(); setPlacing(false); return; }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')){
+      e.preventDefault(); undoPlace(); return;
+    }
+  });
+  $('compute').addEventListener('click', compute);
+  // 把内核回显的实际生效值填回输入框（只在用户没手动改过时）。
+  // 这样"页面看到的默认值"永远是内核真在用的那个数，而不是页面抄的一份副本；
+  // 内核哪天改了默认值，页面下次请求就自动跟上。
+  function syncBioFromEcho(){
+    const B = data && data.bio;
+    if (B){
+      if ($('bioyears').value === '') $('bioyears').placeholder = String(B.full_ladder_years);
+      if ($('albedo').value === '')    $('albedo').placeholder    = String(B.albedo);
+      if (!B.defaults_used && !$('greenhouse').dataset.touched &&
+          B.greenhouse_K <= +$('greenhouse').max)
+        $('greenhouse').value = B.greenhouse_K;
+    }
+    syncPanels();
+  }
+
+  // ---- 画质：内核标定 + 一键改成推荐值 ----
+  // 轨迹是"把采样点用直线连起来"画的，所以"每圈几个采样点"直接决定圆会不会被画成多边形。
+  // 这个数不是页面算的：内核用自己 t=0 的状态按 vis-viva 算出最短环绕周期，再折算成点数回显。
+  // 页面只负责把它显示出来，并在太稀的时候给一个"改成多少"的建议。
+  function samplingBadge(){
+    const el = $('qrow');
+    if (!el) return;
+    if (!sampling || !(sampling.min_period_years > 0)){
+      el.innerHTML = '<span class="stat">画质：这个系统里没有环绕天体，'
+        + '"每圈采样点数"不适用。</span>';
+      return;
+    }
+    const p = sampling.points_per_orbit_min;
+    const tgt = sampling.points_per_orbit_target || 60;
+    const okPts = sampling.points_per_orbit_ok || 24;   // 门槛也由内核给，页面不自己拍
+    const col = p >= okPts ? '#1a9c6b' : (p >= okPts / 3 ? '#f0893c' : '#e8746b');
+    const word = p >= okPts ? '够用' : (p >= okPts / 3 ? '偏稀' : '太稀，圆会被画成多边形');
+    let html = '画质：最内圈天体每圈 <b style="color:' + col + '">' + p.toFixed(1)
+      + '</b> 个采样点（够用线 ' + okPts + '、理想 ' + tgt + ' → ' + word + '）'
+      + ' · 最短环绕周期 ' + fmt(sampling.min_period_years)
+      + ' 年是内核按 vis-viva 从各天体 t=0 状态算出的，页面不参与。';
+    // 只在两个条件下给建议：当前不够用，而且"改成推荐值"确实会变好。
+    // 少了后半条，页面就会一直举着一个永远点不掉（甚至点了没用）的按钮。
+    const candY = Math.max(1, Math.round(sampling.suggested_years));
+    const candS = Math.min(PAGE_SAMPLES_MAX, sampling.suggested_samples);
+    // 这个乘除只用来决定"要不要给按钮"，沿用的是内核在 method 里写明的同一个定义
+    // （每圈点数 = 最短周期 × 帧数 / 年数）。真正显示出来的读数，永远是重算后内核的回显。
+    const candPts = sampling.min_period_years * candS / candY;
+    if (p < okPts && candPts > p + 0.5){
+      html += ' <button id="qfix" style="font-size:11px;padding:2px 8px">改成 '
+        + candY + ' 年 / ' + candS + ' 帧（本页上限）</button>';
+    }
+    el.innerHTML = html;
+    const b = $('qfix');
+    if (b) b.addEventListener('click', () => {
+      $('years').value = candY;
+      $('years').dataset.touched = '1';
+      $('samples').value = candS;
+      $('samples').dataset.touched = '1';
+      compute();
+    });
+  }
+
+  // 演化开关关掉时，三个旋钮一起置灰（置灰不是隐藏：你要看得见它们存在过）。
+  function syncBioEnabled(){
+    const on = $('bioon').checked;
+    ['bioyears', 'albedo', 'greenhouse'].forEach(id => { $(id).disabled = !on; });
+  }
+
+  function syncPanels(){
+    const sc = $('scenario').value;
+    syncBioEnabled();
+    $('custombox').style.display = sc === 'custom' ? 'block' : 'none';
+    // 选了「自定义」就把装着它的「更多设置」摊开 —— 否则用户会以为"我的行星"没了。
+    // 只在真的显示它时才展开：collidebox / biobox 在多数场景下都在，不该因此把折叠区顶开。
+    if (sc === 'custom') revealInDetails($('custombox'));
+    $('collidebox').style.display = sc === 'figure8' ? 'none' : 'block';
+    $('biobox').style.display = 'block';
+    $('ghlabel').textContent = '（' + $('greenhouse').value + ' K'
+      + (data && data.bio ? '，本次生效 ' + data.bio.greenhouse_K + ' K' : '') + '）';
+    $('bionote').innerHTML =
+      '驱动量是真的：每颗星体的辐照度 S = (L/L☉)/r²，r 取它到主星的实时距离；'
+      + 'T_eq = 278.6·((1−A)·S)^(1/4)；T_surf = T_eq + 温室增温。'
+      + '只有地表温落在<b>冰点 273 K 与沸点 373 K 之间</b>（水能以液态存在）时阶梯才推进，'
+      + '低于冰点冻住（进度不回退）、达到沸点归零。'
+      + '<b>阶梯本身（9 级与进度）是编排的，不是真实生物学</b>，详见下方演化面板。'
+      + (sc === 'figure8'
+          ? ' <span style="color:#f5c6a5">三体场景里三颗等质量星互为光源，'
+            + '"谁照亮谁"没有物理定义，演化数值仅供参照。</span>'
+          : '');
+    $('fragopts').style.display = $('collide').value === 'fragment' ? 'flex' : 'none';
+    // 「不放太阳系」时没有中心引力源，开普勒初值只决定 initial position，
+    // 之后天体按牛顿定律互相吸引（几乎无质量时近似直线飞散）。这是如实的行为，
+    // 但页面必须说明，否则看起来像坏了。
+    const sm = sc === 'custom' ? $('solarmode').value : 'full';
+    $('solarhint').textContent = sm === 'none'
+      ? '没有中心天体：天体只互相吸引（质量太小时近似直线飞散）。想看到束缚轨道，把某个天体的质量调到 ~1 M☉ 当中心星。'
+      : (sm === 'sun'
+          ? '只放太阳：行星表的根数不生效，天体绕太阳走。'
+          : '');
+  }
+  $('solarmode').addEventListener('change', () => { syncPanels(); compute(); });
+  $('scenario').addEventListener('change', () => {
+    syncPanels();
+    if ($('scenario').value === 'figure8') $('years').value = 6.32591398;
+    else $('years').value = 20;
+    compute();
+  });
+  $('collide').addEventListener('change', syncPanels);
+  // 演化旋钮：滑杆拖动只更新标签与本地状态，松手（change）才重算，
+  // 否则会按帧率把内核打爆。开关与数字框同理。
+  $('greenhouse').addEventListener('input', () => {
+    $('greenhouse').dataset.touched = '1';
+    $('ghlabel').textContent = '（' + $('greenhouse').value + ' K）';
+  });
+  $('greenhouse').addEventListener('change', compute);
+  $('bioon').addEventListener('change', () => {
+    syncBioEnabled();
+    saveState();
+    compute();
+  });
+  ['bioyears', 'albedo'].forEach(id =>
+    $(id).addEventListener('change', () => { $(id).dataset.touched = '1'; compute(); }));
+  syncPanels();
+  // 这几个控件改了不会自动重算，所以要显式把"参数已改"标记出来
+  DIRTY_IDS.forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    ['input', 'change'].forEach(ev => el.addEventListener(ev, () => setDirty(true)));
+  });
+  paintComputeBtn();
+  paintPlaceBtn();
+    applyMode(uiMode, false);        // 首次进入：默认"普通人"（会随会话恢复覆盖）
+  buildPalette();
+  $('hrcard').style.display = 'none';   // 还没算过数据时不占版面
+  $('integplain').textContent = INTEG_PLAIN[$('integ').value] || '';
+  // 任何控件的改动都落一次盘。用捕获阶段监听，这样后渲染出来的行星表格输入框
+  // 也不用逐个挂钩；程序化赋值（恢复会话时的 .value =）不触发事件，所以不会自激。
+  ['input', 'change'].forEach(ev =>
+    document.addEventListener(ev, () => saveState(), true));
+  // 页面藏起来 / 关掉时立刻写一次：debounce 里没落盘的那次不能丢。
+  window.addEventListener('pagehide', flushSave);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSave();
+  });
+  $('scrub').addEventListener('input', () => {
+    if (!data) return;
+    frameF = Math.round(+$('scrub').value / 1000 * (data.frames.length-1));
+  });
+  $('years').addEventListener('input', e => e.target.dataset.touched = '1');
+
+  // 启动：健康检查 + 首次计算
+  fetch('/api/health').then(r => r.json()).then(h => {
+    if (!h.exists)
+      $('statline').innerHTML = '<span style="color:#f5c6a5">未找到 starpivot 可执行文件，请先编译。</span>';
+  }).catch(() => {
+    $('statline').innerHTML = '<span style="color:#f5c6a5">检测不到本地服务：请运行 '
+      + '<code>python tools/webapp.py</code> 后从 http://localhost:8765/universe.html 打开。</span>';
+  });
+  resizeCanvas();
+  // 先回填上一次的选择，再让 compute() 用这套选择重新去问内核。
+  // pending 非空表示「这次计算是为了恢复会话」，播放位置/播放暂停/选中态在算完后才接得上。
+  const shared = parseShareHash();
+  if (shared) persistBlocked = true;   // 打开别人的分享链接，先别写你自己的存档
+  const savedSession = shared || readStore();
+  if (savedSession){ restoreSession(savedSession); pending = savedSession; }
+  showSessionNote(savedSession, !!shared);
+  // 导览：deep link 优先（#step-xxx）；第一次打开（没有存档）自动开；
+  // 之后只在标题栏留一个「▶ 开始导览」，不打扰。
+  // 注意这一段必须放在 savedSession 声明**之后** —— 放在前面会 TDZ 抛错，
+  // 整个脚本停在那里，连内核都不会去调（本项目已经因为"声明位置"栽过两次了）。
+  {
+    const m = /^#step-([a-z0-9-]+)$/.exec(location.hash || '');
+    if (m){
+      const idx = TOUR.findIndex(s => s.id === m[1]);
+      setTimeout(() => startTour(idx >= 0 ? idx : 0), 300);
+    } else if (!savedSession) {
+      setTimeout(() => startTour(0), 400);
+    }
+  }
+  compute();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

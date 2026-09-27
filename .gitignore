@@ -1,0 +1,60 @@
+# StarPivot —— 只把"源码与判据"纳入版本控制。
+#
+# 原则：能由源码重建的东西一律不进仓库。否则历史会被二进制与录制撑爆，
+# 而且它们会悄悄过期 —— "绑体积+sha1 核对源码"这种一致性，只有重建才保证得了。
+# ⚠ 本文件里注释只能独占一行：gitignore **不支持行尾注释**（`x # 说明` 会把说明当模式）。
+
+# ---------- 构建产物（发布包也排除 build/，所以它从不属于交付物）----------
+build/
+*.o
+*.obj
+*.pdb
+*.ilk
+*.exe
+
+# ---------- 发布用的 Linux 静态二进制 ----------
+# 它放 kernel/ 而不是 build/，是为了让发布包能带上它；但它仍是可重建的产物
+# （zig c++ -target x86_64-linux-musl），因此不进版本库。
+# ⚠ 前缀必须写全 /starpivot/ —— 写成 kernel/... 只匹配仓库根下的 kernel/，
+#   而真实路径是 starpivot/kernel/...（踩过：8.7 MB 的 ELF 差点被提交）。
+/starpivot/kernel/linux-x86_64/starpivot
+
+# ---------- 探针的运行产物 ----------
+# 录制缓存：可用 python _record.py 从内核重录，并且绑 体积+sha1，内核一重建就作废。
+_replay.json
+_plan_*.json
+*.err
+# 散落在 starpivot/ 根下的调试 JSON（真实数据在 starpivot/data/，不在忽略之列）。
+/starpivot/_*.json
+_f_*.json
+_frag*.json
+
+# ---------- 结果文件与运行日志 ----------
+# 它们是判据的落盘证据，不是源码 —— 每次跑都重写。
+# ⚠ 只忽略 .txt/.log/.out，绝不碰同名的 .js/.py：判据套件本身是项目资产。
+_probe_*.txt
+_check*.txt
+_check.txt
+_runall.txt
+_runall_*.txt
+_my_runall.txt
+_build*.txt
+_c_*.txt
+*.log
+*.out
+__pycache__/
+*.pyc
+
+# ---------- 其它工具的产物 / 截图 / 平台文件 ----------
+output/
+_shot/
+.wbapp_*.genie
+# .workbuddy/ 是本机的项目数据与开发日记（含发布 appId、每次决策的过程、内部复盘）。
+# 文件留在磁盘上，但不进公开仓库 —— 一旦公开就会被缓存 / 被 fork，撤不回来。
+.workbuddy/
+
+# ---------- 编辑器与系统 ----------
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,25 @@
+=== 1. 玩家能从自定义场景触发的失败路径 ===
+  无行星 + 不放太阳系 → 退出码 2 | starpivot: --scenario custom needs at least one --body
+  无行星 + 只放太阳 → 退出码 2 | starpivot: --scenario custom needs at least one --body
+  e = 1.5（页面表格允许输入） → 退出码 2 | starpivot: --body e must be in [0,1) (name X)
+  e = 1.0（正好等于 1） → 退出码 2 | starpivot: --body e must be in [0,1) (name X)
+  a = -3（负半长轴） → 退出码 2 | starpivot: --body a_AU must be > 0 (name X)
+  质量 = 1e9 M☉ → 退出码 0 | { "status": "ok", "command": "nbody", "scenario": "custom", "solar": "sun", "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame", "integrator": "leapfrog2 (symplectic, kick-drift-kick)", "collide": "off", "radius_scale": …
+  17 个行星（页面按钮静默截断在 16） → 退出码 2 | starpivot: at most 16 --body entries
+
+=== 2. 错误提示能活多久（玩家看得见吗）===
+  正常状态 statline = 积分器 leapfrog（辛）· 能量漂移 2.08e-7 · 滚轮缩放 / 拖拽平移 / 双击复位 / 点击星体切到它
+  内核请求体里的 e = [1.5,0.2]
+  内核拒绝后【同一瞬间】statline = starpivot: --body e must be in [0,1) (name A)
+  推进 1 帧之后        statline = 积分器 leapfrog（辛）· 能量漂移 7.34e-8 · 滚轮缩放 / 拖拽平移 / 双击复位 / 点击星体切到它的轨道平面 · 视角 = 黄道平面（俯仰 0°） · 本页零计算，全部数据来自 C++ 内核。 （当
+  → 错误提示已经被下一帧覆盖掉了
+  此时画面上仍显示的是：t = 0.050（旧数据还在，玩家看不出这次重算失败了）
+  端点/控制台异常 = 无
+
+=== 3. 内核返回 status:ok 但 frames 为空（--dt 0 就是这个结果）时页面会怎样 ===
+探针异常：TypeError: Cannot read properties of undefined (reading 't')
+    at render (http://localhost:8765/universe.html:681:33)
+    at tick (http://localhost:8765/universe.html:831:5)
+    at step (C:\Users\geral\WorkBuddy\2026-09-24-16-11-48\_audit_fail_path.js:72:105)
+    at Object.settle (C:\Users\geral\WorkBuddy\2026-09-24-16-11-48\_audit_fail_path.js:75:57)
+    at async C:\Users\geral\WorkBuddy\2026-09-24-16-11-48\_audit_fail_path.js:127:3

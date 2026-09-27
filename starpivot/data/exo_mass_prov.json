@@ -1,0 +1,465 @@
+{
+  "dataset": "exo_mass_prov",
+  "description": "每颗行星的质量值、质量出处(mass provenance)与不确定度。用于补齐 real_exoplanets.json 里 pl_bmassj 缺的方法学信息：pl_bmassj 本身是 Archive 的综合值，其性质随探测方法而异，本文件把'出处'与'不确定度'显式记下。",
+  "source": {
+    "name": "NASA Exoplanet Archive",
+    "institution": "NASA / Caltech (IPAC), 美国",
+    "table": "pscomppars",
+    "service": "TAP sync",
+    "endpoint": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+    "retrieved_utc": "2026-09-27T13:45:39Z",
+    "query": "select pl_name,hostname,pl_orbper,pl_bmassj,pl_bmassjerr1,pl_bmassjerr2,pl_bmassjsymerr,pl_bmassjlim,pl_bmassjstr,pl_bmassjformat,pl_bmassj_solnid,pl_bmassprov,pl_bmassj_reflink from pscomppars where hostname in ('TRAPPIST-1','TOI-178','ups And','51 Peg','Proxima Cen') order by hostname,pl_orbper",
+    "raw_response_bytes": 5765,
+    "raw_response_sha1": "c0be90badadcfd8b08afebe24355a72a5c578aa9",
+    "raw_csv": "pscomp_massprov.csv",
+    "evidence": "PROVENANCE-exo_mass_prov.md"
+  },
+  "units": {
+    "pl_bmassj": "木星质量 (M_jup)",
+    "pl_bmassjerr1": "木星质量 (M_jup)",
+    "pl_bmassjerr2": "木星质量 (M_jup)"
+  },
+  "field_semantics": {
+    "pl_bmassprov": {
+      "meaning": "质量出处/方法。由官方 TAP_SCHEMA 描述为 'Planet Mass or Mass*sin(i) Provenance'。",
+      "retrieved_vocabulary": "对全表 pscomppars 做 group by 实测得到的完整取值域（非凭记忆）",
+      "full_table_vocabulary": {
+        "M-R relationship": 2970,
+        "Mass": 2462,
+        "Msini": 925,
+        "Msin(i)/sin(i)": 15
+      },
+      "how_to_use": "Msini 表示该值为 m*sin(i)，是视向速度给出的质量【下限】；Mass 表示【绝对/实测质量】，不是下限；M-R relationship 表示质量由质径关系推得，不是实测；Msin(i)/sin(i) 表示已假定/已知 sin(i) 后由 m*sin(i) 反推的绝对质量。",
+      "note": "取值域里【没有】'TTV' 这个字面值。Archive 不用 'TTV' 标注凌星计时质量，而用 'Mass'。因此不能凭 pl_bmassprov 直接断言'某颗来自 TTV'。"
+    },
+    "pl_bmassjlim": {
+      "official_description": "TAP_SCHEMA 原文: 'Planet Mass or Mass*sin(i) [Jupiter Mass] Limit Flag'（未给出取值枚举）",
+      "semantics": "未验证",
+      "observed_for_our_19": "19 颗全部为 0",
+      "warning": "全表实测显示 pl_bmassjlim 不能当作'是否下限'的判据：有 891 颗 pl_bmassprov='Msini'（真·下限）其 lim 却是 0；反过来 221 颗 prov='Mass'（绝对质量）其 lim 是 1。判断是否下限请一律用 pl_bmassprov。"
+    },
+    "pl_bmassjsymerr": {
+      "meaning": "误差是否对称的标志位；本文件按实测归纳：1 = 对称（|err1| == |err2|），0 = 非对称",
+      "verification": "在本批 19 颗样本上逐一验证成立；未在官方文档中核实其定义，故记为'实测归纳'而非'官方定义'"
+    }
+  },
+  "classification_by_pl_bmassprov": {
+    "Mass": [
+      "51 Peg b",
+      "TOI-178 b",
+      "TOI-178 c",
+      "TOI-178 d",
+      "TOI-178 e",
+      "TOI-178 f",
+      "TOI-178 g",
+      "TRAPPIST-1 b",
+      "TRAPPIST-1 c",
+      "TRAPPIST-1 d",
+      "TRAPPIST-1 e",
+      "TRAPPIST-1 f",
+      "TRAPPIST-1 g",
+      "TRAPPIST-1 h",
+      "ups And c",
+      "ups And d"
+    ],
+    "Msini": [
+      "Proxima Cen b",
+      "Proxima Cen d",
+      "ups And b"
+    ],
+    "counts": {
+      "Mass": 16,
+      "Msini": 3
+    },
+    "note": "本批 19 颗只出现两种取值：Mass（16 颗，绝对质量）、Msini（3 颗，下限）。不要把这 16 颗说成'下限'，也不要把这 3 颗说成'实测质量'。"
+  },
+  "alignment": {
+    "ours": 19,
+    "hit": 19,
+    "miss": [],
+    "value_mismatch": [],
+    "note": "19 颗逐颗对齐，pl_bmassj 数值与 real_exoplanets.json 完全一致（逐颗比对，差值 < 1e-12）。"
+  },
+  "planets": {
+    "TRAPPIST-1 b": {
+      "hostname": "TRAPPIST-1",
+      "pl_bmassj": 0.00432309,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.0002171,
+        "pl_bmassjerr2": -0.0002171,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.004323&plusmn;0.000217",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "AGOL_ET_AL__2021",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2021PSJ.....2....1A/abstract",
+        "label": "Agol et al. 2021"
+      }
+    },
+    "TRAPPIST-1 c": {
+      "hostname": "TRAPPIST-1",
+      "pl_bmassj": 0.00411543,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.0001762,
+        "pl_bmassjerr2": -0.0001762,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.004115&plusmn;0.000176",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "AGOL_ET_AL__2021",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2021PSJ.....2....1A/abstract",
+        "label": "Agol et al. 2021"
+      }
+    },
+    "TRAPPIST-1 d": {
+      "hostname": "TRAPPIST-1",
+      "pl_bmassj": 0.00122078,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 3.776e-05,
+        "pl_bmassjerr2": -3.776e-05,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.00122&plusmn;0.00004",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "AGOL_ET_AL__2021",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2021PSJ.....2....1A/abstract",
+        "label": "Agol et al. 2021"
+      }
+    },
+    "TRAPPIST-1 e": {
+      "hostname": "TRAPPIST-1",
+      "pl_bmassj": 0.00217728,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 6.922e-05,
+        "pl_bmassjerr2": -6.922e-05,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.00218&plusmn;0.00007",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "AGOL_ET_AL__2021",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2021PSJ.....2....1A/abstract",
+        "label": "Agol et al. 2021"
+      }
+    },
+    "TRAPPIST-1 f": {
+      "hostname": "TRAPPIST-1",
+      "pl_bmassj": 0.00326906,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 9.754e-05,
+        "pl_bmassjerr2": -9.754e-05,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.003269&plusmn;0.000098",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "AGOL_ET_AL__2021",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2021PSJ.....2....1A/abstract",
+        "label": "Agol et al. 2021"
+      }
+    },
+    "TRAPPIST-1 g": {
+      "hostname": "TRAPPIST-1",
+      "pl_bmassj": 0.00415633,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.00011956,
+        "pl_bmassjerr2": -0.00011956,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.004156&plusmn;0.000120",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "AGOL_ET_AL__2021",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2021PSJ.....2....1A/abstract",
+        "label": "Agol et al. 2021"
+      }
+    },
+    "TRAPPIST-1 h": {
+      "hostname": "TRAPPIST-1",
+      "pl_bmassj": 0.00102571,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 6.293e-05,
+        "pl_bmassjerr2": -6.293e-05,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.00103&plusmn;0.00006",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "AGOL_ET_AL__2021",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2021PSJ.....2....1A/abstract",
+        "label": "Agol et al. 2021"
+      }
+    },
+    "TOI-178 b": {
+      "hostname": "TOI-178",
+      "pl_bmassj": 0.0030205,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.00220245,
+        "pl_bmassjerr2": -0.00204513,
+        "pl_bmassjsymerr": 0,
+        "symmetry": "asymmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "<div><span class=supersubNumber\">0.00302</span><span class=\"superscript\">+0.00220</span><span class=\"subscript\">-0.00205</span></div>\"",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "LELEU_ET_AL__2024",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2024A&A...688A.211L/abstract",
+        "label": "Leleu et al. 2024"
+      }
+    },
+    "TOI-178 c": {
+      "hostname": "TOI-178",
+      "pl_bmassj": 0.01459907,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.0016361,
+        "pl_bmassjerr2": -0.00166757,
+        "pl_bmassjsymerr": 0,
+        "symmetry": "asymmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "<div><span class=supersubNumber\">0.0146</span><span class=\"superscript\">+0.0016</span><span class=\"subscript\">-0.0017</span></div>\"",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "LELEU_ET_AL__2024",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2024A&A...688A.211L/abstract",
+        "label": "Leleu et al. 2024"
+      }
+    },
+    "TOI-178 d": {
+      "hostname": "TOI-178",
+      "pl_bmassj": 0.01636103,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.00122708,
+        "pl_bmassjerr2": -0.00135293,
+        "pl_bmassjsymerr": 0,
+        "symmetry": "asymmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "<div><span class=supersubNumber\">0.0164</span><span class=\"superscript\">+0.0012</span><span class=\"subscript\">-0.0014</span></div>\"",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "LELEU_ET_AL__2024",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2024A&A...688A.211L/abstract",
+        "label": "Leleu et al. 2024"
+      }
+    },
+    "TOI-178 e": {
+      "hostname": "TOI-178",
+      "pl_bmassj": 0.0109493,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.00091244,
+        "pl_bmassjerr2": -0.00091244,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.0109&plusmn;0.0009",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "LELEU_ET_AL__2024",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2024A&A...688A.211L/abstract",
+        "label": "Leleu et al. 2024"
+      }
+    },
+    "TOI-178 f": {
+      "hostname": "TOI-178",
+      "pl_bmassj": 0.01771396,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.00141586,
+        "pl_bmassjerr2": -0.00129,
+        "pl_bmassjsymerr": 0,
+        "symmetry": "asymmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "<div><span class=supersubNumber\">0.0177</span><span class=\"superscript\">+0.0014</span><span class=\"subscript\">-0.0013</span></div>\"",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "LELEU_ET_AL__2024",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2024A&A...688A.211L/abstract",
+        "label": "Leleu et al. 2024"
+      }
+    },
+    "TOI-178 g": {
+      "hostname": "TOI-178",
+      "pl_bmassj": 0.01384395,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.00122708,
+        "pl_bmassjerr2": -0.00116415,
+        "pl_bmassjsymerr": 0,
+        "symmetry": "asymmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "<div><span class=supersubNumber\">0.0138</span><span class=\"superscript\">+0.0012</span><span class=\"subscript\">-0.0012</span></div>\"",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "LELEU_ET_AL__2024",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2024A&A...688A.211L/abstract",
+        "label": "Leleu et al. 2024"
+      }
+    },
+    "ups And b": {
+      "hostname": "ups And",
+      "pl_bmassj": 0.6876,
+      "pl_bmassprov": "Msini",
+      "mass_is_lower_limit": true,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.0044,
+        "pl_bmassjerr2": -0.0044,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.6876&plusmn;0.0044",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "CURIEL_ET_AL__2011",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2011A&A...525A..78C/abstract",
+        "label": "Curiel et al. 2011"
+      }
+    },
+    "ups And c": {
+      "hostname": "ups And",
+      "pl_bmassj": 13.98,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 2.3,
+        "pl_bmassjerr2": -5.3,
+        "pl_bmassjsymerr": 0,
+        "symmetry": "asymmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "<div><span class=supersubNumber\">13.98</span><span class=\"superscript\">+2.30</span><span class=\"subscript\">-5.30</span></div>\"",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "MCARTHUR_ET_AL__2010",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2010ApJ...715.1203M/abstract",
+        "label": "McArthur et al. 2010"
+      }
+    },
+    "ups And d": {
+      "hostname": "ups And",
+      "pl_bmassj": 10.25,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.7,
+        "pl_bmassjerr2": -3.3,
+        "pl_bmassjsymerr": 0,
+        "symmetry": "asymmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "<div><span class=supersubNumber\">10.25</span><span class=\"superscript\">+0.70</span><span class=\"subscript\">-3.30</span></div>\"",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "MCARTHUR_ET_AL__2010",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2010ApJ...715.1203M/abstract",
+        "label": "McArthur et al. 2010"
+      }
+    },
+    "51 Peg b": {
+      "hostname": "51 Peg",
+      "pl_bmassj": 0.61,
+      "pl_bmassprov": "Mass",
+      "mass_is_lower_limit": false,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.06,
+        "pl_bmassjerr2": -0.05,
+        "pl_bmassjsymerr": 0,
+        "symmetry": "asymmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "<div><span class=supersubNumber\">0.61</span><span class=\"superscript\">+0.06</span><span class=\"subscript\">-0.05</span></div>\"",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "CONT_ET_AL_2026",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2026A&A...710A.345C/abstract",
+        "label": "Cont et al. 2026"
+      }
+    },
+    "Proxima Cen b": {
+      "hostname": "Proxima Cen",
+      "pl_bmassj": 0.0033194,
+      "pl_bmassprov": "Msini",
+      "mass_is_lower_limit": true,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.00017305,
+        "pl_bmassjerr2": -0.00017305,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.003319&plusmn;0.000173",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "SU_AMP_AACUTE_REZ_MASCARE_AMP_NTILDE_O_ET_AL__2025",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2025A&A...700A..11M/abstract",
+        "label": "Suárez Mascareño et al. 2025"
+      }
+    },
+    "Proxima Cen d": {
+      "hostname": "Proxima Cen",
+      "pl_bmassj": 0.00081805,
+      "pl_bmassprov": "Msini",
+      "mass_is_lower_limit": true,
+      "uncertainty": {
+        "pl_bmassjerr1": 0.00011956,
+        "pl_bmassjerr2": -0.00011956,
+        "pl_bmassjsymerr": 1,
+        "symmetry": "symmetric",
+        "pl_bmassjlim": 0,
+        "pl_bmassjstr": "0.000818&plusmn;0.000120",
+        "note": "err1=上不确定度(正向)，err2=下不确定度(负值)。两值分列，不合并成单个数。"
+      },
+      "reference": {
+        "refstr": "SU_AMP_AACUTE_REZ_MASCARE_AMP_NTILDE_O_ET_AL__2025",
+        "ads_url": "https://ui.adsabs.harvard.edu/abs/2025A&A...700A..11M/abstract",
+        "label": "Suárez Mascareño et al. 2025"
+      }
+    }
+  }
+}

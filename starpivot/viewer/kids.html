@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#fbf8f1">
+<title>行星小实验 — 点一下，放一颗行星</title>
+<meta name="description" content="点一下画面就能放一颗行星，看看它绕恒星转一圈要多久。给小朋友的一页。">
+<style>
+  /* StarPivot 设计系统 v1 —— 暖色版：令牌名、字号阶梯、间距刻度、圆角与阴影
+     与其余三页完全相同，只把底色与强调色换成暖色（这一页要有"给小孩"的温度），
+     并把基础字号抬高到 17px —— 这是"读者不同"带来的语义差异，不是另搞一套。 */
+  :root{
+    /* —— 颜色令牌（暖色版）—— */
+    --bg:#fbf8f1; --card:#ffffff; --card2:#fdf7ec;
+    --line:#ece3d3; --line2:#dccdb4;
+    /* ink2 / ink3 承载文字，需在暖色底上过 AA：实测最差底色 --card2 #fdf7ec
+       → ink 14.39 / ink2 6.37 / ink3 4.68（旧 ink3 #948872 只有 3.27）。 */
+    --ink:#2a241d; --ink2:#635a4a; --ink3:#7c6e50;
+    --accent:#b45c15; --accent-soft:#fdf0e2;
+    --accent2:#2455d6; --accent2-soft:#eaf0fe;
+    --ok:#127a52; --ok-soft:#e9f8f1;
+    --warn:#b4530a; --warn-soft:#fdf3e7;
+    --danger:#b42318; --danger-soft:#fdeceb;
+    --grid:#f4efe4;
+    /* —— 字号阶梯（基础字号按本页读者抬高，其余同比例）—— */
+    --fs-xs:12px; --fs-sm:13.5px; --fs-base:17px; --fs-md:18px;
+    --fs-lg:20px; --fs-xl:23px; --fs-2xl:28px; --fs-3xl:40px;
+    /* —— 行高 —— */
+    --lh-tight:1.3; --lh-body:1.7; --lh-loose:1.85;
+    /* —— 间距刻度 —— */
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
+    /* —— 圆角与阴影 —— */
+    --r-1:6px; --r-2:10px; --r-3:16px; --r-full:999px;
+    --sh-1:0 1px 2px rgba(80,60,20,.05); --sh-2:0 8px 24px rgba(80,60,20,.09);
+    --ring:0 0 0 3px rgba(180,92,21,.30);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --dur:.16s; --ease:cubic-bezier(.2,.6,.2,1);
+    --wrap:760px;
+  }
+  *{box-sizing:border-box}
+  /* 触屏：点按不闪系统灰；刘海屏 / Home 指示条处留安全区，内容不被压住。 */
+  html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:rgba(180,92,21,.18)}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+       padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
+       font:var(--fs-base)/var(--lh-body) -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:var(--sp-5) var(--sp-4) var(--sp-6)}
+  h1{margin:0 0 var(--sp-2);font-size:var(--fs-2xl);font-weight:700;letter-spacing:.4px;line-height:var(--lh-tight)}
+  .lead{font-size:var(--fs-md);color:var(--ink);line-height:var(--lh-loose);margin-bottom:var(--sp-4)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-3);
+        padding:var(--sp-4);margin-bottom:var(--sp-4);box-shadow:var(--sh-1)}
+  /* 这一页的玩法是"点一下画面"：必须声明 touch-action，否则触屏会把点按当成滚动意图。
+     用 manipulation（不是 none）—— 点按立刻生效、双击缩放关掉，但页面仍能正常上下滚。 */
+  canvas{width:100%;display:block;border-radius:var(--r-2);background:#fffdf8;cursor:crosshair;
+         touch-action:manipulation}
+  .knobs{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);margin-top:var(--sp-4)}
+  .knob label{display:block;font-size:var(--fs-base);margin-bottom:2px}
+  .knob .hint{font-size:var(--fs-sm);color:var(--ink2);margin-bottom:var(--sp-2)}
+  input[type=range]{width:100%;accent-color:var(--accent);touch-action:manipulation}
+  .val{font-weight:800;color:var(--accent)}
+  .big{font-size:var(--fs-xl);text-align:center;padding:var(--sp-4) var(--sp-3);
+       border-radius:var(--r-3);background:#fff7ee;border:1px dashed #f0d9bf}
+  .big b{font-size:var(--fs-3xl);color:var(--accent);vertical-align:-2px;font-variant-numeric:tabular-nums}
+  /* 交互控件：字号下限 16px（iOS Safari 在 <16px 的输入框/下拉聚焦时会整页放大）。 */
+  input,select,textarea{font-size:max(16px,var(--fs-base));touch-action:manipulation}
+  button{font:inherit;font-size:var(--fs-md);padding:var(--sp-3) var(--sp-5);border-radius:var(--r-2);
+         border:1px solid var(--line2);background:var(--card);color:var(--ink);cursor:pointer;
+         touch-action:manipulation;min-height:48px;
+         transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
+  button:hover{border-color:var(--accent);background:var(--accent-soft)}
+  button:active{transform:translateY(1px)}
+  .found{background:var(--ok-soft);border:1px solid #bbf7d0;border-radius:var(--r-3);
+         padding:var(--sp-4);font-size:var(--fs-base);line-height:var(--lh-loose);color:#14532d}
+  .found b{color:#0d5b3e}
+  /* —— 玩法层：猜一猜 ——
+     这一块是**编排**（好玩的部分），对错由页面按"内核回的两次时间相差多少倍"分档得出；
+     分档规则写在面板里，明说它是玩法规则、不是自然规律。 */
+  .guess{margin-top:var(--sp-4);padding:var(--sp-4);border-radius:var(--r-3);
+         background:var(--accent2-soft);border:1px dashed #b7cdf7}
+  .guess .ask{font-size:var(--fs-md);font-weight:700;margin-bottom:var(--sp-3);text-align:center}
+  .guess .opts{display:flex;gap:var(--sp-2);flex-wrap:wrap;justify-content:center}
+  .guess .grule{font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-3);line-height:var(--lh-body)}
+  .miss{background:var(--warn-soft);border:1px solid #efd2ab;border-radius:var(--r-3);
+        padding:var(--sp-4);font-size:var(--fs-base);line-height:var(--lh-loose);color:#6f3a08;margin-top:14px}
+  .miss b{color:#5d3006}
+  details{margin-top:var(--sp-4);border-top:1px solid var(--line);padding-top:var(--sp-3)}
+  summary{cursor:pointer;font-size:var(--fs-md);color:var(--ink2);font-weight:600;touch-action:manipulation}
+  details .inner{font-size:var(--fs-md);color:var(--ink2);line-height:var(--lh-loose);margin-top:var(--sp-2)}
+  details .inner dt{font-weight:700;color:var(--ink);margin-top:var(--sp-2)}
+  details .inner dd{margin:0}
+  code{font-family:var(--mono);font-size:var(--fs-sm);background:var(--grid);
+       padding:1px 6px;border-radius:var(--r-1)}
+  pre{background:#2b2620;color:#f6f1e8;padding:var(--sp-3);border-radius:var(--r-2);
+      overflow-x:auto;font-size:var(--fs-sm);line-height:1.6}
+  footer{color:var(--ink2);font-size:var(--fs-md);margin-top:var(--sp-5);text-align:center;line-height:var(--lh-loose)}
+  .tip{font-size:var(--fs-md);color:var(--ink2);text-align:center;margin-top:var(--sp-3)}
+  a{color:var(--accent2);text-underline-offset:2px;touch-action:manipulation}
+  /* —— 可访问性：键盘焦点必须看得见；正文对比度按暖色底重新取值 —— */
+  a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,[tabindex]:focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-1)}
+  @media(max-width:560px){
+    .knobs{grid-template-columns:1fr}
+    .wrap{padding:var(--sp-4) var(--sp-3) var(--sp-5)}
+    h1{font-size:var(--fs-xl)}
+    .big b{font-size:var(--fs-2xl)}
+  }
+  /* —— 平板档：561–1024px（iPad 竖 768 / 横 1024）——
+     意图：保持"一屏看完"——画布宽度顶到 760 上限，两个旋钮继续并排（不塌成一列），
+     并把按钮/滑块抬到手指尺寸；560 以下才收成一列。 */
+  @media(min-width:561px) and (max-width:1024px){
+    .wrap{padding-left:var(--sp-4);padding-right:var(--sp-4)}
+    .knobs{grid-template-columns:1fr 1fr}
+    button{min-height:48px}
+    input[type=range]{height:44px}
+  }
+  /* —— 触摸设备（pointer:coarse）：可点区域最小 44×44（Material 建议 48）—— */
+  @media(pointer:coarse){
+    button,summary,a,[tabindex]{min-height:44px}
+    a{display:inline-flex;align-items:center;justify-content:center}
+    input[type=range]{height:44px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>行星小实验</h1>
+  <div class="lead">点一下画面，放一颗行星 —— 看看它绕恒星转一圈，要多久。</div>
+
+  <div class="card">
+    <canvas id="sky" width="720" height="520"></canvas>
+    <div class="tip" id="tip">画面里的黄点是恒星。在它周围点一下，行星就放在那儿。</div>
+
+    <div class="knobs" id="knobs">
+      <div class="knob">
+        <label>离恒星多远：<span class="val" id="vdist">2</span> 步</label>
+        <div class="hint">拖动它，看看远近有什么不一样</div>
+        <input type="range" id="dist" min="1" max="4" step="1" value="2">
+      </div>
+      <div class="knob">
+        <label>它的路有多扁：<span class="val" id="vecc">0.0</span></label>
+        <div class="hint">0 是正圆；数字越大，路越扁、拉得越长</div>
+        <input type="range" id="ecc" min="0" max="0.6" step="0.1" value="0">
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:14px" id="againwrap">
+      <button id="again">换成这个再试一次</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="big">转一圈要 <b id="period">—</b> <span id="unit">年</span></div>
+    <div class="tip" id="ptip">正在问……</div>
+    <div class="guess" id="guess" style="display:none">
+      <div class="ask" id="ask">你猜：它转一圈要多久？</div>
+      <div class="opts">
+        <button id="g_near" data-g="near">和刚才差不多</button>
+        <button id="g_double" data-g="double">长一倍左右</button>
+        <button id="g_much" data-g="much">长得多（两倍以上）</button>
+      </div>
+      <div class="grule">这只是这一页的小游戏<b>玩法规则</b>：按两次时间相差多少倍分成三档 ——
+        差不多（不到 1.5 倍）、长一倍左右（1.5 到 2.4 倍）、长得多（2.4 倍以上）。
+        它只是玩法的分档，不是大自然的规定。</div>
+    </div>
+    <div class="found" id="verdict" style="display:none"></div>
+    <div class="found" id="found" style="display:none;margin-top:14px"></div>
+  </div>
+
+  <div class="card">
+    <div class="tip" id="coltip">还想看别的？这里有两颗行星，可以让它们撞一下看看。</div>
+    <div style="text-align:center;margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button id="dobump">让它们撞一下</button>
+      <button id="dopass">让它们穿过去（不撞）</button>
+      <button id="backlab" style="display:none">回到刚才的小实验</button>
+    </div>
+    <div class="found" id="colstory" style="display:none;margin-top:14px"></div>
+    <div class="miss" id="colexplain">
+      这一页把两颗行星<b>画大了 450 倍</b>，好让它们真的能撞上。真实的行星比画面里小得多得多 ——
+      小到它们几乎永远撞不到。所以你看到的“撞上”，是因为先把它们放大了才发生的。
+    </div>
+  </div>
+
+  <details>
+    <summary>这些词是什么意思？（点开看看）</summary>
+    <div class="inner">
+      <dl style="margin:0">
+        <dt>恒星</dt><dd>自己会发光的星球，比如太阳。画面里那个黄点就是一颗。</dd>
+        <dt>行星</dt><dd>自己不会发光、绕着恒星转的星球。地球就是一颗。</dd>
+        <dt>一步</dt><dd>这一页用来量远近的说法。<b>1 步</b> 就是地球到太阳那么远 —— 天文学家把这个距离叫做 <b>1 AU</b>（天文单位），大约是 1.5 亿千米。</dd>
+        <dt>转一圈要多久</dt><dd>行星绕恒星跑完一整圈用的时间。地球转一圈正好是一年。</dd>
+        <dt>路为什么有扁有圆</dt><dd>行星的路大多不是正圆，而是稍微拉长一点的椭圆形。拉得越长，它跑远的时候就越远、越慢。</dd>
+        <dt>你刚才发现的那件事，有个名字</dt><dd>天文学家把它叫做 <b>开普勒第三定律</b>：行星离得越远，绕一圈就越久。他们还给"多远"和"多久"写了一条规定得很准的关系式，不过你先记住这一句就够了 —— 这是你自己试出来的。</dd>
+      </dl>
+    </div>
+  </details>
+
+  <details>
+    <summary>看看数字（写给好奇的大人）</summary>
+    <div class="inner">
+      <div id="nums">还没有试过。</div>
+      <div style="margin-top:10px">
+        这一页<b>不自己算任何物理量</b>：转一圈要多久、走出去什么形状，全部来自内核回显的数字
+        （<code>sampling.min_period_years</code> 与逐帧位置）。页面只做两件小事：
+        把位置画出来，以及按"一圈占几帧"把动画循环起来。
+      </div>
+      <div style="margin-top:10px" id="colnums">还没有试过撞一下。</div>
+      <div style="margin-top:10px">
+        "猜一猜"的对错也<b>不来自页面判断</b>：页面把内核回显的<b>两次</b>一圈时长相除得到倍数，
+        再按 1.5 / 2.4 两个分界把它归到三档里，与你选的那一档比对。
+        分界值是<b>玩法规则的阈值</b>，不是物理结论 —— 页面上那句"小游戏玩法规则"说的就是这件事。
+      </div>
+      <div style="margin-top:10px">等价命令（在终端跑，得到与画面同一份数据）：</div>
+      <pre id="cli">—</pre>
+      <div style="margin-top:10px">撞一下那一组：下面是这一页**原样**发给网关的请求体
+        （<code>collide</code> 改成 <code>off</code> 就是"互相穿过去"的对照）。
+        不写"等价命令行"是因为半径与碰撞参数在 CLI 里的字段名没在这里核过 ——
+        宁可不写，也不给一条跑不通的命令：</div>
+      <pre id="colcli">—</pre>
+    </div>
+  </details>
+
+  <footer>
+    <a href="home.html">← 回到首页</a>　·
+    <a href="universe.html">想自己搭一个星系？去大一点的实验室 →</a>
+  </footer>
+
+</div>
+
+<script>
+'use strict';
+const cv = document.getElementById('sky');
+const ctx = cv.getContext('2d');
+const $ = (id) => document.getElementById(id);
+
+// 画面坐标：把"步"换成像素。中心是恒星，最多看到 7 步远。
+const MAXSTEP = 7;
+const cx = cv.width / 2, cy = cv.height / 2;
+const scale = Math.min(cv.width, cv.height) / (2 * MAXSTEP);
+
+let dist = 2, ecc = 0;
+let frames = null, period = null, dtYears = null;
+let tried = [];               // 每揭晓一次记一条：{dist, ecc, period}
+let mode = 'sandbox';         // 'sandbox' 单颗行星的小实验 / 'collide' 两颗撞一下
+let col = null;               // 撞一下那一组的数据（全部来自回执）
+let pendingGuess = null;      // 正在等孩子猜的那一次
+
+function px(step, angle) {
+  return [cx + Math.cos(angle) * step * scale, cy - Math.sin(angle) * step * scale];
+}
+
+function drawSky() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // 淡淡的圈：每一格代表"离恒星几步远"
+  ctx.strokeStyle = '#efe7d8'; ctx.lineWidth = 1;
+  for (let s = 1; s <= MAXSTEP; s++) {
+    ctx.beginPath(); ctx.arc(cx, cy, s * scale, 0, Math.PI * 2); ctx.stroke();
+  }
+  // 恒星
+  const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, 16);
+  g.addColorStop(0, '#ffe89a'); g.addColorStop(0.5, '#ffc63d'); g.addColorStop(1, 'rgba(255,198,61,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f4a300'; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawPath() {
+  if (!frames) return;
+  ctx.strokeStyle = 'rgba(47,109,246,.45)'; ctx.lineWidth = 2; ctx.beginPath();
+  frames.forEach((f, i) => {
+    const p = f.p[1];
+    const x = cx + p[0] * scale, y = cy - p[1] * scale;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function drawPlanetAt(fi) {
+  const p = frames[fi].p[1];
+  const x = cx + p[0] * scale, y = cy - p[1] * scale;
+  ctx.fillStyle = '#2f6df6';
+  ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(47,109,246,.25)'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.stroke();
+  return [x, y];
+}
+
+// 动画用"代次"（token）来管，而不是一个 playing 布尔量。
+// 原因：拖一次滑块就会重跑一次，如果只有一个布尔量，**上一轮的 setTimeout 还会再醒过来**
+// 并看到 playing 又变 true，于是新旧两轮同时画 —— 行星会闪、会突然变快。
+// 每次 play/stop 都把 token 加一，旧的那轮醒来发现自己过期了就退出。
+let animToken = 0;
+function play() {
+  if (!frames) return;
+  const my = ++animToken;
+  // 一圈占几帧 = 内核给的一圈时长 ÷ 内核给的每帧时长。页面只做这一处"除法"，
+  // 为的是让动画恰好绕一圈就重来（这是画图的事，不是物理）。
+  const per = Math.max(2, Math.round(period / dtYears));
+  const span = Math.min(per, frames.length);
+  let i = 0;
+  const step = () => {
+    if (my !== animToken) return;      // 已经有新的一轮了，这一轮到此为止
+    drawSky(); drawPath(); drawPlanetAt(i % span);
+    i++;
+    setTimeout(step, 1000 / 30);
+  };
+  step();
+}
+function stop() { animToken++; }
+
+/* ================= 玩法 A：猜一猜 =================
+   原则：**编排（好玩的部分）在页面，裁决（对错）必须由数据出。**
+   - 揭晓的数字只有一个来源：回执里的 sampling.min_period_years。
+   - 猜得对不对，只用**两次**那个数相除得到的倍数来判，别的什么都不看。
+   - 两个分界（1.5 / 2.4）是这一页的玩法阈值，不是物理结论 —— 面板里明写了这句。 */
+const NEAR_MAX = 1.5, DOUBLE_MAX = 2.4;
+const GLABEL = { near: '和刚才差不多', double: '长一倍左右', much: '长得多（两倍以上）' };
+function bucketOf(ratio) {
+  if (ratio < NEAR_MAX) return 'near';
+  if (ratio < DOUBLE_MAX) return 'double';
+  return 'much';
+}
+const fmtRatio = (r) => (r >= 10 ? r.toFixed(0) : r.toFixed(1));
+
+function showGuess() {
+  pendingGuess = { dist: dist, ecc: ecc };
+  $('guess').style.display = 'block';
+  $('verdict').style.display = 'none';
+  $('found').style.display = 'none';
+  $('period').textContent = '？';
+  // 这句话孩子会看到，所以不许出现"内核"这种词 —— 判据会把写进页面的字一起查。
+  $('ptip').textContent = '先猜一猜，再按一个按钮 —— 按完才知道答案。';
+}
+
+// 改了远近之后要不要"先猜"：只有已经试过一次（tried 里有记录）才问。
+// 第一次进来不问 —— 先让孩子自己动手放一颗，保留原来的顺序。
+// 另外：**正在等孩子猜的时候，任何别的操作都不揭晓**（拖"路有多扁"、再点画面、
+// 按"再试一次"都只是把猜一猜继续摆着）—— 否则动一下别的滑块就绕过了这条规则。
+function requestRun(needGuess) {
+  if (pendingGuess) { showGuess(); return; }
+  if (needGuess && tried.length > 0 && mode === 'sandbox') { stop(); showGuess(); return; }
+  $('guess').style.display = 'none';
+  run(null);
+}
+
+function reveal(guess) {
+  const prevPeriod = tried.length ? tried[tried.length - 1].period : null;
+  $('period').textContent = period.toFixed(period < 10 ? 2 : 1);
+  $('ptip').textContent = '这就是它绕恒星跑一整圈用的时间。';
+
+  tried.push({ dist: dist, ecc: ecc, period: period });
+  const nums = tried[tried.length - 1];
+  $('nums').innerHTML =
+    '你放的这一颗：离恒星 <b>' + nums.dist + ' 步</b>（<code>a = ' + nums.dist + ' AU</code>）、'
+    + '路扁 <b>' + nums.ecc.toFixed(1) + '</b>（<code>e = ' + nums.ecc.toFixed(1) + '</code>）→ '
+    + '转一圈 <b>' + nums.period.toFixed(4) + ' 年</b>（内核回显 <code>sampling.min_period_years</code>）。';
+  $('cli').textContent = 'starpivot nbody --scenario custom --solar none --primary Sun \\\n'
+    + '  --years 12 --samples 720 \\\n'
+    + '  --body "Sun,1,0,0,0,0,0,1.0" --body "Planet,' + nums.dist + ','
+    + nums.ecc.toFixed(1) + ',0,0,0,0,0.000003"';
+
+  // 揭晓"猜中没猜中"。判定只用回执给的两个周期值 —— 页面不引入任何别的东西。
+  const v = $('verdict');
+  if (guess && prevPeriod !== null) {
+    const ratio = period / prevPeriod;
+    const actual = bucketOf(ratio);
+    const hit = (guess === actual);
+    v.style.display = 'block';
+    v.className = hit ? 'found' : 'miss';
+    v.innerHTML = hit
+      ? '你猜对了！确实是「' + GLABEL[actual] + '」：上一次是 <b>' + prevPeriod.toFixed(2)
+        + ' 年</b>，这一次是 <b>' + period.toFixed(2) + ' 年</b> —— 是上一次的 <b>'
+        + fmtRatio(ratio) + ' 倍</b>。'
+      // 猜错也要好好说，不许假装对。
+      : '这次没猜中 —— 你说的是「' + GLABEL[guess] + '」，其实是「' + GLABEL[actual]
+        + '」。没关系：上一次是 <b>' + prevPeriod.toFixed(2) + ' 年</b>，这一次是 <b>'
+        + period.toFixed(2) + ' 年</b>，是上一次的 <b>' + fmtRatio(ratio) + ' 倍</b>。';
+  } else {
+    v.style.display = 'none';
+  }
+
+  // 孩子自己"发现"：试过两个不同远近，就把两次结果并排摆出来，不替他下结论之外的话。
+  const byDist = {};
+  tried.forEach(t => { byDist[t.dist] = t.period; });
+  const ds = Object.keys(byDist).map(Number).sort((a, b) => a - b);
+  if (ds.length >= 2) {
+    const a = ds[0], b = ds[ds.length - 1];
+    const parts = ds.map(d => d + ' 步远 → ' + byDist[d].toFixed(2) + ' 年');
+    $('found').style.display = 'block';
+    $('found').innerHTML = '你试了这么多：<b>' + parts.join('，') + '</b>。<br>'
+      + '同一颗恒星，行星离得越远，它的一年就越长 —— 远了 ' + (b / a).toFixed(0)
+      + ' 倍，一圈的时间从 ' + byDist[a].toFixed(2) + ' 年变成了 ' + byDist[b].toFixed(2) + ' 年。';
+  }
+}
+
+async function run(guess) {
+  mode = 'sandbox';
+  $('guess').style.display = 'none';
+  pendingGuess = null;
+  $('period').textContent = '…';
+  // "年"写死在 HTML 里、这里不去动它：这样即使脚本没跑起来，
+  // 静态页面读出来也是完整的一句"转一圈要 — 年"，而不是一个没有单位的数字。
+  $('ptip').textContent = '正在算……';
+  stop();
+  try {
+    const r = await fetch('/api/nbody', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      // 名字必须是纯英文：天体名会走命令行参数，而中文名在那条路上不可靠。
+      body: JSON.stringify({
+        scenario: 'custom', solar: 'none', primary: 'Sun',
+        years: 12, samples: 720,
+        bodies: [
+          { name: 'Sun', a: 1, e: 0, inc: 0, raan: 0, argp: 0, M0: 0, mass: 1.0 },
+          { name: 'Planet', a: dist, e: ecc, inc: 0, raan: 0, argp: 0, M0: 0, mass: 3e-6 }
+        ]
+      })
+    });
+    const j = await r.json();
+    if (!j.frames || !j.frames.length || !j.sampling || !j.sampling.min_period_years) {
+      throw new Error(j.error || '没拿到结果');
+    }
+    frames = j.frames; dtYears = j.dt_years; period = j.sampling.min_period_years;
+    drawSky(); drawPath(); play();
+    reveal(guess);
+  } catch (e) {
+    $('period').textContent = '—';
+    $('ptip').textContent = '没能算出来：' + e.message + '（这一页需要一个在跑的服务，'
+      + '直接双击打开文件是不行的）';
+  }
+}
+
+/* ================= 玩法 B：撞一下看看 =================
+   下面这组初值、碰撞模式与半径放大是**实测过会撞上**的那一组（t≈0.8 年、质量守恒）。
+   页面不算几何、也不重画理想椭圆：两颗的位置逐帧取回执里的 frames[i].p[1] / p[2]。
+   ⚠ 半径放大必须披露：不放大，两颗行星永远擦不到，"撞上"就成了假象。 */
+const BODY_A = { name: 'A', a: 1.0, e: 0.2, inc: 0, raan: 0, argp: 0,   M0: 0,   mass: 3e-6, radius_km: 6371 };
+const BODY_B = { name: 'B', a: 1.0, e: 0.2, inc: 0, raan: 0, argp: 180, M0: 135, mass: 3e-6, radius_km: 6371 };
+const COL_RSCALE = 450;
+function colPayload(collide) {
+  // 注意：不带 primary —— solar:'sun' 与 primary 同时给会被网关拒（400）。
+  return { scenario: 'custom', solar: 'sun', years: 3, samples: 2000,
+           collide: collide, radius_scale: COL_RSCALE, bodies: [BODY_A, BODY_B] };
+}
+
+function drawColPaths() {
+  if (!col) return;
+  const n = col.mergeFrame >= 0 ? col.mergeFrame : col.frames.length - 1;
+  const lines = [[1, 'rgba(47,109,246,.40)'], [2, 'rgba(214,110,40,.40)']];
+  lines.forEach((ln) => {
+    const idx = ln[0];
+    ctx.strokeStyle = ln[1]; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i <= n && i < col.frames.length; i++) {
+      const p = col.frames[i].p[idx];
+      const x = cx + p[0] * scale, y = cy - p[1] * scale;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  });
+}
+
+function drawColScene(fi) {
+  drawSky(); drawColPaths();
+  const i = Math.max(0, Math.min(fi, col.frames.length - 1));
+  const f = col.frames[i];
+  const dot = (p, fill, r) => {
+    const x = cx + p[0] * scale, y = cy - p[1] * scale;
+    ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  };
+  if (col.mergeFrame >= 0 && i >= col.mergeFrame) {
+    dot(f.p[1], '#7a3fd0', 11);           // 合成后的那一颗
+  } else {
+    dot(f.p[1], '#2f6df6', 8);            // A
+    dot(f.p[2], '#d66e28', 8);            // B
+  }
+}
+
+function playCollision() {
+  if (!col) return;
+  const my = ++animToken;
+  const span = col.mergeFrame >= 0 ? col.mergeFrame : col.frames.length - 1;
+  const inc = Math.max(1, Math.ceil(span / 90));   // 无论几千帧，约 3 秒走完
+  let i = 0;
+  const step = () => {
+    if (my !== animToken) return;
+    drawColScene(i);
+    if (i >= span) {
+      if (col.mergeFrame >= 0) return;   // 撞上就停住
+      i = 0;                             // "穿过去"那一组让它一直绕
+    } else { i = Math.min(i + inc, span); }
+    setTimeout(step, 1000 / 30);
+  };
+  step();
+}
+
+const fmtNum = (x) => (+x.toFixed(2)).toString();
+
+function showCollisionStory() {
+  const ev = col.ev;
+  const st = $('colstory');
+  st.style.display = 'block';
+  // 半径放大的披露是**静态**写在这一页上的（不靠脚本填），运行到这里只补事实。
+  if (ev) {
+    // "重量一点没少"这句必须有回执撑腰：拿 mass_before 与 mass_after 比出来的。
+    const same = Math.abs(ev.mass_before - ev.mass_after) < 1e-12;
+    st.innerHTML = '它们在 <b>' + fmtNum(ev.t) + ' 年</b>撞上了（还不到一年）。'
+      + '撞之前是两颗，撞之后变成一颗大的：<b>重量一点没少</b> —— 撞之前两块加起来有多重，'
+      + '撞之后那一颗就有多重。' + (same ? '' : '（这一次竟然变了，得去问个明白。）');
+  } else {
+    st.innerHTML = '它们没有撞上 —— 两颗互相穿了过去，谁也没变。'
+      + '这一页把“会不会撞上”关掉了，所以它们直接穿过彼此。';
+  }
+  const bits = ['两颗的路线都是逐帧画出来的（<code>frames[i].p[1]</code> 与 <code>p[2]</code>），'
+    + '没有为好看重画理想椭圆。'];
+  if (ev) {
+    bits.push('内核 <code>events[0]</code>：<code>' + JSON.stringify(ev) + '</code>');
+    bits.push('回读的半径放大 <code>radius_scale=' + col.radiusScale + '</code>、'
+      + '碰撞模式 <code>collide=' + col.collide + '</code>；'
+      + '质量守恒成立：mass_before=' + ev.mass_before + '，mass_after=' + ev.mass_after + '。');
+  } else {
+    bits.push('内核 <code>event_count=0</code>：一次碰撞事件都没有 —— 这就是"穿过去"的对照。'
+      + '半径放大 <code>radius_scale=' + col.radiusScale + '</code> 仍在请求里，'
+      + '但碰撞模式是 <code>collide=' + col.collide + '</code>。');
+  }
+  $('colnums').innerHTML = bits.join('<br>');
+  $('colcli').textContent = JSON.stringify(colPayload(col.collide), null, 2);
+}
+
+async function runCollision(collide) {
+  stop();
+  mode = 'collide';
+  pendingGuess = null;
+  $('guess').style.display = 'none';
+  $('coltip').textContent = '正在算……';
+  $('colstory').style.display = 'none';
+  $('dobump').disabled = true; $('dopass').disabled = true;
+  try {
+    const r = await fetch('/api/nbody', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(colPayload(collide))
+    });
+    const j = await r.json();
+    if (!j.frames || !j.frames.length) throw new Error(j.error || '没拿到结果');
+    const ev = (j.events && j.events.length) ? j.events[0] : null;
+    col = {
+      frames: j.frames, dtYears: j.dt_years, collide: j.collide,
+      radiusScale: j.radius_scale, ev: ev,
+      mergeFrame: (collide === 'merge' && ev) ? Math.max(1, Math.round(ev.t / j.dt_years)) : -1
+    };
+    $('knobs').style.display = 'none';
+    $('againwrap').style.display = 'none';
+    $('backlab').style.display = 'inline-block';
+    $('coltip').textContent = ev ? '看，它们正在靠近……'
+      : '看，它们各自绕着自己的路走 —— 谁也没碰到谁。';
+    playCollision();
+    showCollisionStory();
+  } catch (e) {
+    $('coltip').textContent = '没能算出来：' + e.message;
+  } finally {
+    $('dobump').disabled = false; $('dopass').disabled = false;
+  }
+}
+
+function backToSandbox() {
+  col = null; mode = 'sandbox';
+  $('knobs').style.display = '';
+  $('againwrap').style.display = '';
+  $('backlab').style.display = 'none';
+  $('colstory').style.display = 'none';
+  $('coltip').textContent = '还想看别的？这里有两颗行星，可以让它们撞一下看看。';
+  run(null);
+}
+
+// 点画面：按点的方向、按点到中心的距离定"多远"（吸附到整数步，孩子好对账）
+cv.addEventListener('click', (ev) => {
+  if (mode === 'collide') return;      // 撞一下的画面里点它不做事，免得两套玩法打架
+  const rect = cv.getBoundingClientRect();
+  const mx = (ev.clientX - rect.left) * (cv.width / rect.width) - cx;
+  const my = (ev.clientY - rect.top) * (cv.height / rect.height) - cy;
+  const step = Math.round(Math.hypot(mx, my) / scale);
+  const nd = Math.min(4, Math.max(1, step));
+  const changed = (nd !== dist);
+  dist = nd;
+  $('dist').value = String(dist); $('vdist').textContent = String(dist);
+  $('tip').textContent = '你把它放在了 ' + dist + ' 步远的地方。';
+  requestRun(changed);
+});
+$('dist').addEventListener('input', (e) => {
+  const nd = +e.target.value;
+  const changed = (nd !== dist);
+  dist = nd; $('vdist').textContent = String(dist);
+  requestRun(changed);
+});
+$('ecc').addEventListener('input', (e) => {
+  ecc = +e.target.value; $('vecc').textContent = ecc.toFixed(1); requestRun(false);
+});
+$('again').addEventListener('click', () => requestRun(false));
+['near', 'double', 'much'].forEach((g) => {
+  $('g_' + g).addEventListener('click', () => { if (pendingGuess) run(g); });
+});
+$('dobump').addEventListener('click', () => runCollision('merge'));
+$('dopass').addEventListener('click', () => runCollision('off'));
+$('backlab').addEventListener('click', backToSandbox);
+
+drawSky();
+run(null);
+</script>
+</body>
+</html>

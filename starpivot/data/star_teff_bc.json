@@ -1,0 +1,679 @@
+{
+  "dataset": "star_teff_bc",
+  "kind": "calibration_tables",
+  "description": "SpType -> T_eff and SpType -> BC_V calibration tables, for the star luminosity chain SpType -> T_eff -> BC -> M_bol -> L. These are CALIBRATED mean values for a spectral type, NOT observations of any individual star; the page must label them as calibration, not measurement.",
+  "units": {
+    "sptype_to_teff_K": "kelvin",
+    "sptype_to_bc_v_mag": "magnitude (Johnson V); BC_V = M_bol - M_V"
+  },
+  "identity": {
+    "solar_T_eff_K": 5772,
+    "solar_M_bol_mag": 4.74,
+    "solar_M_V_mag": 4.83,
+    "note": "solar anchors are INPUTS to the chain, not values from the table; see PROVENANCE for the derivation."
+  },
+  "source": {
+    "name": "Mamajek, \"A Modern Mean Dwarf Stellar Color and Effective Temperature Sequence\"",
+    "author": "Eric E. Mamajek (University of Rochester)",
+    "version": "2022.04.16",
+    "url": "http://www.pas.rochester.edu/~emamajek/EEM_dwarf_UBVIJHK_colors_Teff.txt",
+    "url_effective_after_redirect": "https://www.pas.rochester.edu/~emamajek/EEM_dwarf_UBVIJHK_colors_Teff.txt",
+    "retrieved_utc": "2026-09-27T13:53:48Z",
+    "bytes": 55680,
+    "sha1": "c1ad104bc4cc5b9ffa13a479fbabdff44dd96843",
+    "sha256": "1de2edeec17bb3346e0e4e70b999de5ee29947df38474e64cddb7cfacc164b7f",
+    "citation_required": [
+      "Pecaut & Mamajek (2013), ApJS 208, 9",
+      "Pecaut, Mamajek & Bubar (2012), ApJ 756, 154"
+    ],
+    "author_request": "the file asks to be emailed if the table is used in research"
+  },
+  "source_scope": {
+    "covers": "luminosity class V (dwarfs) only, spectral classes O3-M9 plus L/T/Y",
+    "does_not_cover": [
+      "luminosity class IV",
+      "luminosity class III",
+      "luminosity class II",
+      "luminosity class Ib / Iab / Ia",
+      "Wolf-Rayet (W) types",
+      "composite / double-lined classifications"
+    ],
+    "bc_v_missing_in_source": [
+      "L6V",
+      "L7V",
+      "L8V",
+      "L9V",
+      "T0V",
+      "T1V",
+      "T2V",
+      "T3V",
+      "T4V",
+      "T4.5V",
+      "T5V",
+      "T5.5V",
+      "T6V",
+      "T7V",
+      "T7.5V",
+      "T8V",
+      "T8.5V",
+      "T9V",
+      "T9.5V",
+      "Y0V",
+      "Y0.5V",
+      "Y1V",
+      "Y1.5V",
+      "Y2V",
+      "Y4V"
+    ],
+    "bc_v_missing_note": "the source prints '...' (no value) in the BC_V column for these keys; they are kept in the T_eff table and OMITTED from the BC table - not filled with any substitute."
+  },
+  "tables": {
+    "sptype_to_teff_K": {
+      "O3V": 44900,
+      "O4V": 42900,
+      "O5V": 41400,
+      "O5.5V": 40500,
+      "O6V": 39500,
+      "O6.5V": 38300,
+      "O7V": 37100,
+      "O7.5V": 36100,
+      "O8V": 35100,
+      "O8.5V": 34300,
+      "O9V": 33300,
+      "O9.5V": 31900,
+      "B0V": 31400,
+      "B0.5V": 29000,
+      "B1V": 26000,
+      "B1.5V": 24500,
+      "B2V": 20600,
+      "B2.5V": 18500,
+      "B3V": 17000,
+      "B4V": 16400,
+      "B5V": 15700,
+      "B6V": 14500,
+      "B7V": 14000,
+      "B8V": 12300,
+      "B9V": 10700,
+      "B9.5V": 10400,
+      "A0V": 9700,
+      "A1V": 9300,
+      "A2V": 8800,
+      "A3V": 8600,
+      "A4V": 8250,
+      "A5V": 8100,
+      "A6V": 7910,
+      "A7V": 7760,
+      "A8V": 7590,
+      "A9V": 7400,
+      "F0V": 7220,
+      "F1V": 7020,
+      "F2V": 6820,
+      "F3V": 6750,
+      "F4V": 6670,
+      "F5V": 6550,
+      "F6V": 6350,
+      "F7V": 6280,
+      "F8V": 6180,
+      "F9V": 6050,
+      "F9.5V": 5990,
+      "G0V": 5930,
+      "G1V": 5860,
+      "G2V": 5770,
+      "G3V": 5720,
+      "G4V": 5680,
+      "G5V": 5660,
+      "G6V": 5600,
+      "G7V": 5550,
+      "G8V": 5480,
+      "G9V": 5380,
+      "K0V": 5270,
+      "K1V": 5170,
+      "K2V": 5100,
+      "K3V": 4830,
+      "K4V": 4600,
+      "K5V": 4440,
+      "K6V": 4300,
+      "K7V": 4100,
+      "K8V": 3990,
+      "K9V": 3930,
+      "M0V": 3850,
+      "M0.5V": 3770,
+      "M1V": 3660,
+      "M1.5V": 3620,
+      "M2V": 3560,
+      "M2.5V": 3470,
+      "M3V": 3430,
+      "M3.5V": 3270,
+      "M4V": 3210,
+      "M4.5V": 3110,
+      "M5V": 3060,
+      "M5.5V": 2930,
+      "M6V": 2810,
+      "M6.5V": 2740,
+      "M7V": 2680,
+      "M7.5V": 2630,
+      "M8V": 2570,
+      "M8.5V": 2420,
+      "M9V": 2380,
+      "M9.5V": 2350,
+      "L0V": 2270,
+      "L1V": 2160,
+      "L2V": 2060,
+      "L3V": 1920,
+      "L4V": 1870,
+      "L5V": 1710,
+      "L6V": 1550,
+      "L7V": 1530,
+      "L8V": 1420,
+      "L9V": 1370,
+      "T0V": 1255,
+      "T1V": 1240,
+      "T2V": 1220,
+      "T3V": 1200,
+      "T4V": 1180,
+      "T4.5V": 1170,
+      "T5V": 1160,
+      "T5.5V": 1040,
+      "T6V": 950,
+      "T7V": 825,
+      "T7.5V": 750,
+      "T8V": 680,
+      "T8.5V": 600,
+      "T9V": 560,
+      "T9.5V": 510,
+      "Y0V": 450,
+      "Y0.5V": 400,
+      "Y1V": 360,
+      "Y1.5V": 325,
+      "Y2V": 320,
+      "Y4V": 250
+    },
+    "sptype_to_bc_v_mag": {
+      "O3V": -4.01,
+      "O4V": -3.89,
+      "O5V": -3.76,
+      "O5.5V": -3.67,
+      "O6V": -3.57,
+      "O6.5V": -3.49,
+      "O7V": -3.41,
+      "O7.5V": -3.33,
+      "O8V": -3.24,
+      "O8.5V": -3.18,
+      "O9V": -3.11,
+      "O9.5V": -3.01,
+      "B0V": -2.99,
+      "B0.5V": -2.83,
+      "B1V": -2.58,
+      "B1.5V": -2.44,
+      "B2V": -2.03,
+      "B2.5V": -1.77,
+      "B3V": -1.54,
+      "B4V": -1.49,
+      "B5V": -1.34,
+      "B6V": -1.13,
+      "B7V": -1.05,
+      "B8V": -0.73,
+      "B9V": -0.42,
+      "B9.5V": -0.36,
+      "A0V": -0.21,
+      "A1V": -0.14,
+      "A2V": -0.07,
+      "A3V": -0.04,
+      "A4V": -0.02,
+      "A5V": 0.0,
+      "A6V": 0.005,
+      "A7V": 0.01,
+      "A8V": 0.02,
+      "A9V": 0.02,
+      "F0V": 0.01,
+      "F1V": 0.005,
+      "F2V": -0.005,
+      "F3V": -0.01,
+      "F4V": -0.015,
+      "F5V": -0.02,
+      "F6V": -0.03,
+      "F7V": -0.035,
+      "F8V": -0.04,
+      "F9V": -0.05,
+      "F9.5V": -0.06,
+      "G0V": -0.065,
+      "G1V": -0.073,
+      "G2V": -0.085,
+      "G3V": -0.095,
+      "G4V": -0.1,
+      "G5V": -0.105,
+      "G6V": -0.115,
+      "G7V": -0.125,
+      "G8V": -0.14,
+      "G9V": -0.16,
+      "K0V": -0.195,
+      "K1V": -0.23,
+      "K2V": -0.26,
+      "K3V": -0.375,
+      "K4V": -0.52,
+      "K5V": -0.63,
+      "K6V": -0.75,
+      "K7V": -0.93,
+      "K8V": -1.03,
+      "K9V": -1.07,
+      "M0V": -1.15,
+      "M0.5V": -1.29,
+      "M1V": -1.42,
+      "M1.5V": -1.5,
+      "M2V": -1.62,
+      "M2.5V": -1.78,
+      "M3V": -1.93,
+      "M3.5V": -2.28,
+      "M4V": -2.51,
+      "M4.5V": -2.84,
+      "M5V": -3.11,
+      "M5.5V": -3.58,
+      "M6V": -4.13,
+      "M6.5V": -4.62,
+      "M7V": -4.99,
+      "M7.5V": -5.32,
+      "M8V": -5.65,
+      "M8.5V": -5.78,
+      "M9V": -5.86,
+      "M9.5V": -6.13,
+      "L0V": -6.25,
+      "L1V": -6.48,
+      "L2V": -6.62,
+      "L3V": -7.05,
+      "L4V": -7.53,
+      "L5V": -7.87
+    }
+  },
+  "lookup_rules": [
+    "1. exact: raw SpType string equals a key of sptype_to_teff_K / sptype_to_bc_v_mag.",
+    "2. normalized_obs_note: strip a trailing non-MK note (var / SB / ... / :) and re-match. These notes do not change the MK type.",
+    "3. normalized_peculiarity: strip a trailing MK peculiarity code (p/m/e/n) that follows the luminosity class, then re-match.",
+    "4. unresolved: anything else. A composite ('+' or 'comp'), a luminosity-class range ('-' or '/'), or a string with no class-V classification is NOT guessed - it stays missing."
+  ],
+  "resolution": {
+    "A0IV": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "A0V SB": {
+      "status": "normalized_obs_note",
+      "key": "A0V",
+      "n_stars": 1,
+      "reason": "stripped a non-MK observing/binarity/truncation note from the raw string"
+    },
+    "A0m...": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "A0p": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "A1IV": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "A1V": {
+      "status": "exact",
+      "key": "A1V",
+      "n_stars": 2,
+      "reason": "raw string equals a tabulated key"
+    },
+    "A2IV": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "A2V": {
+      "status": "exact",
+      "key": "A2V",
+      "n_stars": 2,
+      "reason": "raw string equals a tabulated key"
+    },
+    "A2Vm": {
+      "status": "normalized_peculiarity",
+      "key": "A2V",
+      "n_stars": 1,
+      "reason": "stripped MK peculiarity code after the luminosity class"
+    },
+    "A3Vvar": {
+      "status": "normalized_obs_note",
+      "key": "A3V",
+      "n_stars": 1,
+      "reason": "stripped a non-MK observing/binarity/truncation note from the raw string"
+    },
+    "A8Ib": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B0.5III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B0.5IV": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B0.5Iavar": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B0IV:evar": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B0Ia": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B1II/III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "two luminosity classes given as alternatives (a/b); ambiguous, no value chosen"
+    },
+    "B1III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 2,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B1V": {
+      "status": "exact",
+      "key": "B1V",
+      "n_stars": 1,
+      "reason": "raw string equals a tabulated key"
+    },
+    "B2II": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B2III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B2IV": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B3V SB": {
+      "status": "normalized_obs_note",
+      "key": "B3V",
+      "n_stars": 1,
+      "reason": "stripped a non-MK observing/binarity/truncation note from the raw string"
+    },
+    "B3Vp": {
+      "status": "normalized_peculiarity",
+      "key": "B3V",
+      "n_stars": 1,
+      "reason": "stripped MK peculiarity code after the luminosity class"
+    },
+    "B5Ia": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B7III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B7V": {
+      "status": "exact",
+      "key": "B7V",
+      "n_stars": 1,
+      "reason": "raw string equals a tabulated key"
+    },
+    "B8Ia": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "B8V": {
+      "status": "exact",
+      "key": "B8V",
+      "n_stars": 2,
+      "reason": "raw string equals a tabulated key"
+    },
+    "B9p": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "F0Ib": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "F2III-IV": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "luminosity-class range given (x-y); ambiguous, no value chosen"
+    },
+    "F5IV-V": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "luminosity-class range given (x-y); ambiguous, no value chosen"
+    },
+    "F5Ib": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "F7:Ib-IIv SB": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "luminosity-class range given (x-y); ambiguous, no value chosen"
+    },
+    "F7V comp": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "composite spectrum (\"comp\"); a single-star calibration does not apply"
+    },
+    "F8Ia": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "K0II-IIIvar": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "luminosity-class range given (x-y); ambiguous, no value chosen"
+    },
+    "K0III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 2,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "K0III...": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "K0IIIb": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "K0IIIvar": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "K2III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "K3III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "K3III+B2V": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "composite spectrum (two classifications joined by \"+\"); a single-star calibration does not apply"
+    },
+    "K4Ib-II": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "luminosity-class range given (x-y); ambiguous, no value chosen"
+    },
+    "K5III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "M0IIIvar": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "M1: comp": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "composite spectrum (\"comp\"); a single-star calibration does not apply"
+    },
+    "M2Ib": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "M4III": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "O5IAf": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "O9.5II": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "O9.5Ib SB": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "no key: the source is a DWARF (luminosity class V) sequence and this string carries no class-V classification"
+    },
+    "WC8 + O9I": {
+      "status": "unresolved",
+      "key": null,
+      "n_stars": 1,
+      "reason": "composite spectrum (two classifications joined by \"+\"); a single-star calibration does not apply"
+    }
+  },
+  "coverage": {
+    "stars_total": 60,
+    "stars_resolved": 13,
+    "stars_unresolved": 47,
+    "unique_sptypes": 55,
+    "unique_sptypes_resolved": 10,
+    "unresolved_sptypes": [
+      "A0IV",
+      "A0m...",
+      "A0p",
+      "A1IV",
+      "A2IV",
+      "A8Ib",
+      "B0.5III",
+      "B0.5IV",
+      "B0.5Iavar",
+      "B0IV:evar",
+      "B0Ia",
+      "B1II/III",
+      "B1III",
+      "B2II",
+      "B2III",
+      "B2IV",
+      "B5Ia",
+      "B7III",
+      "B8Ia",
+      "B9p",
+      "F0Ib",
+      "F2III-IV",
+      "F5IV-V",
+      "F5Ib",
+      "F7:Ib-IIv SB",
+      "F7V comp",
+      "F8Ia",
+      "K0II-IIIvar",
+      "K0III",
+      "K0III...",
+      "K0IIIb",
+      "K0IIIvar",
+      "K2III",
+      "K3III",
+      "K3III+B2V",
+      "K4Ib-II",
+      "K5III",
+      "M0IIIvar",
+      "M1: comp",
+      "M2Ib",
+      "M4III",
+      "O5IAf",
+      "O9.5II",
+      "O9.5Ib SB",
+      "WC8 + O9I"
+    ]
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "dataset": "real_exoplanets",
+  "description": "真实系外行星系统。每一行都是 NASA Exoplanet Archive 的 pscomppars（Planetary Systems Composite Parameters）表里的最佳综合值，不是我们自己编的、也不是从图上看来的。",
+  "source": {
+    "name": "NASA Exoplanet Archive",
+    "table": "pscomppars",
+    "service": "TAP sync (https://exoplanetarchive.ipac.caltech.edu/TAP/sync)",
+    "retrieved": "2026-09-26",
+    "query": "select pl_name,hostname,pl_orbper,pl_orbsmax,pl_orbeccen,pl_bmassj,pl_rade,st_mass,st_rad,st_teff from pscomppars where hostname in ('TRAPPIST-1','TOI-178','ups And','51 Peg','Proxima Cen') order by hostname,pl_orbper",
+    "note": "pscomppars 与 ps 的区别很重要：ps 表里同一颗行星会因不同文献出现多行，直接取会拿到互相矛盾的参数；pscomppars 每颗行星只有一行最佳综合值。"
+  },
+  "units": {
+    "pl_orbper": "day",
+    "pl_orbsmax": "AU",
+    "pl_orbeccen": "无量纲",
+    "pl_bmassj": "木星质量",
+    "pl_rade": "地球半径",
+    "st_mass": "太阳质量",
+    "st_rad": "太阳半径",
+    "st_teff": "K"
+  },
+  "warning": "含有观测缺项（空值）；缺项一律保持缺失，不补零、不用同类天体顶替。页面与内核都必须把缺失当成缺失处理。",
+  "conversions": {
+    "note": "把上面的单位换成内核 --body 的口径（质量用 M☉，半径用 km）。这些是单位换算，不是物理模型。放在数据文件里而不是写进页面/判据里，是因为它们必须有唯一一份：任何一个消费者自己抄一遍，就会在某个时刻出现两个只差一点的木星质量。取值与内核 bodytype.cpp 的 kRsun_km 同源（IAU 2015 nominal）。",
+    "M_jup_to_Msun": 9.5458e-4,
+    "R_earth_to_km": 6371.0,
+    "R_sun_to_km": 696340.0
+  },
+  "systems": [
+    {
+      "hostname": "TRAPPIST-1",
+      "star": { "st_mass": 0.0898, "st_rad": 0.1192, "st_teff": 2566.0 },
+      "star_note": "0.0898 Msun 刚好在氢燃烧下限（0.08）之上 —— 在我们的模型里它会自己发光。T=2566 K 是 M8 型矮星。",
+      "planets": [
+        { "name": "TRAPPIST-1 b", "pl_orbper": 1.510826, "pl_orbsmax": 0.01154, "pl_orbeccen": 0.00622, "pl_bmassj": 0.00432309, "pl_rade": 1.116 },
+        { "name": "TRAPPIST-1 c", "pl_orbper": 2.421937, "pl_orbsmax": 0.01580, "pl_orbeccen": 0.00654, "pl_bmassj": 0.00411543, "pl_rade": 1.097 },
+        { "name": "TRAPPIST-1 d", "pl_orbper": 4.049219, "pl_orbsmax": 0.02227, "pl_orbeccen": 0.00837, "pl_bmassj": 0.00122078, "pl_rade": 0.788 },
+        { "name": "TRAPPIST-1 e", "pl_orbper": 6.101013, "pl_orbsmax": 0.02925, "pl_orbeccen": 0.00510, "pl_bmassj": 0.00217728, "pl_rade": 0.920 },
+        { "name": "TRAPPIST-1 f", "pl_orbper": 9.207540, "pl_orbsmax": 0.03849, "pl_orbeccen": 0.01007, "pl_bmassj": 0.00326906, "pl_rade": 1.045 },
+        { "name": "TRAPPIST-1 g", "pl_orbper": 12.352446, "pl_orbsmax": 0.04683, "pl_orbeccen": 0.00208, "pl_bmassj": 0.00415633, "pl_rade": 1.129 },
+        { "name": "TRAPPIST-1 h", "pl_orbper": 18.772866, "pl_orbsmax": 0.06189, "pl_orbeccen": 0.00567, "pl_bmassj": 0.00102571, "pl_rade": 0.755 }
+      ]
+    },
+    {
+      "hostname": "TOI-178",
+      "star": { "st_mass": 0.647, "st_rad": 0.662, "st_teff": 4316.0 },
+      "star_note": "6 颗行星，其中 5 颗处于拉普拉斯共振链（1:2→2:3→2:3→2:3→2:3），是检验共振结构的真实样本。",
+      "planets": [
+        { "name": "TOI-178 b", "pl_orbper": 1.9145601, "pl_orbsmax": 0.02607, "pl_orbeccen": null, "pl_bmassj": 0.00302050, "pl_rade": 1.200 },
+        { "name": "TOI-178 c", "pl_orbper": 3.238486, "pl_orbsmax": 0.03700, "pl_orbeccen": 0.00032, "pl_bmassj": 0.01459907, "pl_rade": 1.754 },
+        { "name": "TOI-178 d", "pl_orbper": 6.557569, "pl_orbsmax": 0.05920, "pl_orbeccen": 0.00680, "pl_bmassj": 0.01636103, "pl_rade": 2.695 },
+        { "name": "TOI-178 e", "pl_orbper": 9.963180, "pl_orbsmax": 0.07830, "pl_orbeccen": 0.00038, "pl_bmassj": 0.01094930, "pl_rade": 2.301 },
+        { "name": "TOI-178 f", "pl_orbper": 15.233350, "pl_orbsmax": 0.10390, "pl_orbeccen": 0.00045, "pl_bmassj": 0.01771396, "pl_rade": 2.417 },
+        { "name": "TOI-178 g", "pl_orbper": 20.716630, "pl_orbsmax": 0.12750, "pl_orbeccen": 0.00043, "pl_bmassj": 0.01384395, "pl_rade": 2.939 }
+      ]
+    },
+    {
+      "hostname": "ups And",
+      "star": { "st_mass": 1.30, "st_rad": 1.56, "st_teff": 6156.77 },
+      "star_note": "第一个被发现的多行星系统（1996）。三颗行星质量从 0.69 到 13.98 木星质量，正好演示「同一系统里行星性质可以差很多」。",
+      "planets": [
+        { "name": "ups And b", "pl_orbper": 4.617033, "pl_orbsmax": 0.05922166, "pl_orbeccen": 0.0215, "pl_bmassj": 0.6876, "pl_rade": 14.0 },
+        { "name": "ups And c", "pl_orbper": 241.258, "pl_orbsmax": 0.8277740, "pl_orbeccen": 0.2596, "pl_bmassj": 13.98, "pl_rade": 12.3 },
+        { "name": "ups And d", "pl_orbper": 1276.46, "pl_orbsmax": 2.5132900, "pl_orbeccen": 0.2987, "pl_bmassj": 10.25, "pl_rade": 12.5 }
+      ]
+    },
+    {
+      "hostname": "51 Peg",
+      "star": { "st_mass": 1.07, "st_rad": 1.19, "st_teff": 5761.0 },
+      "star_note": "51 Peg b 是 1995 年发现的、第一颗围绕类太阳恒星的行星（热木星），2019 年诺贝尔物理学奖的工作对象。",
+      "planets": [
+        { "name": "51 Peg b", "pl_orbper": 4.2307966, "pl_orbsmax": 0.052, "pl_orbeccen": 0.0063, "pl_bmassj": 0.61, "pl_rade": 14.1 }
+      ]
+    },
+    {
+      "hostname": "Proxima Cen",
+      "star": { "st_mass": 0.1221, "st_rad": 0.1410, "st_teff": 2900.0 },
+      "star_note": "离太阳最近的恒星（比邻星）。两组数据里它都刚好在氢燃烧下限之上，会发光。d 是已确认的候选之一，本表按 Archive 的综合值收录。",
+      "planets": [
+        { "name": "Proxima Cen b", "pl_orbper": 11.184650, "pl_orbsmax": 0.04848, "pl_orbeccen": 0.0, "pl_bmassj": 0.00331940, "pl_rade": 1.020 },
+        { "name": "Proxima Cen d", "pl_orbper": 5.123380, "pl_orbsmax": 0.02881, "pl_orbeccen": 0.0, "pl_bmassj": 0.00081805, "pl_rade": 0.692 }
+      ]
+    }
+  ]
+}

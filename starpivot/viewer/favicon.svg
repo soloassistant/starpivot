@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="StarPivot">
+  <!-- 四页共用的站点图标：一个深空底 + 发光主星 + 一条轨道 + 行星。
+       为什么是 SVG 而不是 .ico/.png：网关的静态服务是按 UTF-8 **文本**读文件的
+       （webapp.py 的 _static 用 read_text），二进制图片会被读坏；而 MIME 表里本来
+       就有 .svg: image/svg+xml。所以这是唯一能在**不动网关**的前提下加上的图标。
+       底色用深空而不是透明：标签页在浅色与深色两种浏览器主题下都要看得清。 -->
+  <defs>
+    <radialGradient id="sp-star" cx="50%" cy="45%" r="62%">
+      <stop offset="0" stop-color="#fffdf3"/>
+      <stop offset="0.5" stop-color="#ffd479"/>
+      <stop offset="1" stop-color="#f79b34"/>
+    </radialGradient>
+    <linearGradient id="sp-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#131c33"/>
+      <stop offset="1" stop-color="#080d18"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#sp-bg)"/>
+  <g transform="rotate(-20 16 16)">
+    <ellipse cx="16" cy="16" rx="12.6" ry="4.6" fill="none"
+             stroke="#6ea8ff" stroke-width="1.5" opacity="0.8"/>
+  </g>
+  <circle cx="16" cy="16" r="6.6" fill="url(#sp-star)"/>
+  <circle cx="27.4" cy="11.6" r="2.5" fill="#8fd3ff"/>
+  <circle cx="4.7" cy="20.4" r="1.3" fill="#cfe4ff" opacity="0.7"/>
+</svg>

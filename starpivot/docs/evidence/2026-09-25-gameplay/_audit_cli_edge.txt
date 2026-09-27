@@ -1,0 +1,214 @@
+--- 基线 solar 默认 50 年（--samples 5 缩短输出）
+    argv: nbody --scenario solar --no-bio --samples 5
+    耗时 277 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 0.001,
+  "years": 50,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+    {"t": 0, "p": [[-0.007135, -0.002795, 0.000206], [-0.137224, -0.450088, -0.024393], [-0.725452, -0.035502, 0.041222], [-0.184307, 0.9644 …(截断)
+
+--- solar 1 年
+    argv: nbody --scenario solar --no-bio --years 1 --samples 5
+    耗时 207 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 0.001,
+  "years": 1,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+    {"t": 0, "p": [[-0.007135, -0.002795, 0.000206], [-0.137224, -0.450088, -0.024393], [-0.725452, -0.035502, 0.041222], [-0.184307, 0.96441 …(截断)
+
+--- years = 0
+    argv: nbody --scenario solar --no-bio --years 0 --samples 5
+    耗时 203 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 0.001,
+  "years": 0,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+    {"t": 0, "p": [[-0.007135, -0.002795, 0.000206], [-0.137224, -0.450088, -0.024393], [-0.725452, -0.035502, 0.041222], [-0.184307, 0.96441 …(截断)
+
+--- years = -5
+    argv: nbody --scenario solar --no-bio --years -5 --samples 5
+    耗时 264 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 0.001,
+  "years": 50,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+    {"t": 0, "p": [[-0.007135, -0.002795, 0.000206], [-0.137224, -0.450088, -0.024393], [-0.725452, -0.035502, 0.041222], [-0.184307, 0.9644 …(截断)
+
+--- years = 1e6（页面输入框允许）
+    argv: nbody --scenario solar --no-bio --years 1000000 --samples 5
+    耗时 25015 ms，退出码 null（被我 25000 ms 掐断，不是它自己结束）
+    输出: (空)
+
+--- years = nan（玩家粘进非数字）
+    argv: nbody --scenario solar --no-bio --years abc --samples 5
+    耗时 865 ms，退出码 3221226505
+    输出: libc++abi: terminating due to uncaught exception of type std::invalid_argument: stod: no conversion
+
+--- samples = 4001（超内核上限）
+    argv: nbody --scenario solar --no-bio --years 1 --samples 4001
+    耗时 436 ms，退出码 2
+    输出: starpivot: --samples must be in [2, 4000]
+
+--- samples = 1（低于下限）
+    argv: nbody --scenario solar --no-bio --years 1 --samples 1
+    耗时 367 ms，退出码 2
+    输出: starpivot: --samples must be in [2, 4000]
+
+--- dt = 0
+    argv: nbody --scenario solar --no-bio --years 1 --dt 0 --samples 5
+    耗时 359 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 0,
+  "years": 1,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+
+  ],
+  "events": [],
+  "event_count": 0,
+  "bodies": [{"id": "Sun", "mass_msun": 1, "radius_km": 696340, "density_g_cm3": 1.40626, "born_at" …(截断)
+
+--- dt = -0.001
+    argv: nbody --scenario solar --no-bio --years 1 --dt -0.001 --samples 5
+    耗时 350 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 0.001,
+  "years": 1,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+    {"t": 0, "p": [[-0.007135, -0.002795, 0.000206], [-0.137224, -0.450088, -0.024393], [-0.725452, -0.035502, 0.041222], [-0.184307, 0.96441 …(截断)
+
+--- dt = 1e-12（极小步长）
+    argv: nbody --scenario solar --no-bio --years 1 --dt 1e-12 --samples 5
+    耗时 468 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 1e-12,
+  "years": 1,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+
+  ],
+  "events": [],
+  "event_count": 0,
+  "bodies": [{"id": "Sun", "mass_msun": 1, "radius_km": 696340, "density_g_cm3": 1.40626, "born …(截断)
+
+--- solar 50 年（算斜率用）
+    argv: nbody --scenario solar --no-bio --years 50 --samples 5
+    耗时 493 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 0.001,
+  "years": 50,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+    {"t": 0, "p": [[-0.007135, -0.002795, 0.000206], [-0.137224, -0.450088, -0.024393], [-0.725452, -0.035502, 0.041222], [-0.184307, 0.9644 …(截断)
+
+--- solar 500 年（算斜率用）
+    argv: nbody --scenario solar --no-bio --years 500 --samples 5
+    耗时 616 ms，退出码 0
+    输出: {
+  "status": "ok",
+  "command": "nbody",
+  "scenario": "solar",
+  "solar": "full",
+  "units": "AU / Msun / yr (figure8: G=1, m=1), ecliptic J2000 frame",
+  "integrator": "leapfrog2 (symplectic, kick-drift-kick)",
+  "collide": "off",
+  "radius_scale": 1,
+  "dt_years": 0.001,
+  "years": 500,
+  "samples": 5,
+  "star_collide": false,
+  "overrides": [],
+  "frames": [
+    {"t": 0, "p": [[-0.007135, -0.002795, 0.000206], [-0.137224, -0.450088, -0.024393], [-0.725452, -0.035502, 0.041222], [-0.184307, 0.964 …(截断)
+
+=== 耗时外推（用 50 年与 500 年两点差出的斜率，已扣掉进程启动）===
+  每年约 0.27 ms（solar，dt=0.001，10 个天体）
+       1000 年 → 约 0 秒
+      10000 年 → 约 3 秒
+     100000 年 → 约 27 秒
+    1000000 年 → 约 273 秒  ← 超过网关 180 秒超时，玩家会白等到 504

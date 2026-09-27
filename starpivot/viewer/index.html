@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#f6f7f9">
+<title>StarPivot — 轨道递推可视化</title>
+<style>
+  /* StarPivot 设计系统 v1 —— 与 home.html 逐字同一套令牌（浅色·技术审计版）。
+     轨道页的性格是"高密度工具"：同样的卡片/表格/提示条，但强调可读的表格与紧凑控件。 */
+  :root{
+    /* —— 颜色令牌（与 home.html 一致）—— */
+    --bg:#f6f7f9; --card:#ffffff; --card2:#f3f5f9;
+    --line:#e2e6ee; --line2:#ccd4e2;
+    /* ink2 / ink3 承载文字，必须在其实际底色上过 AA：实测最差底色 --card2 #f3f5f9
+       → ink 15.97 / ink2 6.68 / ink3 4.79（旧 ink3 #828b9a 只有 3.15，是回归）。
+       与 home.html 的取值逐字一致。 */
+    --ink:#161a22; --ink2:#4e5766; --ink3:#646d7c;
+    --accent:#2455d6; --accent-soft:#eaf0fe;
+    --accent2:#b45c15; --accent2-soft:#fdf0e2;
+    --ok:#127a52; --ok-soft:#e9f8f1;
+    --warn:#b4530a; --warn-soft:#fdf3e7;
+    --danger:#b42318; --danger-soft:#fdeceb;
+    --grid:#eef1f6;
+    /* —— 字号阶梯 —— */
+    --fs-xs:11.5px; --fs-sm:12.5px; --fs-base:14px; --fs-md:15px;
+    --fs-lg:16.5px; --fs-xl:20px; --fs-2xl:25px; --fs-3xl:38px;
+    /* —— 行高 —— */
+    --lh-tight:1.3; --lh-body:1.6; --lh-loose:1.78;
+    /* —— 间距刻度 —— */
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
+    /* —— 圆角与阴影 —— */
+    --r-1:6px; --r-2:10px; --r-3:14px; --r-full:999px;
+    --sh-1:0 1px 2px rgba(16,24,40,.05); --sh-2:0 8px 24px rgba(16,24,40,.08);
+    --ring:0 0 0 3px rgba(36,85,214,.30);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --dur:.16s; --ease:cubic-bezier(.2,.6,.2,1);
+    --wrap:1180px;
+  }
+  *{box-sizing:border-box}
+  /* 触屏：点按不闪系统灰；刘海屏 / Home 指示条处留安全区，内容不被压住。 */
+  html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:rgba(36,85,214,.14)}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+       padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
+       font:var(--fs-base)/var(--lh-body) -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:var(--sp-5) var(--sp-5) var(--sp-7)}
+  header{display:flex;align-items:baseline;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-2)}
+  h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:.2px;line-height:var(--lh-tight)}
+  .ver{color:var(--ink3);font-size:var(--fs-sm)}
+  .sub{color:var(--ink2);font-size:var(--fs-base);line-height:var(--lh-loose);max-width:74ch;margin-bottom:var(--sp-4)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-3);
+        padding:var(--sp-5);margin-bottom:var(--sp-4);box-shadow:var(--sh-1)}
+  h2{margin:0 0 var(--sp-3);font-size:var(--fs-lg);font-weight:650;letter-spacing:.1px}
+  .row{display:flex;gap:var(--sp-4);flex-wrap:wrap}
+  .col{flex:1 1 320px;min-width:280px}
+  label{font-size:var(--fs-sm);color:var(--ink2);display:block;margin-bottom:var(--sp-1);font-weight:600}
+  /* 表单控件字号 ≥16px：iOS Safari 在 <16px 的输入框聚焦时会整页放大。 */
+  select,input,textarea,button{font:inherit;font-size:max(16px,var(--fs-base));color:var(--ink);
+        background:var(--card);border:1px solid var(--line2);border-radius:var(--r-1);padding:7px 10px;
+        touch-action:manipulation}
+  textarea{font-family:var(--mono);font-size:max(16px,var(--fs-base));line-height:1.5}
+  button{cursor:pointer;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
+  button:hover{border-color:var(--accent)}
+  button:active{transform:translateY(1px)}
+  input[type=range]{padding:0;accent-color:var(--accent)}
+  canvas{width:100%;display:block;border-radius:var(--r-2);background:#fbfcfe}
+  table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);line-height:1.5}
+  th,td{text-align:left;padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink3);font-weight:650;font-size:var(--fs-xs);letter-spacing:.02em}
+  tbody tr:hover{background:var(--card2)}
+  td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+  .badge{display:inline-block;padding:2px 9px;border-radius:var(--r-full);font-size:var(--fs-xs);
+         font-weight:600;white-space:nowrap;border:1px solid transparent;
+         background:var(--accent-soft);color:var(--accent);border-color:#c7d8fb}
+  .badge.off{background:var(--card2);color:var(--ink3);border-color:var(--line)}
+  .note{font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-3);line-height:var(--lh-loose)}
+  .warnbox{border-left:3px solid var(--warn);background:var(--warn-soft);padding:var(--sp-3) var(--sp-4);
+           border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#7c3d0a;line-height:var(--lh-loose)}
+  .okbox{border-left:3px solid var(--ok);background:var(--ok-soft);padding:var(--sp-3) var(--sp-4);
+         border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#0d5b3e;line-height:var(--lh-loose)}
+  code{font-family:var(--mono);font-size:var(--fs-sm);background:var(--grid);
+       padding:1px 6px;border-radius:var(--r-1)}
+  .legend{display:flex;gap:var(--sp-4);flex-wrap:wrap;font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-3)}
+  .sw{display:inline-block;width:22px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+  footer{color:var(--ink3);font-size:var(--fs-sm);margin-top:var(--sp-6);
+         border-top:1px solid var(--line);padding-top:var(--sp-4);line-height:var(--lh-loose)}
+  a{color:var(--accent);text-underline-offset:2px}
+  .navlink{font-size:var(--fs-sm);text-decoration:none;color:var(--accent)}
+  .navlink.muted{color:var(--ink2)}
+  /* 动态生成的表格（#kv / #model / #cresult）在窄屏上也要能横滚 —— 保持原来的写法不动 */
+  #cresult,.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* —— 可访问性：键盘焦点必须看得见 —— */
+  a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,
+  select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-1)}
+  /* —— 平板档：561–1024px（iPad 竖 768 / 横 1024）——
+     意图：左右两栏（.col）在 768 上仍能并排（flex-basis 320px ×2 + gap 放得下），
+     宽表在此宽度内取消 520px 最小宽、自适应收窄，避免 iPad 上被迫横拖。 */
+  @media(min-width:561px) and (max-width:1024px){
+    .wrap{padding-left:var(--sp-5);padding-right:var(--sp-5)}
+    .tablewrap table{min-width:0}
+  }
+  @media(max-width:720px){
+    .wrap{padding:var(--sp-4) var(--sp-4) var(--sp-6)}
+    h1{font-size:var(--fs-xl)}
+    .card{padding:var(--sp-4);border-radius:var(--r-2)}
+    .tablewrap table{min-width:520px}
+  }
+  /* —— 触摸设备（pointer:coarse）：可点区域最小 44×44 —— */
+  @media(pointer:coarse){
+    button,select,input,textarea,summary,[tabindex]{min-height:44px}
+    a{display:inline-flex;align-items:center;min-height:44px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>StarPivot</h1>
+    <span class="ver">v1.0.0 · C++17 物理内核 · 命令行 <code>starpivot</code></span>
+    <a class="navlink muted" href="home.html">← 首页</a>
+    <a class="navlink" href="universe.html">🌌 宇宙模拟 →</a>
+  </header>
+  <div class="sub">
+    轨迹与碰撞预警均为本机 <code>starpivot</code> CLI 的真实输出；本页只做绘制与请求转发，不做任何计算。
+  </div>
+  <div class="warnbox" style="margin-bottom:16px">
+    <b>上半页这三份轨道是随页面打包的预计算样本</b>（<code>viewer/demo.js</code>），
+    加载时不会调用本地内核 —— 实测打开本页只发过一次 <code>/api/health</code>。
+    它们确实是 CLI 算出来的真结果，但是<b>打包那一刻算的</b>。想用你自己这台机器现算，
+    命令行跑 <code>starpivot verify-tle …</code>；本页只有下半部分的
+    <b>conj（碰撞预警）</b> 两个按钮是真·现场调用。
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div style="flex:0 0 auto">
+        <label>场景</label>
+        <select id="scenario"></select>
+      </div>
+      <div style="flex:1 1 260px">
+        <label>回放</label>
+        <input id="slider" type="range" min="0" max="1000" value="1000" style="width:100%">
+      </div>
+      <div style="flex:0 0 auto;align-self:flex-end">
+        <button id="play">▶ 播放</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>地面轨迹（等距圆柱投影）</h2>
+    <canvas id="map" width="1120" height="560"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:#cfd6e4"></i>经纬网</span>
+      <span><i class="sw" style="background:#9aa3b2"></i>陆地（Natural Earth 110m）</span>
+      <span><i class="sw" style="background:#2f6df6"></i>已飞过</span>
+      <span><i class="sw" style="background:#f0893c"></i>当前位置</span>
+    </div>
+    <div class="note" id="mapnote"></div>
+  </div>
+
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <h2>高度剖面</h2>
+        <canvas id="alt" width="540" height="220"></canvas>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h2>关键量</h2>
+        <table id="kv"></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>本次计算用了什么模型</h2>
+    <table id="model"></table>
+    <div id="verdict" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>碰撞预警 · TLE 最近接近（conj）</h2>
+    <div class="row">
+      <div class="col">
+        <label>对象 A（TLE 两行）</label>
+        <textarea id="tleA" rows="3" spellcheck="false"
+          style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:max(16px,var(--fs-base));border:1px solid var(--line);border-radius:7px;padding:7px"></textarea>
+      </div>
+      <div class="col">
+        <label>对象 B（TLE 两行）</label>
+        <textarea id="tleB" rows="3" spellcheck="false"
+          style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:max(16px,var(--fs-base));border:1px solid var(--line);border-radius:7px;padding:7px"></textarea>
+      </div>
+    </div>
+    <div class="row" style="align-items:flex-end;margin-top:10px">
+      <div><label>窗口（分钟）</label><input id="cwin" type="number" value="1440" style="width:110px"></div>
+      <div><label>步长（分钟）</label><input id="cstep" type="number" value="1" step="0.5" style="width:90px"></div>
+      <div><label>告警阈值（km）</label><input id="cthr" type="number" value="100" style="width:110px"></div>
+      <div>
+        <label>真实编目</label>
+        <select id="cgroups">
+          <option value="iridium,globalstar,orbcomm">Iridium+Globalstar+Orbcomm（快）</option>
+          <option value="starlink">Starlink（较慢，约 1–2 分钟）</option>
+        </select>
+      </div>
+      <div style="flex:0 0 auto;align-self:flex-end">
+        <button id="cfind">🔍 从真实编目找近距对</button>
+        <button id="crun" style="background:var(--accent);color:#fff;border-color:var(--accent)">运行 conj</button>
+      </div>
+    </div>
+    <div id="cstatus" class="note"></div>
+    <div id="cresult" style="margin-top:12px"></div>
+    <div id="cmapbox" style="display:none;margin-top:16px">
+      <h2>TCA 前后 ±90 分钟地面轨迹（内核算的星下点，本页只画）</h2>
+      <canvas id="cmap" width="1120" height="520"></canvas>
+      <div class="legend">
+        <span><i class="sw" style="background:#c2410c"></i>对象 A 轨迹</span>
+        <span><i class="sw" style="background:#2563eb"></i>对象 B 轨迹</span>
+        <span>★ TCA 时刻位置（轨迹交叉处即最近接近点）</span>
+        <span style="margin-left:auto;color:var(--ink2)">球面地球星下点，纬度偏差 ≤ ~21 km，仅用于展示</span>
+      </div>
+    </div>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--ink2)">原始 JSON（CLI 输出）</summary>
+      <pre id="cjson" style="background:#0f172a;color:#d8e2f2;padding:12px;border-radius:8px;overflow:auto;font-size:11.5px;max-height:320px"></pre>
+    </details>
+    <div class="note">几何最近距离，<b>不含协方差</b>：正式告警须叠加硬球半径 + 协方差椭圆门槛。
+      所有数值来自本机 <code>starpivot conj</code>（对上 Vallado 附录 D 的 SGP4/SDP4），本页不做计算。</div>
+  </div>
+
+  <div class="card">
+    <h2>还没有做的（不做假）</h2>
+    <div class="warnbox">
+      以下能力尚未实现，命令会明确拒绝而不是返回一个"看起来对"的数：<br>
+      · <b>定轨</b>（最小二乘 / 卡尔曼滤波）<br>
+      · <b>田谐项重力场</b>（当前只有带谐 J2/J3/J4，缺 20×20 田谐与扇谐）<br>
+      · <b>空间天气驱动的大气密度</b>（当前用静态 US Standard Atmosphere 均值，太阳活动高低年相差约 2 倍）
+    </div>
+    <div class="okbox" style="margin-top:10px">
+      已实现并验证：<b>SGP4 / SDP4</b>（TLE 两行根数预报）——对上 Vallado AIAA 2006-6753
+      Rev 1 附录 D 全 6 官方向量（位置 &lt;1e-6 km、速度 &lt;1e-9 km/s），并经真实在轨 TLE
+      （ISS 25544、GPS BIIR-5 26407）核对。碰撞预警最近接近筛选（<code>conj</code>）构建其上，
+      见下方「碰撞预警」面板。
+    </div>
+  </div>
+
+  <footer>
+    内核：N 体引力 · Hermite 4 阶 · 辛 leapfrog · 自转/岁差 · 时间尺度 · 带谐重力/阻力/光压。
+    单位：N 体内核 AU/M☉/yr；摄动与 CLI 为 km/kg/s。零第三方数值依赖，仅用 C++17 标准库。
+  </footer>
+</div>
+
+<script src="world.js"></script>
+<script src="demo.js"></script>
+<script>
+(function(){
+  const LAND = window.WORLD_LAND || [];
+  const DEMO = window.STARPIVOT_DEMO || {};
+  const keys = Object.keys(DEMO).filter(k => !k.startsWith('__'));
+
+  const sel = document.getElementById('scenario');
+  const labels = {
+    sso700:   '太阳同步轨道 · 700 km · i=98.2° · 24 h',
+    iss_drag: '空间站类 · 420 km · i=51.6° · 48 h · 含大气阻力',
+    molniya:  '大椭圆轨道 · e=0.74 · 临界倾角 63.4° · 12 h'
+  };
+  keys.forEach(k => {
+    const o = document.createElement('option');
+    o.value = k; o.textContent = labels[k] || k;
+    sel.appendChild(o);
+  });
+
+  const map = document.getElementById('map'), mctx = map.getContext('2d');
+  const alt = document.getElementById('alt'), actx = alt.getContext('2d');
+  const cmap = document.getElementById('cmap'), cctx = cmap.getContext('2d');
+  const slider = document.getElementById('slider');
+  let playing = false, timer = null;
+
+  // Equirectangular projection: lon [-180,180] -> x, lat [90,-90] -> y.
+  function px(c, lon){ return (lon + 180) / 360 * c.width; }
+  function py(c, lat){ return (90 - lat) / 180 * c.height; }
+
+  function drawBase(c){
+    const g = c.getContext('2d');
+    g.clearRect(0,0,c.width,c.height);
+    g.fillStyle = '#fbfcfe';
+    g.fillRect(0,0,c.width,c.height);
+
+    // graticule
+    g.strokeStyle = '#e7ebf2'; g.lineWidth = 1;
+    for(let lon=-180; lon<=180; lon+=30){
+      g.beginPath(); g.moveTo(px(c,lon),0); g.lineTo(px(c,lon),c.height); g.stroke();
+    }
+    for(let lat=-90; lat<=90; lat+=30){
+      g.beginPath(); g.moveTo(0,py(c,lat)); g.lineTo(c.width,py(c,lat)); g.stroke();
+    }
+    // equator + prime meridian a touch stronger
+    g.strokeStyle = '#d3d9e4';
+    g.beginPath(); g.moveTo(0,py(c,0)); g.lineTo(c.width,py(c,0)); g.stroke();
+    g.beginPath(); g.moveTo(px(c,0),0); g.lineTo(px(c,0),c.height); g.stroke();
+
+    // land
+    g.fillStyle = '#e8ebf0';
+    g.strokeStyle = '#c8cfda'; g.lineWidth = 0.8;
+    for(const ring of LAND){
+      g.beginPath();
+      for(let i=0;i<ring.length;i++){
+        const x = px(c,ring[i][0]), y = py(c,ring[i][1]);
+        if(i===0) g.moveTo(x,y); else g.lineTo(x,y);
+      }
+      g.closePath(); g.fill(); g.stroke();
+    }
+  }
+
+  // 把一条地面轨迹画到任意地图画布上；split 段处理反子午线穿越。
+  function drawTrackLine(c, g, track, color, width){
+    let prev = null;
+    g.lineWidth = width; g.strokeStyle = color;
+    g.beginPath();
+    let started = false;
+    for(const p of track){
+      if(prev && Math.abs(p[1] - prev[1]) > 180){  // antimeridian jump
+        g.stroke(); g.beginPath(); started = false;
+      }
+      const x = px(c, p[1]), y = py(c, p[0]);
+      if(!started){ g.moveTo(x,y); started = true; } else g.lineTo(x,y);
+      prev = p;
+    }
+    g.stroke();
+  }
+
+  function drawTrack(track, upto){
+    // Split at antimeridian crossings so we don't draw horizontal streaks.
+    let prev = null;
+    mctx.lineWidth = 1.6;
+    for(let i=0;i<upto;i++){
+      const p = track[i];
+      if(prev){
+        if(Math.abs(p.lon_deg - prev.lon_deg) > 180){ prev = null; }
+        else {
+          mctx.strokeStyle = '#2f6df6';
+          mctx.beginPath();
+          mctx.moveTo(px(map,prev.lon_deg), py(map,prev.lat_deg));
+          mctx.lineTo(px(map,p.lon_deg), py(map,p.lat_deg));
+          mctx.stroke();
+        }
+      }
+      prev = p;
+    }
+    // current marker
+    if(upto>0){
+      const p = track[upto-1];
+      mctx.fillStyle = '#f0893c';
+      mctx.beginPath(); mctx.arc(px(map,p.lon_deg), py(map,p.lat_deg), 5, 0, Math.PI*2); mctx.fill();
+      mctx.strokeStyle = '#fff'; mctx.lineWidth = 2; mctx.stroke();
+    }
+  }
+
+  function drawAlt(track, upto){
+    actx.clearRect(0,0,alt.width,alt.height);
+    actx.fillStyle='#fbfcfe'; actx.fillRect(0,0,alt.width,alt.height);
+    if(!track.length) return;
+    const pad = {l:52,r:12,t:14,b:26};
+    const w = alt.width-pad.l-pad.r, h = alt.height-pad.t-pad.b;
+    let lo=Infinity, hi=-Infinity;
+    for(const p of track){ lo=Math.min(lo,p.alt_km); hi=Math.max(hi,p.alt_km); }
+    if(hi-lo < 1){ hi = lo + 1; }
+    const tmax = track[track.length-1].t_s || 1;
+    const X = t => pad.l + t/tmax*w;
+    const Y = a => pad.t + (1-(a-lo)/(hi-lo))*h;
+
+    // axes
+    actx.strokeStyle='#e3e6ec'; actx.lineWidth=1;
+    for(let i=0;i<=4;i++){
+      const y = pad.t + i/4*h;
+      actx.beginPath(); actx.moveTo(pad.l,y); actx.lineTo(alt.width-pad.r,y); actx.stroke();
+      actx.fillStyle='#5b6472'; actx.font='11px monospace'; actx.textAlign='right';
+      actx.fillText((hi-(hi-lo)*i/4).toFixed(0), pad.l-6, y+3);
+    }
+    actx.textAlign='center';
+    actx.fillText('0 h', pad.l, alt.height-8);
+    actx.fillText((tmax/3600).toFixed(0)+' h', alt.width-pad.r, alt.height-8);
+    actx.save(); actx.translate(12, pad.t+h/2); actx.rotate(-Math.PI/2);
+    actx.fillText('高度 (km)', 0, 0); actx.restore();
+
+    // curve
+    actx.strokeStyle='#2f6df6'; actx.lineWidth=1.5; actx.beginPath();
+    let prev=null;
+    for(let i=0;i<upto;i++){
+      const p=track[i];
+      if(prev && Math.abs(p.lon_deg-prev.lon_deg)>180){ actx.stroke(); actx.beginPath(); }
+      const x=X(p.t_s), y=Y(p.alt_km);
+      if(i===0) actx.moveTo(x,y); else actx.lineTo(x,y);
+      prev=p;
+    }
+    actx.stroke();
+  }
+
+  function kvTable(d){
+    const el = d.final_elements_osculating || {};
+    const m0 = d.mean_elements_start || {};
+    const m1 = d.mean_elements_end || {};
+    const dr = d.secular_drift || {};
+    // 周期只有 initial_elements 里回显（mean_elements_start/end 打的是 a/e/inc/raan/argp 五个量）。
+    // 这里曾经读 m0.period_s —— 那个键从来不存在，于是 (…||0) 把第一行**安静地**显示成
+    // "0 s (0.0 min)"，三个场景全一样。字段名走散两边都不报错，值却是假的。
+    // 现在读真正回显它的那一处；真的没有就给 "—"，缺测按缺失处理，不补零。
+    const e0 = d.initial_elements || {};
+    const rows = [
+      ['周期（起始）', e0.period_s
+        ? (e0.period_s).toFixed(0)+' s  ('+(e0.period_s/60).toFixed(1)+' min)'
+        : '—（内核未回显）'],
+      ['平均半长轴 a', (m1.a_km||0).toFixed(3)+' km'],
+      ['平均偏心率 e', (m1.e||0).toExponential(3)],
+      ['平均倾角 i', (m1.inc_deg||0).toFixed(4)+'°'],
+      ['24h / 全程 Δa', (dr.da_km||0).toFixed(4)+' km'],
+      ['ΔΩ（升交点）', (dr.draan_deg||0).toFixed(4)+'°'],
+      ['ΔΩ 速率', (dr.draan_deg_per_day||0).toFixed(4)+' °/day'],
+      ['Δω（近地点）', (dr.dargp_deg||0).toFixed(4)+'°'],
+      ['密切 vs 平均 a', (d.osculating_minus_mean_a_km||0).toFixed(3)+' km'],
+      ['起始历元 (UTC)', d.epoch_utc || '-']
+    ];
+    let html = '<tr><th>量</th><th style="text-align:right">值</th></tr>';
+    for(const [k,v] of rows) html += '<tr><td>'+k+'</td><td class="num">'+v+'</td></tr>';
+    document.getElementById('kv').innerHTML = html;
+  }
+
+  function modelTable(d){
+    const m = d.model || {};
+    const rows = [
+      ['积分器', m.integrator + '  (步长 ' + m.step_s + ' s)'],
+      ['引力场', m.gravity],
+      ['大气阻力', m.drag ? '开' : '关'],
+      ['太阳光压', m.srp ? '开' : '关'],
+      // 阻力与光压都通过 A/m 进入方程。不把这两个数写出来，看的人就无法判断
+      // "两天掉多少"对应的是什么飞行器，也无法复现这一行结果 —— 样本里曾经缺它们，
+      // 而那 641 个点只能靠拟合一个标量反推。有则显示，没有就不占一行（不补零）。
+      ...(m.spacecraft ? [['航天器面积 / 质量',
+        m.spacecraft.area_m2 + ' m² / ' + m.spacecraft.mass_kg + ' kg（A/m = '
+        + m.spacecraft.area_over_mass_m2_per_kg.toExponential(2) + ' m²/kg）']] : []),
+      ['地球形状（星下点）', m.earth_model]
+    ];
+    let html = '<tr><th>项</th><th>设置</th></tr>';
+    for(const [k,v] of rows) html += '<tr><td>'+k+'</td><td>'+v+'</td></tr>';
+    document.getElementById('model').innerHTML = html;
+  }
+
+  // Independent, externally-checkable verdicts. These are the numbers a domain
+  // expert would sanity-check first, so we assert them on the page.
+  function verdict(k, d){
+    const dr = d.secular_drift || {};
+    const rate = dr.draan_deg_per_day;
+    const m0 = d.mean_elements_start || {};
+    let html = '';
+    if(k === 'sso700'){
+      const ok = Math.abs(rate - 0.9856) < 0.02;
+      html = ok
+        ? '<div class="okbox">太阳同步检验：ΔΩ = '+rate.toFixed(4)+' °/day，'
+          +'太阳同步要求 0.9856 °/day，偏差 '+Math.abs(rate-0.9856).toFixed(4)
+          +' °/day。700 km 高度的标准 SSO 倾角就是 98.2°，与公开资料一致。</div>'
+        : '<div class="warnbox">太阳同步检验未通过：'+rate.toFixed(4)+' vs 0.9856 °/day</div>';
+      html += '<div class="note">J2 是保守力，所以 Δa 应当接近 0：实测 '
+              + (dr.da_km||0).toFixed(4) + ' km。</div>';
+    } else if(k === 'iss_drag'){
+      const ok = Math.abs(rate - (-4.95)) < 0.3;
+      html = ok
+        ? '<div class="okbox">升交点回归检验：ΔΩ = '+rate.toFixed(3)
+          +' °/day，国际空间站轨道（i=51.6°, h≈420 km）的教科书值约 −4.95 °/day。</div>'
+        : '<div class="warnbox">升交点回归偏离教科书值：'+rate.toFixed(3)+' °/day</div>';
+      html += '<div class="note">阻力在消耗能量，但 420 km 处两天只掉 '
+              + Math.abs(dr.da_km||0).toFixed(4)
+              +' km；把 --mass 调小或 --area 调大可以放大衰减。</div>';
+    } else if(k === 'molniya'){
+      const ok = Math.abs(dr.dargp_deg) < 0.05;
+      html = ok
+        ? '<div class="okbox">临界倾角检验：i=63.4° 时近地点进动率在解析上为零，'
+          +'实测 Δω = '+dr.dargp_deg.toFixed(5)+'°。这正是闪电轨道被设计在这个倾角的原因。</div>'
+        : '<div class="warnbox">临界倾角检验未通过：Δω = '+dr.dargp_deg.toFixed(4)+'°</div>';
+      html += '<div class="note">大偏心率会显著放大 J2 效应：解析式含 (1−e²)⁻² '
+              +'≈ '+ (1/Math.pow(1-0.74*0.74,2)).toFixed(2) +' 倍因子，实测 ΔΩ = '
+              + rate.toFixed(4) +' °/day 与之相符。</div>';
+    }
+    document.getElementById('verdict').innerHTML = html;
+    document.getElementById('mapnote').textContent =
+      '星下点为球面地球近似（未做扁率改正），纬度误差最大约 21 km —— 够画轨迹，不够做指向。';
+  }
+
+  function render(){
+    const k = sel.value;
+    const d = DEMO[k];
+    if(!d) return;
+    const track = d.ground_track || [];
+    const upto = Math.max(1, Math.round(slider.value/1000*track.length));
+    drawBase(map);
+    drawTrack(track, upto);
+    drawAlt(track, upto);
+    kvTable(d);
+    modelTable(d);
+    verdict(k, d);
+  }
+
+  sel.addEventListener('change', render);
+  slider.addEventListener('input', render);
+  document.getElementById('play').addEventListener('click', function(){
+    if(playing){ clearInterval(timer); playing=false; this.textContent='▶ 播放'; return; }
+    playing = true; this.textContent='⏸ 暂停';
+    slider.value = 0;
+    timer = setInterval(function(){
+      let v = +slider.value + 12;
+      if(v >= 1000){ v = 1000; clearInterval(timer); playing=false;
+                     document.getElementById('play').textContent='▶ 播放'; }
+      slider.value = v; render();
+    }, 30);
+  });
+
+  render();
+
+  // ================= 碰撞预警（conj）面板 =================
+  // 页面不做任何数值计算：输入 TLE 原样交给本地服务，由 C++ CLI 返回 JSON。
+  const $ = id => document.getElementById(id);
+
+  // 启动健康检查：file:// 直接打开时没有本地服务，明确提示而不是静默失败。
+  fetch('/api/health').then(r => r.json()).then(h => {
+    if (!h.exists) {
+      $('cstatus').innerHTML = '<span style="color:#c2410c">未找到 starpivot 可执行文件（'
+        + h.exe + '）——请先编译。</span>';
+    }
+  }).catch(() => {
+    $('cstatus').innerHTML = '<span style="color:#c2410c">检测不到本地服务。'
+      + '请先运行 <code>python tools/webapp.py</code>，然后从 http://localhost:8765 打开本页。</span>';
+  });
+
+  async function postJSON(url, body) {
+    const r = await fetch(url, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const js = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(js.error || ('HTTP ' + r.status));
+    return js;
+  }
+
+  function parseTleBox(txt, name) {
+    const lines = txt.split('\n').map(s => s.trim()).filter(Boolean);
+    if (lines.length < 2) throw new Error(name + ' 需要两行 TLE');
+    return [lines[0], lines[1]];
+  }
+
+  function fmtConj(d) {
+    const r = d.result || {};
+    const a = d.object_a || {}, b = d.object_b || {};
+    const badge = (r.alert === true)
+      ? '<span class="badge" style="background:#fee2e2;color:#991b1b;border-color:#fecaca">⚠ 低于阈值 · alert</span>'
+      : '<span class="badge off">未达告警阈值</span>';
+    const hyp = v => Math.hypot(v[0], v[1], v[2]);
+    const arr = (v, n) => '[' + (v || [0,0,0]).map(x => x.toFixed(n)).join(', ') + ']';
+    return '<div class="row">'
+      + '<div class="col"><table>'
+      + '<tr><th>量</th><th style="text-align:right">值</th></tr>'
+      + '<tr><td>最近距离 miss</td><td class="num"><b>' + (r.miss_distance_km || 0).toFixed(3) + ' km</b></td></tr>'
+      + '<tr><td>最近接近 TCA</td><td class="num">' + (r.tca_utc || '-') + '</td></tr>'
+      + '<tr><td>相对速度</td><td class="num">' + (r.rel_speed_kms || 0).toFixed(5) + ' km/s</td></tr>'
+      + '<tr><td>告警判定</td><td class="num">' + badge + '</td></tr>'
+      + '<tr><td>对象 A</td><td class="num">' + a.satnum + ' · ' + a.intl_designator + ' · ' + a.regime + '</td></tr>'
+      + '<tr><td>对象 B</td><td class="num">' + b.satnum + ' · ' + b.intl_designator + ' · ' + b.regime + '</td></tr>'
+      + '</table></div>'
+      + '<div class="col"><table>'
+      + '<tr><th>TCA 时刻状态（TEME）</th><th style="text-align:right">A</th><th style="text-align:right">B</th></tr>'
+      + '<tr><td>r (km)</td><td class="num">' + arr(r.pos_a_km, 1) + '</td><td class="num">' + arr(r.pos_b_km, 1) + '</td></tr>'
+      + '<tr><td>v (km/s)</td><td class="num">' + arr(r.vel_a_kms, 3) + '</td><td class="num">' + arr(r.vel_b_kms, 3) + '</td></tr>'
+      + '<tr><td>|r| / |v|</td><td class="num">' + hyp(r.pos_a_km || [0,0,0]).toFixed(1) + ' / ' + hyp(r.vel_a_kms || [0,0,0]).toFixed(3) + '</td>'
+      + '<td class="num">' + hyp(r.pos_b_km || [0,0,0]).toFixed(1) + ' / ' + hyp(r.vel_b_kms || [0,0,0]).toFixed(3) + '</td></tr>'
+      + '<tr><td>TCA 星下点 (lat, lon)</td><td class="num">'
+      +   (r.subpoint_a ? r.subpoint_a.lat_deg.toFixed(2) + '°, ' + r.subpoint_a.lon_deg.toFixed(2) + '°' : '-') + '</td>'
+      + '<td class="num">'
+      +   (r.subpoint_b ? r.subpoint_b.lat_deg.toFixed(2) + '°, ' + r.subpoint_b.lon_deg.toFixed(2) + '°' : '-') + '</td></tr>'
+      + '</table></div></div>';
+  }
+
+  // TCA 地面轨迹图：数据（星下点经纬度）全部来自 CLI 的 ground_track 字段。
+  function drawConjMap(r) {
+    const gt = r.ground_track;
+    if (!gt || !gt.a || !gt.a.length) { $('cmapbox').style.display = 'none'; return; }
+    drawBase(cmap);
+    drawTrackLine(cmap, cctx, gt.a, '#c2410c', 2);
+    drawTrackLine(cmap, cctx, gt.b, '#2563eb', 2);
+    // TCA 时刻两星位置：五角星标记。
+    const star = (p, col) => {
+      const x = px(cmap, p[2] !== undefined ? p[2] : p.lon_deg);
+      const y = py(cmap, p[1] !== undefined ? p[1] : p.lat_deg);
+      cctx.fillStyle = col; cctx.strokeStyle = '#fff'; cctx.lineWidth = 1.5;
+      cctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const rad = i % 2 === 0 ? 9 : 4;
+        const a = -Math.PI/2 + i * Math.PI/5;
+        const sx = x + rad * Math.cos(a), sy = y + rad * Math.sin(a);
+        i ? cctx.lineTo(sx, sy) : cctx.moveTo(sx, sy);
+      }
+      cctx.closePath(); cctx.fill(); cctx.stroke();
+    };
+    if (r.subpoint_a) star([r.subpoint_a.lat_deg, r.subpoint_a.lon_deg], '#c2410c');
+    if (r.subpoint_b) star([r.subpoint_b.lat_deg, r.subpoint_b.lon_deg], '#2563eb');
+    $('cmapbox').style.display = 'block';
+  }
+
+  $('crun').addEventListener('click', async () => {
+    try {
+      const [l1, l2] = parseTleBox($('tleA').value, '对象 A');
+      const [l3, l4] = parseTleBox($('tleB').value, '对象 B');
+      $('cstatus').textContent = '运行 starpivot conj …（窗口内逐对传播，通常 1–2 秒）';
+      const d = await postJSON('/api/conj', {
+        line1: l1, line2: l2, line3: l3, line4: l4,
+        window_min: +$('cwin').value || 1440,
+        step_min: +$('cstep').value || 1,
+        threshold_km: $('cthr').value === '' ? null : +$('cthr').value
+      });
+      $('cstatus').textContent = '';
+      $('cresult').innerHTML = fmtConj(d);
+      drawConjMap(d.result || {});
+      $('cjson').textContent = JSON.stringify(d, null, 2);
+    } catch (e) {
+      $('cstatus').innerHTML = '<span style="color:#c2410c">' + e.message + '</span>';
+    }
+  });
+
+  $('cfind').addEventListener('click', async () => {
+    try {
+      const groups = $('cgroups').value;
+      $('cstatus').textContent = '从 Celestrak 拉取真实 TLE 并逐对真实传播'
+        + (groups.indexOf('starlink') >= 0 ? '（Starlink 约 1–2 分钟）' : '（约 10–30 秒）') + '…';
+      const r = await fetch('/api/find-close?groups=' + encodeURIComponent(groups)
+        + '&top=12&cap=1500');
+      const js = await r.json();
+      if (!r.ok) throw new Error(js.error || ('HTTP ' + r.status));
+      const pairs = js.pairs || [];
+      if (!pairs.length) throw new Error('没有可用结果（网络或编目问题）');
+      const p = pairs[0];
+      $('tleA').value = p.l1_a + '\n' + p.l2_a;
+      $('tleB').value = p.l1_b + '\n' + p.l2_b;
+      let html = '<table><tr><th>#</th><th>satA</th><th>satB</th>'
+        + '<th style="text-align:right">miss km</th><th style="text-align:right">vrel km/s</th><th>TCA (UTC)</th></tr>';
+      pairs.forEach((q, i) => {
+        html += '<tr data-i="' + i + '" style="cursor:pointer">'
+          + '<td>' + (i + 1) + '</td><td>' + q.satnum_a + '</td><td>' + q.satnum_b + '</td>'
+          + '<td class="num"><b>' + q.miss_km.toFixed(2) + '</b></td>'
+          + '<td class="num">' + q.rel_speed_kms.toFixed(3) + '</td>'
+          + '<td>' + q.tca_utc + '</td></tr>';
+      });
+      html += '</table><div class="note">点击任意行把该对载入上方输入框；第 1 名已填入。</div>';
+      $('cresult').innerHTML = html;
+      $('cstatus').textContent = '';
+      $('cjson').textContent = JSON.stringify(js, null, 2);
+      $('cresult').querySelectorAll('tr[data-i]').forEach(tr => {
+        tr.addEventListener('click', () => {
+          const q = pairs[+tr.dataset.i];
+          $('tleA').value = q.l1_a + '\n' + q.l2_a;
+          $('tleB').value = q.l1_b + '\n' + q.l2_b;
+        });
+      });
+    } catch (e) {
+      $('cstatus').innerHTML = '<span style="color:#c2410c">' + e.message + '</span>';
+    }
+  });
+
+  // 默认样例：今天从真实编目筛出的近距对（Starlink 2025-280 同批、同面）
+  $('tleA').value = '1 66842U 25280X   26267.92632680  .00003739  00000+0  32093-3 0  9993\n2 66842  70.0004 191.9440 0002614 268.6136  91.4724 14.98341207 45928';
+  $('tleB').value = '1 66826U 25280F   26267.92616233  .00003481  00000+0  29936-3 0  9997\n2 66826  70.0013 191.9469 0002645 269.7557  90.3299 14.98337695 45925';
+})();
+</script>
+</body>
+</html>
