@@ -42,6 +42,7 @@ _build*.txt
 _c_*.txt
 *.log
 *.out
+_audit_frontend*.out.md
 __pycache__/
 *.pyc
 
