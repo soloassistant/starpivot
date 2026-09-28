@@ -22,6 +22,8 @@ build/
 # ---------- 探针的运行产物 ----------
 # 录制缓存：可用 python _record.py 从内核重录，并且绑 体积+sha1，内核一重建就作废。
 _replay.json
+# 重录前的备份（_replay.json.bak_HHMMSS）。⚠ .gitignore 不支持行尾注释，注释必须独占一行。
+_replay.json.bak*
 _plan_*.json
 *.err
 # 散落在 starpivot/ 根下的调试 JSON（真实数据在 starpivot/data/，不在忽略之列）。
@@ -38,6 +40,8 @@ _check.txt
 _runall.txt
 _runall_*.txt
 _my_runall.txt
+# 只补跑 E 层/部分层时的那轮日志（与 _runall_*.txt 同性质）
+_e_layer_*.txt
 _build*.txt
 _c_*.txt
 *.log

@@ -141,11 +141,11 @@
   <div class="card">
     <div class="row">
       <div style="flex:0 0 auto">
-        <label>场景</label>
+        <label for="scenario">场景</label>
         <select id="scenario"></select>
       </div>
       <div style="flex:1 1 260px">
-        <label>回放</label>
+        <label for="slider">回放</label>
         <input id="slider" type="range" min="0" max="1000" value="1000" style="width:100%">
       </div>
       <div style="flex:0 0 auto;align-self:flex-end">
@@ -156,21 +156,21 @@
 
   <div class="card">
     <h2>地面轨迹（等距圆柱投影）</h2>
-    <canvas id="map" width="1120" height="560"></canvas>
+    <canvas id="map" role="img" aria-label="地面轨迹图：卫星星下点画在等距圆柱投影的世界地图上" width="1120" height="560"></canvas>
     <div class="legend">
       <span><i class="sw" style="background:#cfd6e4"></i>经纬网</span>
       <span><i class="sw" style="background:#9aa3b2"></i>陆地（Natural Earth 110m）</span>
       <span><i class="sw" style="background:#2f6df6"></i>已飞过</span>
       <span><i class="sw" style="background:#f0893c"></i>当前位置</span>
     </div>
-    <div class="note" id="mapnote"></div>
+    <div class="note" id="mapnote" aria-live="polite"></div>
   </div>
 
   <div class="row">
     <div class="col">
       <div class="card">
         <h2>高度剖面</h2>
-        <canvas id="alt" width="540" height="220"></canvas>
+        <canvas id="alt" role="img" aria-label="高度剖面图：轨道高度随时间的变化" width="540" height="220"></canvas>
       </div>
     </div>
     <div class="col">
@@ -184,29 +184,29 @@
   <div class="card">
     <h2>本次计算用了什么模型</h2>
     <table id="model"></table>
-    <div id="verdict" style="margin-top:12px"></div>
+    <div id="verdict" aria-live="polite" style="margin-top:12px"></div>
   </div>
 
   <div class="card">
     <h2>碰撞预警 · TLE 最近接近（conj）</h2>
     <div class="row">
       <div class="col">
-        <label>对象 A（TLE 两行）</label>
+        <label for="tleA">对象 A（TLE 两行）</label>
         <textarea id="tleA" rows="3" spellcheck="false"
           style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:max(16px,var(--fs-base));border:1px solid var(--line);border-radius:7px;padding:7px"></textarea>
       </div>
       <div class="col">
-        <label>对象 B（TLE 两行）</label>
+        <label for="tleB">对象 B（TLE 两行）</label>
         <textarea id="tleB" rows="3" spellcheck="false"
           style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:max(16px,var(--fs-base));border:1px solid var(--line);border-radius:7px;padding:7px"></textarea>
       </div>
     </div>
     <div class="row" style="align-items:flex-end;margin-top:10px">
-      <div><label>窗口（分钟）</label><input id="cwin" type="number" value="1440" style="width:110px"></div>
-      <div><label>步长（分钟）</label><input id="cstep" type="number" value="1" step="0.5" style="width:90px"></div>
-      <div><label>告警阈值（km）</label><input id="cthr" type="number" value="100" style="width:110px"></div>
+      <div><label for="cwin">窗口（分钟）</label><input id="cwin" type="number" value="1440" style="width:110px"></div>
+      <div><label for="cstep">步长（分钟）</label><input id="cstep" type="number" value="1" step="0.5" style="width:90px"></div>
+      <div><label for="cthr">告警阈值（km）</label><input id="cthr" type="number" value="100" style="width:110px"></div>
       <div>
-        <label>真实编目</label>
+        <label for="cgroups">真实编目</label>
         <select id="cgroups">
           <option value="iridium,globalstar,orbcomm">Iridium+Globalstar+Orbcomm（快）</option>
           <option value="starlink">Starlink（较慢，约 1–2 分钟）</option>
@@ -217,11 +217,11 @@
         <button id="crun" style="background:var(--accent);color:#fff;border-color:var(--accent)">运行 conj</button>
       </div>
     </div>
-    <div id="cstatus" class="note"></div>
+    <div id="cstatus" class="note" aria-live="polite"></div>
     <div id="cresult" style="margin-top:12px"></div>
     <div id="cmapbox" style="display:none;margin-top:16px">
       <h2>TCA 前后 ±90 分钟地面轨迹（内核算的星下点，本页只画）</h2>
-      <canvas id="cmap" width="1120" height="520"></canvas>
+      <canvas id="cmap" role="img" aria-label="最近接近前后各 90 分钟的两条地面轨迹" width="1120" height="520"></canvas>
       <div class="legend">
         <span><i class="sw" style="background:#c2410c"></i>对象 A 轨迹</span>
         <span><i class="sw" style="background:#2563eb"></i>对象 B 轨迹</span>

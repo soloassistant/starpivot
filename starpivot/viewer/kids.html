@@ -133,17 +133,17 @@
   <div class="lead">点一下画面，放一颗行星 —— 看看它绕恒星转一圈，要多久。</div>
 
   <div class="card">
-    <canvas id="sky" width="720" height="520"></canvas>
-    <div class="tip" id="tip">画面里的黄点是恒星。在它周围点一下，行星就放在那儿。</div>
+    <canvas id="sky" role="img" aria-label="实验画面：中间那个黄点是恒星，在它旁边点一下就放一颗行星" width="720" height="520"></canvas>
+    <div class="tip" id="tip" aria-live="polite">画面里的黄点是恒星。在它周围点一下，行星就放在那儿。</div>
 
     <div class="knobs" id="knobs">
       <div class="knob">
-        <label>离恒星多远：<span class="val" id="vdist">2</span> 步</label>
+        <label for="dist">离恒星多远：<span class="val" id="vdist">2</span> 步</label>
         <div class="hint">拖动它，看看远近有什么不一样</div>
         <input type="range" id="dist" min="1" max="4" step="1" value="2">
       </div>
       <div class="knob">
-        <label>它的路有多扁：<span class="val" id="vecc">0.0</span></label>
+        <label for="ecc">它的路有多扁：<span class="val" id="vecc">0.0</span></label>
         <div class="hint">0 是正圆；数字越大，路越扁、拉得越长</div>
         <input type="range" id="ecc" min="0" max="0.6" step="0.1" value="0">
       </div>
@@ -155,7 +155,7 @@
 
   <div class="card">
     <div class="big">转一圈要 <b id="period">—</b> <span id="unit">年</span></div>
-    <div class="tip" id="ptip">正在问……</div>
+    <div class="tip" id="ptip" aria-live="polite">正在问……</div>
     <div class="guess" id="guess" style="display:none">
       <div class="ask" id="ask">你猜：它转一圈要多久？</div>
       <div class="opts">
@@ -172,7 +172,7 @@
   </div>
 
   <div class="card">
-    <div class="tip" id="coltip">还想看别的？这里有两颗行星，可以让它们撞一下看看。</div>
+    <div class="tip" id="coltip" aria-live="polite">还想看别的？这里有两颗行星，可以让它们撞一下看看。</div>
     <div style="text-align:center;margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
       <button id="dobump">让它们撞一下</button>
       <button id="dopass">让它们穿过去（不撞）</button>

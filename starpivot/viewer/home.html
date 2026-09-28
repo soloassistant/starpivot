@@ -212,7 +212,7 @@
     <div class="dbody">
       <div class="grid2">
         <div>
-          <h3>是</h3>
+          <h3 aria-level="2">是</h3>
           <ul style="margin:0;padding-left:18px;font-size:13px">
             <li><b>真在算</b>：引力/jerk、辛蛙跳 / Hermite4 / 半隐式欧拉 / 开普勒解析、J2–J4、大气阻力、太阳光压、SGP4/SDP4、碰撞（吸积与碎裂）、生物演化阶梯 —— 全部是内核里的实现。</li>
             <li><b>数据可追</b>：真实恒星与系外行星来自公开编目，逐项标注了出处与类别（见下）。</li>
@@ -220,7 +220,7 @@
           </ul>
         </div>
         <div>
-          <h3>不是</h3>
+          <h3 aria-level="2">不是</h3>
           <ul style="margin:0;padding-left:18px;font-size:13px">
             <li><b>不是天文动画</b>：不是"看起来像"的示意图，轨道是从初值积分出来的。</li>
             <li><b>不是前端库</b>：没有借用任何第三方天文前端库，内核是自己的 C++17 实现（命令行 <code>starpivot</code>）。</li>
@@ -287,7 +287,7 @@
         </tbody>
       </table></div>
 
-      <h3>四类怎么分（这不是措辞讲究，是这句话决定了它能不能被信任）</h3>
+      <h3 aria-level="2">四类怎么分（这不是措辞讲究，是这句话决定了它能不能被信任）</h3>
       <div class="tablewrap"><table>
         <tbody>
           <tr><td style="width:120px"><span class="badge obs">观测</span></td><td>公开编目/发布值，能追到具体来源与查询语句</td></tr>
@@ -307,7 +307,7 @@
   <details class="card">
     <summary>怎么自己验：五层判据、几个能被独立复算的数、可直接粘贴的命令</summary>
     <div class="dbody">
-      <h3>① 判据：五层，全绿</h3>
+      <h3 aria-level="2">① 判据：五层，全绿</h3>
       <div class="tablewrap"><table>
         <thead><tr><th>层</th><th>内容</th><th>抓什么错</th></tr></thead>
         <tbody>
@@ -322,7 +322,7 @@
         当前状态：<b>A/B/C/D/E 五层全过，<code>fail=0 skip=0</code></b>（有跳过项不算全绿）。
       </div>
 
-      <h3>② 几个具体的数（都能被独立复算打回来）</h3>
+      <h3 aria-level="2">② 几个具体的数（都能被独立复算打回来）</h3>
       <div class="tablewrap"><table>
         <thead><tr><th>验的是</th><th>结果</th></tr></thead>
         <tbody>
@@ -341,7 +341,7 @@
         </tbody>
       </table></div>
 
-      <h3>③ 等价命令行：你在终端跑，能得到与画面相同的 JSON</h3>
+      <h3 aria-level="2">③ 等价命令行：你在终端跑，能得到与画面相同的 JSON</h3>
       <div class="note" style="margin-top:0">
         每个工具页都能"复制等价 CLI 命令"。例如太阳系 N 体：
       </div>

@@ -56,6 +56,8 @@
         padding:var(--sp-4);margin-bottom:var(--sp-4);box-shadow:var(--sh-1)}
   h2{margin:0 0 var(--sp-3);font-size:var(--fs-lg);font-weight:650;letter-spacing:.1px}
   label{font-size:var(--fs-sm);color:var(--ink2);display:block;margin-bottom:var(--sp-1)}
+  /* 一组按钮的说明文字用这个：它背后没有可关联的表单控件，但长得要和 label 一样 */
+  .grouplabel{font-size:var(--fs-sm);color:var(--ink2);display:block;margin-bottom:var(--sp-1)}
   /* 表单控件字号 ≥16px：iOS Safari 在 <16px 的输入框聚焦时会整页放大。
      控件声明 touch-action:manipulation —— 画布自己用 none（要接管拖动转向）。 */
   select,input,button{font:inherit;font-size:max(16px,var(--fs-base));color:var(--ink);
@@ -180,14 +182,14 @@
     它只影响画面平滑度，不产生任何新的物理量——判断、时刻、演化数值仍然全部取自内核。
   </div>
 
-  <div id="errbar" class="warnbox" style="display:none;margin-bottom:12px"></div>
+  <div id="errbar" class="warnbox" role="status" style="display:none;margin-bottom:12px"></div>
 
 
 
 
 
   <div class="card stage" id="stage">
-    <canvas id="view"></canvas>
+    <canvas id="view" role="img" aria-label="宇宙模拟主画面：天体在黄道面上的位置与轨道"></canvas>
     <div class="legend" id="legend"></div>
     <div class="note" id="statline"></div>
     <!-- 选中天体的数据卡就在画面正下方 —— 点一下画面，数据要在视线里出现才有用；
@@ -197,7 +199,7 @@
       <h2 style="margin:0 0 6px">选中的天体 <span style="font-size:12px;font-weight:400;color:var(--ink2)">
         全部来自内核回显，页面不算</span>
         <span style="float:right"><button id="selclose" style="font-size:11.5px;padding:3px 9px">✕ 取消选中 · 回全景</button></span></h2>
-      <div id="selbody" class="stat" style="font-size:12.5px"></div>
+      <div id="selbody" class="stat" aria-live="polite" style="font-size:12.5px"></div>
     </div>
   </div>
 
@@ -208,9 +210,9 @@
     <div class="row">
       <div><button id="play">⏸ 暂停</button></div>
       <div><button id="dirbtn" title="倒放 / 正放">⟲ 倒放</button></div>
-      <div style="flex:1 1 260px"><label>时间 <span id="tlabel" class="stat"></span></label>
+      <div style="flex:1 1 260px"><label for="scrub">时间 <span id="tlabel" class="stat"></span></label>
         <input id="scrub" type="range" min="0" max="1000" value="1000" style="width:100%"></div>
-      <div><label>播放速度（帧/秒）</label>
+      <div><label for="speed">播放速度（帧/秒）</label>
         <input id="speed" type="range" min="2" max="120" value="40" style="width:140px"></div>
       <div><button id="placemode">✛ 点画面放行星</button></div>
       <div><button id="unplace" title="撤销刚才点画面放下的那一颗（也可以按 Ctrl+Z）">↩ 撤销上一颗</button></div>
@@ -218,8 +220,8 @@
       <div><button id="share">🔗 复制分享链接</button></div>
       <div><button id="fs">⛶ 全屏</button></div>
     </div>
-    <div class="note" id="sharenote" style="display:none;margin-top:6px"></div>
-    <div class="note" id="qrow" style="margin-top:8px"></div>
+    <div class="note" id="sharenote" aria-live="polite" style="display:none;margin-top:6px"></div>
+    <div class="note" id="qrow" aria-live="polite" style="margin-top:8px"></div>
     <!-- 稳定性挑战原来是页面下方一张独立卡片，而它的提示写着"先在下面的行星表里把天体加好" ——
          那张表现在收在「更多设置」里、普通人模式还看不到它，提示与流程早就对不上了。
          现在把它搬进演奏条：开始挑战就直接进放置模式，放一颗判一次，成绩就在这一行下面。 -->
@@ -232,11 +234,11 @@
       <div><button id="ch_start" class="primary">开始挑战</button></div>
       <div><button id="ch_quit">退出挑战</button></div>
     </div>
-    <div id="challengebox" class="note" style="margin-top:8px"></div>
+    <div id="challengebox" class="note" aria-live="polite" style="margin-top:8px"></div>
   </div>
 
   <div class="card" id="tourcard" style="display:none">
-    <h2>导览 <span class="stat" id="tourcount" style="font-weight:400"></span>
+    <h2>导览 <span class="stat" id="tourcount" aria-live="polite" style="font-weight:400"></span>
       <span style="float:right"><button id="tour_close" style="font-size:11.5px;padding:3px 9px">关闭</button></span></h2>
     <div id="tourbody" style="font-size:13.5px;line-height:1.75"></div>
     <div class="row" style="margin-top:10px;align-items:center">
@@ -250,7 +252,7 @@
   <div class="card">
     <h2>一键开局 · 预设宇宙</h2>
     <div id="presets" class="row" style="gap:8px;align-items:flex-start"></div>
-    <div class="note" id="presetnote" style="margin-top:8px"></div>
+    <div class="note" id="presetnote" aria-live="polite" style="margin-top:8px"></div>
   </div>
 
   <div class="card">
@@ -258,7 +260,7 @@
       点一个类型，再点画面空白处 —— 就放下一颗。类型表来自内核（<code>starpivot catalog</code>），
       半径与光度都由内核按类型算，页面不参与。</span></h2>
     <div id="palette"></div>
-    <div class="note" id="typenote" style="margin-top:8px">正在读取内核的类型表…</div>
+    <div class="note" id="typenote" aria-live="polite" style="margin-top:8px">正在读取内核的类型表…</div>
   </div>
 
   <details class="card" id="advbox">
@@ -266,21 +268,21 @@
     <div class="dbody">
     <div class="row">
       <div>
-        <label>场景</label>
+        <label for="scenario">场景</label>
         <select id="scenario">
           <option value="solar">太阳系 · 太阳+8 大行星+冥王星</option>
           <option value="figure8">三体 · 8 字周期轨道（Chenciner–Montgomery）</option>
           <option value="custom">自定义 · 你添加的行星（太阳系可选）</option>
         </select>
       </div>
-      <div><label>积分年数</label>
+      <div><label for="years">积分年数</label>
         <input id="years" type="number" value="50" min="1" max="100000" step="1" style="width:90px"></div>
-      <div><label>时长</label>
+      <div><label for="perpetual">时长</label>
         <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink)">
           <input id="perpetual" type="checkbox" style="width:auto"> 永久（算到末尾自动延长，一直演化下去）</label></div>
-      <div><label>输出帧数</label>
+      <div><label for="samples">输出帧数</label>
         <input id="samples" type="number" value="2000" min="10" max="2000" style="width:90px"></div>
-      <div><label>计算方法 <span class="plainterm" id="integplain"></span></label>
+      <div><label for="integ">计算方法 <span class="plainterm" id="integplain"></span></label>
         <select id="integ">
           <option value="leapfrog">蛙跳（辛 · 推荐）</option>
           <option value="hermite">Hermite4（四阶 · 单步更准）</option>
@@ -291,7 +293,7 @@
     </div>
     <!-- "参数改过了，还没重算"跟着参数走：以前它在演奏条里，而参数已经收进这里 ——
          在别处喊一句、要重算的按钮却在另一处，是最容易让人"改了没反应"的摆法。 -->
-    <div class="note" id="dirtyhint" style="display:none;margin-top:6px"></div>
+    <div class="note" id="dirtyhint" aria-live="polite" style="display:none;margin-top:6px"></div>
     <div id="custombox" style="display:none;margin-top:12px">
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px">
         <b style="font-size:13px">你的行星</b>
@@ -307,25 +309,25 @@
             <option value="none">背景：不放太阳系</option>
           </select>
         </label>
-        <span id="solarhint" class="stat" style="font-size:12px;color:#f5c6a5"></span>
+        <span id="solarhint" class="stat" aria-live="polite" style="font-size:12px;color:#f5c6a5"></span>
       </div>
       <table id="bodytable" class="pro-only" style="width:100%;font-size:12.5px"></table>
       <div id="simplebodies" class="simple-only"></div>
     </div>
     <div id="collidebox" style="display:none;margin-top:12px">
       <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
-        <div><label>碰撞模式</label>
+        <div><label for="collide">碰撞模式</label>
           <select id="collide">
             <option value="fragment">撞击碎裂 · 高速撞碎、低速重聚（默认 · 碎片成束溅射 + 级联）</option>
             <option value="merge">合并 · 完美吸积（碰到就并起来，不分碎）</option>
             <option value="off">关 · 质点互相穿过（真实半径下几乎不会碰到）</option>
           </select></div>
-        <div><label>半径放大 ×</label><input id="rscale" type="number" value="450" min="1" max="100000" step="10" style="width:100px"></div>
+        <div><label for="rscale">半径放大 ×</label><input id="rscale" type="number" value="450" min="1" max="100000" step="10" style="width:100px"></div>
         <div id="fragopts" style="display:none;gap:14px;align-items:flex-end;flex-wrap:wrap">
-          <div><label>碎块数</label><input id="nfrag" type="number" value="4" min="2" max="12" style="width:70px"></div>
-          <div><label>色散速度 km/s</label><input id="disp" type="number" value="0.3" step="0.1" style="width:80px"></div>
-          <div><label>碎裂阈值 km/s</label><input id="fmin" type="number" value="0.5" step="0.5" style="width:80px"></div>
-          <div><label>喷流成束 0–1</label><input id="spray" type="number" value="0.6" min="0" max="1" step="0.1" style="width:80px"></div>
+          <div><label for="nfrag">碎块数</label><input id="nfrag" type="number" value="4" min="2" max="12" style="width:70px"></div>
+          <div><label for="disp">色散速度 km/s</label><input id="disp" type="number" value="0.3" step="0.1" style="width:80px"></div>
+          <div><label for="fmin">碎裂阈值 km/s</label><input id="fmin" type="number" value="0.5" step="0.5" style="width:80px"></div>
+          <div><label for="spray">喷流成束 0–1</label><input id="spray" type="number" value="0.6" min="0" max="1" step="0.1" style="width:80px"></div>
         </div>
         <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink)">
           <input id="starcollide" type="checkbox" style="width:auto"> 恒星参与碰撞
@@ -358,28 +360,28 @@
         <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink)">
           <input id="bioon" type="checkbox" checked style="width:auto"> 生物演化
         </label>
-        <div><label>走完 9 级阶梯所需年数</label>
+        <div><label for="bioyears">走完 9 级阶梯所需年数</label>
           <input id="bioyears" type="number" min="1" step="1" style="width:110px"
                  placeholder="内核默认"></div>
-        <div><label>bond albedo（地球 0.306）</label>
+        <div><label for="albedo">bond albedo（地球 0.306）</label>
           <input id="albedo" type="number" min="0.01" max="0.99" step="0.01"
                  style="width:95px" placeholder="内核默认"></div>
-        <div><label>温室增温 K <span id="ghlabel" class="stat"></span></label>
+        <div><label for="greenhouse">温室增温 K <span id="ghlabel" class="stat"></span></label>
           <input id="greenhouse" type="range" min="0" max="300" step="1" value="33"
                  style="width:170px"></div>
       </div>
-      <div class="note" id="bionote" style="margin-top:6px"></div>
+      <div class="note" id="bionote" aria-live="polite" style="margin-top:6px"></div>
     </div>
     <div class="row" style="margin-top:10px">
-      <div><label>逐帧</label>
+      <div><span class="grouplabel">逐帧</span>
         <span style="display:inline-flex;gap:4px">
           <button id="fr_first" title="回到开头">⏮</button>
           <button id="fr_prev" title="上一帧（手动定位会先暂停）">◀</button>
           <button id="fr_next" title="下一帧">▶</button>
           <button id="fr_last" title="跳到结尾">⏭</button>
         </span></div>
-      <div><label>俯仰（0=正俯视）</label><input id="tilt" type="range" min="-90" max="90" value="0" style="width:150px"></div>
-      <div><label>缩放</label><input id="zoom" type="range" min="20" max="300" value="100" style="width:130px"></div>
+      <div><label for="tilt">俯仰（0=正俯视）</label><input id="tilt" type="range" min="-90" max="90" value="0" style="width:150px"></div>
+      <div><label for="zoom">缩放</label><input id="zoom" type="range" min="20" max="300" value="100" style="width:130px"></div>
       <div><label style="display:flex;align-items:center;gap:5px;color:var(--ink);margin-bottom:9px">
         <input id="interp" type="checkbox" checked style="width:auto"> 帧间插值</label></div>
       <div><button id="resetview">⊙ 黄道复位</button></div>
@@ -407,7 +409,7 @@
     <h2>能量误差曲线<span class="stat" style="font-weight:400">
       纵轴是 |E−E₀|/|E₀|（对数）。<b>贴着底 = 这个算法保能量，往上爬 = 它在偷能量。</b>
       换「更多设置」里的「计算方法」，曲线会跟着变。</span></h2>
-    <canvas id="ecv" width="1120" height="260" style="background:#0a0f1e;cursor:default"></canvas>
+    <canvas id="ecv" role="img" aria-label="能量误差曲线：积分过程里总能量的相对漂移" width="1120" height="260" style="background:#0a0f1e;cursor:default"></canvas>
     <div class="note" id="enote" style="margin-top:8px"></div>
   </div>
 
@@ -417,7 +419,7 @@
     <h2>H-R 图（赫罗图）<span class="stat" style="font-weight:400">
       把刚说的前两个维度画出来：横轴是表面温度（光谱型 O→M），纵轴是光度。
       每颗发光天体按内核回显的 (T_eff, L) 落一个点。</span></h2>
-    <canvas id="hr" width="1120" height="520" style="background:#0a0f1e;cursor:default"></canvas>
+    <canvas id="hr" role="img" aria-label="赫罗图：恒星的光度对表面温度" width="1120" height="520" style="background:#0a0f1e;cursor:default"></canvas>
     <div class="note" id="hrnote" style="margin-top:8px"></div>
   </div>
 
@@ -2046,19 +2048,19 @@
       const card = document.createElement('div');
       card.className = 'bodycard';
       card.innerHTML =
-        '<h4><i class="dot" style="background:' + colorOf(b.name, i) + '"></i>'
+        '<h4 aria-level="3"><i class="dot" style="background:' + colorOf(b.name, i) + '"></i>'
         + (b.name || ('第 ' + (i + 1) + ' 颗'))
         + (t ? ' · ' + t.name_zh : '') 
         + (hasObs ? ' <span class="plainterm" title="这颗星用的是它自己的观测值'
             + '（温度 / 光度 / 半径），不是类型表里这一类星的代表值">观测</span>' : '')
         + '<button data-del="' + i + '" style="margin-left:auto;font-size:11px">删掉</button></h4>'
         + '<div class="knobs">'
-        + '<div><label>离恒星多远 <span class="plainterm">a（AU）</span></label>'
-        + '<input type="range" data-i="' + i + '" data-k="a" min="0.05" max="40" step="0.01"'
+        + '<div><label for="ba' + i + '">离恒星多远 <span class="plainterm">a（AU）</span></label>'
+        + '<input id="ba' + i + '" type="range" data-i="' + i + '" data-k="a" min="0.05" max="40" step="0.01"'
         + ' value="' + (+b.a || 1) + '" style="width:200px">'
         + '<span class="stat" data-out="a">' + (+b.a || 1).toFixed(2) + ' AU</span></div>'
-        + '<div><label>轨道有多扁 <span class="plainterm">e（0 = 正圆）</span></label>'
-        + '<input type="range" data-i="' + i + '" data-k="e" min="0" max="0.95" step="0.005"'
+        + '<div><label for="be' + i + '">轨道有多扁 <span class="plainterm">e（0 = 正圆）</span></label>'
+        + '<input id="be' + i + '" type="range" data-i="' + i + '" data-k="e" min="0" max="0.95" step="0.005"'
         + ' value="' + (+b.e || 0) + '" style="width:150px">'
         + '<span class="stat" data-out="e">' + (+b.e || 0).toFixed(3) + '</span></div>'
         + '</div>';
