@@ -16,7 +16,10 @@
   :root{
     /* —— 颜色令牌（深空版）—— */
     --bg:#0a0f1e; --card:#111a30; --card2:#16203a;
-    --line:#25324f; --line2:#37476e;
+    /* 深色主题的描边：它要"亮"才看得见（浅色主题里描边是"压深"的，方向正好相反）。
+       原来两级分别是 1.50:1 / 2.08:1，在 OLED 屏上卡片边界会消失；
+       各提一档到 1.72:1 / 2.36:1 —— 仍然远低于 ink3 的 4.86:1，不抢文字。 */
+    --line:#2a3a5c; --line2:#3d537f;
     --ink:#e9edf7; --ink2:#a2b0d0; --ink3:#7f8daf;
     --accent:#5b9cff; --accent-soft:#15223e;
     --accent2:#f5a25d; --accent2-soft:#2a1a0c;
@@ -24,16 +27,24 @@
     --warn:#f0a071; --warn-soft:#2a1708;
     --danger:#ff8f85; --danger-soft:#2a1113;
     --grid:#182240;
-    /* —— 字号阶梯（与其余三页同一比例）—— */
-    --fs-xs:11.5px; --fs-sm:12.5px; --fs-base:14px; --fs-md:15px;
-    --fs-lg:16.5px; --fs-xl:20px; --fs-2xl:25px; --fs-3xl:38px;
+    /* —— 字号阶梯（与其余三页同一比例、同一组名字）——
+       旧阶梯 base→md→lg 只差 1~1.5px。这一页的信息密度最高（表格、图例、读数条全是小字），
+       级差太小的话"标题 / 小节 / 正文 / 注释"四层全糊在一起。
+       重排成 12 / 13 / 14.5 / 16 / 18 / 22 / 28 / 42。 */
+    --fs-xs:12px; --fs-sm:13px; --fs-base:14.5px; --fs-md:16px;
+    --fs-lg:18px; --fs-xl:22px; --fs-2xl:28px; --fs-3xl:42px;
     /* —— 行高 —— */
-    --lh-tight:1.3; --lh-body:1.6; --lh-loose:1.75;
+    --lh-tight:1.25; --lh-body:1.62; --lh-loose:1.8;
     /* —— 间距刻度 —— */
     --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
-    /* —— 圆角与阴影 —— */
-    --r-1:6px; --r-2:10px; --r-3:14px; --r-full:999px;
-    --sh-1:0 1px 2px rgba(0,0,0,.30); --sh-2:0 10px 28px rgba(0,0,0,.45);
+    /* —— 圆角与阴影 ——
+       深色主题里"浮起来"靠的是**面更亮**（bg #0a0f1e < card #111a30 < card2 #16203a），
+       不是靠投影 —— 投影落在近黑的底上本来就看不见。所以阴影这一档改成
+       "顶部一条 1px 内高光 + 一圈很淡的外扩"：光从上方来，卡片就成了一个受光的平面。
+       这一条是深色页和浅色页最不该互相照抄的地方。 */
+    --r-1:6px; --r-2:10px; --r-3:16px; --r-full:999px;
+    --sh-1:inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.40);
+    --sh-2:inset 0 1px 0 rgba(255,255,255,.07), 0 14px 36px rgba(0,0,0,.55);
     --ring:0 0 0 3px rgba(91,156,255,.40);
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
     --dur:.16s; --ease:cubic-bezier(.2,.6,.2,1);
@@ -47,14 +58,34 @@
        padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
        font:var(--fs-base)/var(--lh-body) -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
   .wrap{max-width:var(--wrap);margin:0 auto;padding:var(--sp-5) var(--sp-5) var(--sp-6)}
-  header{display:flex;align-items:baseline;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-2)}
-  h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:.2px;line-height:var(--lh-tight)}
-  .ver{color:var(--ink3);font-size:var(--fs-sm)}
+  /* 报头：站名 / 读数 / 模式切换 / 两个回退链接 —— 四个东西挤一行，
+     用一条发丝线把它和"两段导语"切开，滚动时才知道自己在页面外面还是里面。 */
+  header{display:flex;align-items:baseline;gap:var(--sp-2) var(--sp-4);flex-wrap:wrap;
+         margin-bottom:var(--sp-4);padding-bottom:var(--sp-4);border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:-.3px;line-height:var(--lh-tight)}
+  .ver{color:var(--ink3);font-size:var(--fs-sm);letter-spacing:.01em}
   .back{color:var(--accent);font-size:var(--fs-sm);text-decoration:none}
-  .sub{color:var(--ink2);font-size:var(--fs-base);line-height:var(--lh-loose);max-width:82ch;margin-bottom:var(--sp-4)}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-3);
+  /* 两段导语（普通人版 / 教授版）各是 4~6 行的一段话，排在页首时就是一堵墙。
+     给它们一块面板：--card2 底 + 左侧一条强调线 —— 一眼看出"这是导语，不是正文"，
+     读完也知道该往哪儿跳。（文字一字未动，只是把它摆成"一块前言"。） */
+  .sub{color:var(--ink2);font-size:var(--fs-base);line-height:var(--lh-loose);max-width:80ch;
+       margin-bottom:var(--sp-3);background:var(--card2);border:1px solid var(--line);
+       border-left:3px solid var(--accent);border-radius:var(--r-2);
+       padding:var(--sp-3) var(--sp-4)}
+  .sub b{color:var(--ink)}
+  .sub code{background:var(--grid)}
+  /* 卡片：深色页的"浮起来" = 面更亮 + 顶部一条内高光（--sh-1 里带着），
+     再给顶边单独提亮一点 —— 光从上方来，卡片才像一块受光的板。
+     不照抄浅色页那种"往下压深"的投影，那在近黑底上什么都看不见。 */
+  .card{background:var(--card);border:1px solid var(--line);border-top-color:var(--line2);
+        border-radius:var(--r-3);
         padding:var(--sp-4);margin-bottom:var(--sp-4);box-shadow:var(--sh-1)}
-  h2{margin:0 0 var(--sp-3);font-size:var(--fs-lg);font-weight:650;letter-spacing:.1px}
+  /* 小节标题脚下一条发丝线：这一页卡片里的内容（画布、图例、读数、表格）都是同一层小字，
+     一条线把"标题"和"它管的那块"绑起来，扫的时候不用逐字读。
+     深色页上这条线要用更亮的一档（--line2）：--line 在 --card 上只有 1.7:1，
+     做"分隔"够用（浅色页的 1.2:1 也是这么用的），但做"分节标题"就看不见了。 */
+  h2{margin:0 0 var(--sp-3);padding-bottom:var(--sp-2);border-bottom:1px solid var(--line2);
+     font-size:var(--fs-lg);font-weight:650;letter-spacing:-.15px}
   label{font-size:var(--fs-sm);color:var(--ink2);display:block;margin-bottom:var(--sp-1)}
   /* 一组按钮的说明文字用这个：它背后没有可关联的表单控件，但长得要和 label 一样 */
   .grouplabel{font-size:var(--fs-sm);color:var(--ink2);display:block;margin-bottom:var(--sp-1)}
@@ -63,13 +94,20 @@
   select,input,button{font:inherit;font-size:max(16px,var(--fs-base));color:var(--ink);
         background:var(--card2);border:1px solid var(--line2);border-radius:var(--r-1);padding:6px 10px;
         touch-action:manipulation}
-  button{cursor:pointer;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
-  button:hover{border-color:var(--accent)}
+  button{cursor:pointer;
+        transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),
+                   filter var(--dur) var(--ease)}
+  button:hover{border-color:var(--accent);filter:brightness(1.14)}
   button:active{transform:translateY(1px)}
   button.primary{background:var(--accent);border-color:var(--accent);color:#08122a;font-weight:650}
-  button.primary:hover{filter:brightness(1.06)}
+  button.primary:hover{filter:brightness(1.06);background:var(--accent)}
   input[type=checkbox]{accent-color:var(--accent)}
-  canvas{width:100%;display:block;border-radius:var(--r-2);background:#070b16;cursor:grab;touch-action:none}
+  select:focus,input:focus{border-color:var(--accent);outline:none}
+  /* 画布用 outline 描边而不是 border：outline 不占布局，画布的 getBoundingClientRect()
+     不会因为描边而变化 —— 这一页"点画面放行星"是把屏幕坐标反解回黄道面的，
+     那 1px 的偏差属于"页面与数据对齐"这条规矩，不值得为一条装饰边去动它。 */
+  canvas{width:100%;display:block;border-radius:var(--r-2);background:#070b16;cursor:grab;
+         touch-action:none;outline:1px solid var(--line);outline-offset:-1px}
   #view{height:72vh;min-height:420px}
   /* 放置模式下换成十字准星：光标本身就是"这里能放"的提示。
      写在 .dragging 之前 —— 同一元素同时有两个类时后定义的胜出，而拖动时该显示"抓"。 */
@@ -84,39 +122,73 @@
   .row{display:flex;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;align-items:flex-end}
   .stat{font-size:var(--fs-sm);color:var(--ink2)}
   .stat b{color:var(--ink);font-family:var(--mono)}
-  .okbox{border-left:3px solid var(--ok);background:var(--ok-soft);padding:var(--sp-2) var(--sp-3);
-         border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#bff0dc;line-height:var(--lh-loose)}
-  .warnbox{border-left:3px solid var(--warn);background:var(--warn-soft);padding:var(--sp-2) var(--sp-3);
-           border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#f6d3b6;line-height:var(--lh-loose)}
-  .legend{display:flex;gap:var(--sp-3);flex-wrap:wrap;font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-2)}
-  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  /* 结论条：与 home / index 用同一组尺寸（padding + 左实线 + 圆角方向一致），
+     四页共用同一套组件是这份设计契约里最实在的一条 —— 深色版只换色值。 */
+  .okbox{border-left:3px solid var(--ok);background:var(--ok-soft);padding:var(--sp-3) var(--sp-4);
+         border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#c9f4e2;line-height:var(--lh-loose)}
+  .warnbox{border-left:3px solid var(--warn);background:var(--warn-soft);padding:var(--sp-3) var(--sp-4);
+           border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#fbdcc4;line-height:var(--lh-loose)}
+  /* 图例：它解释的是"画面上每种颜色是什么意思"，属于**图注**，不是正文 ——
+     所以在画布与它之间加一条线，并把行距与列距一起放开。
+     小圆点补一圈很淡的描边，免得暗色阶色在 --card2 上"糊"进背景。
+     （图例内容由脚本生成、这里只动容器与圆点，不改内容。） */
+  .legend{display:flex;gap:var(--sp-2) var(--sp-4);flex-wrap:wrap;align-items:center;
+          font-size:var(--fs-sm);color:var(--ink2);
+          margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--line)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;
+       vertical-align:middle;box-shadow:0 0 0 1px rgba(255,255,255,.16)}
+  /* 画面下方那行状态读数（帧号 / 能量漂移 / 视角）：左边缘一条细实线，
+     把"这是当前状态"从上面的图注里分出来。它不承载解释，所以不给底色、不加粗。 */
+  #statline{border-left:2px solid var(--line2);padding-left:var(--sp-3)}
   /* ---- 双模式：普通人 / 教授 ----
      同一份数据、同一套内核，只改"露多少"。专业元素一律挂 .pro-only，
      只为普通人准备的大白话元素挂 .simple-only；切换只动 body 上的一个类名。 */
   body.mode-simple .pro-only{display:none !important}
   body.mode-pro    .simple-only{display:none !important}
-  #modeswitch{display:inline-flex;gap:0;border:1px solid var(--line2);border-radius:var(--r-2);overflow:hidden}
-  #modeswitch button{border:0;border-radius:0;padding:5px 13px;font-size:var(--fs-sm);background:transparent;color:var(--ink2)}
+  #modeswitch{display:inline-flex;gap:0;border:1px solid var(--line2);border-radius:var(--r-2);
+              overflow:hidden;background:var(--card2)}
+  #modeswitch button{border:0;border-radius:0;padding:5px 14px;font-size:var(--fs-sm);background:transparent;color:var(--ink2)}
   #modeswitch button.on{background:var(--accent);color:#08122a;font-weight:650}
   .tychip{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);padding:6px 12px;border-radius:var(--r-full);
           border:1px solid var(--line2);background:var(--card2);color:var(--ink);cursor:pointer;
           transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
-  .tychip:hover{border-color:var(--accent)}
+  .tychip:hover{border-color:var(--accent);background:var(--card)}
   .tychip.on{background:var(--accent);border-color:var(--accent);color:#08122a;font-weight:650}
   .tychip.big{font-size:var(--fs-md);padding:9px 16px}
   #palette{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+  /* 表格（机身表 / 事件时间线 / 演化表这三张都是脚本生成的，行内只写了字号与对齐，
+     所以这里补的刻度、描边、表头底色一定生效）：
+     表头垫 --card2 并把下边线换成更亮的 --line2，表体用小间距 + 一行一条分隔。
+     深色页上"表头能不能一眼认出来"全靠这一层底色 —— 单靠字重是分不出的。 */
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th,tbody tr:first-child th{background:var(--card2);border-bottom:1px solid var(--line2)}
+  th{color:var(--ink3);font-weight:650;letter-spacing:.02em}
+  tbody tr:hover{background:var(--card2)}
   /* —— 折叠区：第二屏才需要的东西 ——
      起因：普通人模式下来要面对 95 个可见控件、画布排在所有控件之后。
-     现在首屏只留"画面 + 演奏条 + 一键开局 + 常用类型"，其余收起来（内容一句没删）。 */
-  details.card{padding:0}
+     现在首屏只留"画面 + 演奏条 + 一键开局 + 常用类型"，其余收起来（内容一句没删）。
+     标题行同时是这一页唯一一处"点开才看见"的入口，所以给它一个跟着开合转的雪佛龙 + 悬停底色。 */
+  details.card{padding:0;overflow:hidden}
   details.card>summary{padding:var(--sp-4);cursor:pointer;font-size:var(--fs-md);
-        font-weight:650;color:var(--ink)}
-  details.card>summary::marker{color:var(--ink3)}
+        font-weight:650;color:var(--ink);list-style:none;display:flex;align-items:center;
+        gap:var(--sp-3);transition:background var(--dur) var(--ease)}
+  details.card>summary::-webkit-details-marker{display:none}
+  details.card>summary::before{content:'\25B8';flex:0 0 auto;color:var(--ink3);
+        line-height:1;transition:transform var(--dur) var(--ease)}
+  details.card[open]>summary::before{transform:rotate(90deg)}
+  details.card>summary:hover{background:var(--card2)}
   details.card[open]>summary{border-bottom:1px solid var(--line)}
   details.card>.dbody{padding:var(--sp-3) var(--sp-4) var(--sp-1)}
   details.tyfold{margin-top:var(--sp-2)}
-  details.tyfold>summary{cursor:pointer;font-size:var(--fs-sm);color:var(--ink2)}
-  .bodycard{border:1px solid var(--line);border-radius:var(--r-2);padding:var(--sp-3);margin-bottom:var(--sp-2);background:var(--card2)}
+  details.tyfold>summary{cursor:pointer;font-size:var(--fs-sm);color:var(--ink2);
+        list-style:none;display:flex;align-items:center;gap:var(--sp-2)}
+  details.tyfold>summary::-webkit-details-marker{display:none}
+  details.tyfold>summary::before{content:'\25B8';flex:0 0 auto;color:var(--ink3);
+        line-height:1;transition:transform var(--dur) var(--ease)}
+  details.tyfold[open]>summary::before{transform:rotate(90deg)}
+  .bodycard{border:1px solid var(--line);border-radius:var(--r-2);padding:var(--sp-3);
+            margin-bottom:var(--sp-2);background:var(--card2)}
   .bodycard h4{margin:0 0 var(--sp-2);font-size:var(--fs-sm);font-weight:650;display:flex;align-items:center;gap:var(--sp-2)}
   .bodycard .knobs{display:flex;gap:var(--sp-4);flex-wrap:wrap;align-items:center}
   .bodycard .knobs label{margin:0 0 2px}

@@ -12,7 +12,10 @@
   :root{
     /* —— 颜色令牌（与 home.html 一致）—— */
     --bg:#f6f7f9; --card:#ffffff; --card2:#f3f5f9;
-    --line:#e2e6ee; --line2:#ccd4e2;
+    /* 描边只承担分隔，两级各压深一点点（1.17:1 → 1.19:1 / 1.39:1 → 1.44:1）：
+       这一页卡片里塞的是白色画布，卡片边界一淡就整页糊成一张纸。
+       仍然远低于任何一级文字，不抢层级。与 home.html 取值逐字一致。 */
+    --line:#dee3ec; --line2:#c6cfe0;
     /* ink2 / ink3 承载文字，必须在其实际底色上过 AA：实测最差底色 --card2 #f3f5f9
        → ink 15.97 / ink2 6.68 / ink3 4.79（旧 ink3 #828b9a 只有 3.15，是回归）。
        与 home.html 的取值逐字一致。 */
@@ -23,16 +26,22 @@
     --warn:#b4530a; --warn-soft:#fdf3e7;
     --danger:#b42318; --danger-soft:#fdeceb;
     --grid:#eef1f6;
-    /* —— 字号阶梯 —— */
-    --fs-xs:11.5px; --fs-sm:12.5px; --fs-base:14px; --fs-md:15px;
-    --fs-lg:16.5px; --fs-xl:20px; --fs-2xl:25px; --fs-3xl:38px;
+    /* —— 字号阶梯（与 home.html 逐字一致的同一套刻度）——
+       旧版 base→md→lg 只差 1~1.5px，表头 / 小节标题 / 正文三级在页面上分不出来；
+       这一页的表尤其密（12.5px 的表体 + 11.5px 的表头），小字太细时数字会发虚。
+       重排成 12 / 13 / 14.5 / 16 / 18 / 22 / 28 / 42 —— 最小一级也差 1.5px。 */
+    --fs-xs:12px; --fs-sm:13px; --fs-base:14.5px; --fs-md:16px;
+    --fs-lg:18px; --fs-xl:22px; --fs-2xl:28px; --fs-3xl:42px;
     /* —— 行高 —— */
-    --lh-tight:1.3; --lh-body:1.6; --lh-loose:1.78;
+    --lh-tight:1.25; --lh-body:1.62; --lh-loose:1.8;
     /* —— 间距刻度 —— */
     --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
     /* —— 圆角与阴影 —— */
-    --r-1:6px; --r-2:10px; --r-3:14px; --r-full:999px;
-    --sh-1:0 1px 2px rgba(16,24,40,.05); --sh-2:0 8px 24px rgba(16,24,40,.08);
+    --r-1:6px; --r-2:10px; --r-3:16px; --r-full:999px;
+    /* 与 home.html 同一对阴影：近处一条硬边 + 远处一团散光。
+       这一页的卡片里是画布，卡片"浮起来"了，画布才像嵌在卡片里而不是漂在页面上。 */
+    --sh-1:0 1px 2px rgba(16,24,40,.05), 0 2px 6px rgba(16,24,40,.05);
+    --sh-2:0 10px 28px rgba(16,24,40,.10), 0 2px 6px rgba(16,24,40,.06);
     --ring:0 0 0 3px rgba(36,85,214,.30);
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
     --dur:.16s; --ease:cubic-bezier(.2,.6,.2,1);
@@ -46,33 +55,57 @@
        padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
        font:var(--fs-base)/var(--lh-body) -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
   .wrap{max-width:var(--wrap);margin:0 auto;padding:var(--sp-5) var(--sp-5) var(--sp-7)}
-  header{display:flex;align-items:baseline;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-2)}
-  h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:.2px;line-height:var(--lh-tight)}
-  .ver{color:var(--ink3);font-size:var(--fs-sm)}
+  /* 报头：一条发丝线把"站名 + 版本 + 两个跳转"从正文里切出来。
+     这一页的报头里已经有 4 个元素（站名 / 版本 / ← 首页 / 🌌 宇宙模拟），
+     原来它们和下面的披露条、控件卡连成一片，读的时候要一行行对。 */
+  header{display:flex;align-items:baseline;gap:var(--sp-2) var(--sp-4);flex-wrap:wrap;
+         margin-bottom:var(--sp-5);padding-bottom:var(--sp-4);border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:-.3px;line-height:var(--lh-tight)}
+  .ver{color:var(--ink3);font-size:var(--fs-sm);letter-spacing:.01em}
   .sub{color:var(--ink2);font-size:var(--fs-base);line-height:var(--lh-loose);max-width:74ch;margin-bottom:var(--sp-4)}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-3);
         padding:var(--sp-5);margin-bottom:var(--sp-4);box-shadow:var(--sh-1)}
-  h2{margin:0 0 var(--sp-3);font-size:var(--fs-lg);font-weight:650;letter-spacing:.1px}
+  /* 小节标题脚下一条发丝线。这一页有 8 张卡片，每张一个 h2，
+     而 h2 底下紧跟着就是画布或表格 —— 不给线的话"标题"与"内容"是同一层黑字，
+     滚动时看不出自己在第几节。 */
+  h2{margin:0 0 var(--sp-3);padding-bottom:var(--sp-2);border-bottom:1px solid var(--line);
+     font-size:var(--fs-lg);font-weight:650;letter-spacing:-.15px}
   .row{display:flex;gap:var(--sp-4);flex-wrap:wrap}
   .col{flex:1 1 320px;min-width:280px}
-  label{font-size:var(--fs-sm);color:var(--ink2);display:block;margin-bottom:var(--sp-1);font-weight:600}
+  label{font-size:var(--fs-sm);color:var(--ink2);display:block;margin-bottom:var(--sp-1);
+        font-weight:600;letter-spacing:.01em}
   /* 表单控件字号 ≥16px：iOS Safari 在 <16px 的输入框聚焦时会整页放大。 */
   select,input,textarea,button{font:inherit;font-size:max(16px,var(--fs-base));color:var(--ink);
         background:var(--card);border:1px solid var(--line2);border-radius:var(--r-1);padding:7px 10px;
         touch-action:manipulation}
   textarea{font-family:var(--mono);font-size:max(16px,var(--fs-base));line-height:1.5}
-  button{cursor:pointer;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
-  button:hover{border-color:var(--accent)}
-  button:active{transform:translateY(1px)}
+  button{cursor:pointer;box-shadow:var(--sh-1);
+        transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+  button:hover{border-color:var(--accent);box-shadow:var(--sh-2)}
+  button:active{transform:translateY(1px);box-shadow:var(--sh-1)}
+  /* 焦点：描边保留（键盘可达的底线），颜色只加在**输入类控件**的边框上 ——
+     这样鼠标点进去也有反馈，而不会整屏出现一圈圈描边。 */
+  select:focus,input:focus,textarea:focus{border-color:var(--accent);outline:none}
   input[type=range]{padding:0;accent-color:var(--accent)}
-  canvas{width:100%;display:block;border-radius:var(--r-2);background:#fbfcfe}
-  table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);line-height:1.5}
-  th,td{text-align:left;padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--ink3);font-weight:650;font-size:var(--fs-xs);letter-spacing:.02em}
+  /* 画布用 outline 而不是 border 描边：outline 不占布局，画布的
+     getBoundingClientRect() 宽度不会变 —— 这一页/儿童页的"点画面"坐标是从那个矩形换算的，
+     border 会让映射差 1px（看起来无所谓，但那是"画面与数据对齐"这条规矩上第一处松动）。 */
+  canvas{width:100%;display:block;border-radius:var(--r-2);background:#fbfcfe;
+         outline:1px solid var(--line);outline-offset:-1px}
+  /* 表格：这一页的关键量 / 模型 / 最近接近三张表都是**脚本生成**的，
+     它们的表头行是 <tr><th> 而不是 <thead> —— 所以表头底色要同时认这两种写法
+     （tbody tr:first-child th 就是 kvTable() 那种写法）。
+     ⚠ th 的文字色仍是 ink3（在 --card2 上实测 4.79:1，过 AA），换底色不动色值。 */
+  table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);line-height:1.55}
+  th,td{text-align:left;padding:9px var(--sp-3);border-bottom:1px solid var(--line);vertical-align:top}
+  thead th,tbody tr:first-child th{background:var(--card2);border-bottom:1px solid var(--line2)}
+  th{color:var(--ink3);font-weight:650;font-size:var(--fs-xs);letter-spacing:.03em}
   tbody tr:hover{background:var(--card2)}
   td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
-  .badge{display:inline-block;padding:2px 9px;border-radius:var(--r-full);font-size:var(--fs-xs);
-         font-weight:600;white-space:nowrap;border:1px solid transparent;
+  /* 徽章：字只有 12px，靠"边线 + 内边距"立住；与 home.html 同一组尺寸。 */
+  .badge{display:inline-block;padding:2px 10px;border-radius:var(--r-full);font-size:var(--fs-xs);
+         font-weight:600;line-height:1.6;white-space:nowrap;border:1px solid transparent;
+         vertical-align:1px;
          background:var(--accent-soft);color:var(--accent);border-color:#c7d8fb}
   .badge.off{background:var(--card2);color:var(--ink3);border-color:var(--line)}
   .note{font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-3);line-height:var(--lh-loose)}
@@ -81,9 +114,16 @@
   .okbox{border-left:3px solid var(--ok);background:var(--ok-soft);padding:var(--sp-3) var(--sp-4);
          border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#0d5b3e;line-height:var(--lh-loose)}
   code{font-family:var(--mono);font-size:var(--fs-sm);background:var(--grid);
-       padding:1px 6px;border-radius:var(--r-1)}
-  .legend{display:flex;gap:var(--sp-4);flex-wrap:wrap;font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-3)}
-  .sw{display:inline-block;width:22px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+       border:1px solid var(--line);padding:1px 6px;border-radius:var(--r-1)}
+  /* 原始 JSON 那块 <pre> 自带内联底色，这里只补它没有的三样：等宽、行高、一条浅边。
+     行高放到 1.75 是因为 JSON 里混着中文键名，1.5 会把下标数字贴住汉字。 */
+  pre{font-family:var(--mono);line-height:1.75;border:1px solid #1e2b45;margin:var(--sp-3) 0}
+  /* 图例：色标加宽加粗（原来是 22×3 的一条线，2 倍屏下几乎看不出颜色），
+     并把每一段用 gap 拉开 —— 图例是"画面上那根线是什么意思"的唯一解释，不该靠猜。 */
+  .legend{display:flex;gap:var(--sp-2) var(--sp-5);flex-wrap:wrap;align-items:center;
+          font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-3)}
+  .sw{display:inline-block;width:26px;height:4px;vertical-align:middle;margin-right:7px;
+      border-radius:var(--r-full)}
   footer{color:var(--ink3);font-size:var(--fs-sm);margin-top:var(--sp-6);
          border-top:1px solid var(--line);padding-top:var(--sp-4);line-height:var(--lh-loose)}
   a{color:var(--accent);text-underline-offset:2px}

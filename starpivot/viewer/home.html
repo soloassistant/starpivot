@@ -19,7 +19,11 @@
   :root{
     /* —— 颜色令牌（浅色·技术审计版，与 index.html 逐字一致）—— */
     --bg:#f6f7f9; --card:#ffffff; --card2:#f3f5f9;
-    --line:#e2e6ee; --line2:#ccd4e2;
+    /* 描边只承担"分隔"这一件事（不承载文字），所以它比 ink3 低一档是故意的；
+       但原来的 #e2e6ee 在 --bg 上只有 1.17:1，卡片与底色几乎粘成一片白 ——
+       截图上整页就是"一张大白纸 + 几行灰字"。两级各压深一点点（1.19:1 / 1.44:1）：
+       卡片边界立住了，又远低于任何一级文字，不会来抢层级。 */
+    --line:#dee3ec; --line2:#c6cfe0;
     /* ink2 / ink3 都承载文字（正文/表头/页脚/版本行/badge.off），必须在各自的**实际底色**上过 AA。
        旧的 ink3 #828b9a 在 --card2 上只有 3.15:1 —— 这是改版时引入的回归。
        只把 ink3 压到 4.5 会把 ink2 与 ink3 挤成同一个色，所以两级一起重新定档：
@@ -31,16 +35,25 @@
     --warn:#b4530a; --warn-soft:#fdf3e7;
     --danger:#b42318; --danger-soft:#fdeceb;
     --grid:#eef1f6;
-    /* —— 字号阶梯（同一比例，四页同名）—— */
-    --fs-xs:11.5px; --fs-sm:12.5px; --fs-base:14px; --fs-md:15px;
-    --fs-lg:16.5px; --fs-xl:20px; --fs-2xl:25px; --fs-3xl:38px;
+    /* —— 字号阶梯（同一比例，四页同名）——
+       旧阶梯 base→md→lg 是 14 / 15 / 16.5px，三档只差 1~1.5px：做"表头 / 小节标题 /
+       正文"的区分时肉眼分不出来（用户说的"看不到重点"，有一半是级差太小造成的）。
+       重排成 12 / 13 / 14.5 / 16 / 18 / 22 / 28 / 42，相邻比值 1.08~1.5，
+       最小一级也差 1.5px —— 落到页面上才真的能看出"这是三级文字"。
+       小字整体抬 0.5px：11.5px 在 2 倍屏下太细，读起来发虚。 */
+    --fs-xs:12px; --fs-sm:13px; --fs-base:14.5px; --fs-md:16px;
+    --fs-lg:18px; --fs-xl:22px; --fs-2xl:28px; --fs-3xl:42px;
     /* —— 行高 —— */
-    --lh-tight:1.3; --lh-body:1.6; --lh-loose:1.78;
+    --lh-tight:1.25; --lh-body:1.62; --lh-loose:1.8;
     /* —— 间距刻度 —— */
     --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
     /* —— 圆角与阴影 —— */
-    --r-1:6px; --r-2:10px; --r-3:14px; --r-full:999px;
-    --sh-1:0 1px 2px rgba(16,24,40,.05); --sh-2:0 8px 24px rgba(16,24,40,.08);
+    --r-1:6px; --r-2:10px; --r-3:16px; --r-full:999px;
+    /* 阴影只做一件事：让卡片从 --bg 上"浮"起来。旧的一层 0 1px 2px 太薄，
+       在 #f6f7f9 上基本看不见 —— 卡片只能靠描边确认边界。
+       改成两层：近处一条硬边 + 远处一团散光。这是"有厚度"最省的做法，也不引外链。 */
+    --sh-1:0 1px 2px rgba(16,24,40,.05), 0 2px 6px rgba(16,24,40,.05);
+    --sh-2:0 10px 28px rgba(16,24,40,.10), 0 2px 6px rgba(16,24,40,.06);
     --ring:0 0 0 3px rgba(36,85,214,.30);
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
     --dur:.16s; --ease:cubic-bezier(.2,.6,.2,1);
@@ -54,22 +67,40 @@
        padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
        font:var(--fs-base)/var(--lh-body) -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
   .wrap{max-width:var(--wrap);margin:0 auto;padding:var(--sp-5) var(--sp-5) var(--sp-7)}
-  header{display:flex;align-items:baseline;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-2)}
-  h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:.2px;line-height:var(--lh-tight)}
-  .ver{color:var(--ink3);font-size:var(--fs-sm)}
+  /* 报头：用一条发丝线把"站名 + 版本"从正文里切出来。
+     原来报头与正文之间只隔 8px，标题、首句、三张入口卡连成一片 ——
+     一条线是"这里分节了"最便宜也最不含糊的写法。 */
+  header{display:flex;align-items:baseline;gap:var(--sp-2) var(--sp-4);flex-wrap:wrap;
+         margin-bottom:var(--sp-5);padding-bottom:var(--sp-4);border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:-.3px;line-height:var(--lh-tight)}
+  .ver{color:var(--ink3);font-size:var(--fs-sm);letter-spacing:.01em}
   .sub{color:var(--ink2);font-size:var(--fs-base);line-height:var(--lh-loose);max-width:74ch;margin-bottom:var(--sp-5)}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-3);
         padding:var(--sp-5);margin-bottom:var(--sp-4);box-shadow:var(--sh-1)}
-  h2{margin:0 0 var(--sp-3);font-size:var(--fs-lg);font-weight:650;letter-spacing:.1px}
-  h3{margin:var(--sp-4) 0 var(--sp-2);font-size:var(--fs-md);font-weight:650}
-  table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);line-height:1.5}
-  th,td{text-align:left;padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--ink3);font-weight:650;font-size:var(--fs-xs);letter-spacing:.02em}
+  /* 小节标题脚下加一条发丝线。这一页的 h2/h3 后面往往紧跟一张表，
+     而标题与表里的数据行原来是同一层黑字（15 / 16px），扫的时候看不出从哪开始。
+     一条线把"标题"和"它管的那块内容"绑在一起 —— 层级靠"绑定"，不靠再加字号。 */
+  h2{margin:0 0 var(--sp-3);padding-bottom:var(--sp-2);border-bottom:1px solid var(--line);
+     font-size:var(--fs-lg);font-weight:650;letter-spacing:-.15px}
+  h3{margin:var(--sp-5) 0 var(--sp-3);padding-bottom:6px;border-bottom:1px solid var(--line);
+     font-size:var(--fs-md);font-weight:650;letter-spacing:-.1px}
+  h2+h3,h2+.note+h3{margin-top:var(--sp-4)}
+  /* 表格：表头垫一层 --card2 并换用更清楚的 --line2 下边线。
+     ⚠ th 的文字色仍然是 ink3（在 --card2 上实测 4.79:1，过 AA）——
+       这行是上一轮的回归点，换底色但**不动色值**。
+     只画横行分隔、不画竖线：这一页有几列是长句"口径说明"，竖线会把它切碎。 */
+  table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);line-height:1.55}
+  th,td{text-align:left;padding:10px var(--sp-3);border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{background:var(--card2);border-bottom:1px solid var(--line2)}
+  th{color:var(--ink3);font-weight:650;font-size:var(--fs-xs);letter-spacing:.03em}
   tbody tr:last-child td{border-bottom:0}
   tbody tr:hover{background:var(--card2)}
   td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
-  .badge{display:inline-block;padding:2px 9px;border-radius:var(--r-full);font-size:var(--fs-xs);
-         font-weight:600;white-space:nowrap;border:1px solid transparent}
+  /* 徽章：字只有 12px，全靠"一圈边线 + 内边距"才立得住。
+     统一 padding 与 line-height，四个页面的徽章高度才会一致（组件层是共用的）。 */
+  .badge{display:inline-block;padding:2px 10px;border-radius:var(--r-full);font-size:var(--fs-xs);
+         font-weight:600;line-height:1.6;white-space:nowrap;border:1px solid transparent;
+         vertical-align:1px}
   .badge.off{background:var(--card2);color:var(--ink3);border-color:var(--line)}
   .badge.obs{background:var(--accent-soft);color:var(--accent);border-color:#c7d8fb}
   .badge.cal{background:#fdf1d8;color:#8a5306;border-color:#f4dfa6}
@@ -81,16 +112,26 @@
   .okbox{border-left:3px solid var(--ok);background:var(--ok-soft);padding:var(--sp-3) var(--sp-4);
          border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#0d5b3e;line-height:var(--lh-loose)}
   code{font-family:var(--mono);font-size:var(--fs-sm);background:var(--grid);
-       padding:1px 6px;border-radius:var(--r-1)}
-  pre{background:#0f172a;color:#e2e8f0;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-2);
-      overflow-x:auto;font-family:var(--mono);font-size:var(--fs-sm);line-height:1.65;margin:var(--sp-3) 0}
+       border:1px solid var(--line);padding:1px 6px;border-radius:var(--r-1)}
+  /* 代码块 = 浅色页上的一块深色小板。给它一条浅边（不然深块会像"没加载出来的图片"）
+     和更松的行高（同一行里中文与等宽字符混排时，1.65 会让下标数字贴住汉字）。 */
+  pre{background:#0f172a;color:#e6edf7;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-2);
+      border:1px solid #1e2b45;
+      overflow-x:auto;font-family:var(--mono);font-size:var(--fs-sm);line-height:1.75;margin:var(--sp-3) 0}
   .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--sp-4)}
+  /* 入口卡：三个入口是这一页唯一要人**动手**的地方，所以它们得一眼看出"可点"。
+     旧版三张卡都是 --card2 + 一圈描边，和下面四条折叠区标题几乎长得一样。
+     现在给它们三样折叠区没有的东西：白底（比 --card2 亮一档）、头顶一条 3px 强调色、
+     悬停时抬起来。图标也从裸 emoji 改成同色系的圆角底片 ——
+     三个 emoji 的字重本来就参差，放进同一个尺寸的底片里才排得齐。 */
   .entry{display:block;text-decoration:none;color:inherit;border:1px solid var(--line);
-         border-radius:var(--r-3);padding:var(--sp-4);background:var(--card2);
+         border-top:3px solid var(--accent);
+         border-radius:var(--r-3);padding:var(--sp-4);background:var(--card);
+         box-shadow:var(--sh-1);
          transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease)}
-  .entry:hover{border-color:var(--accent);box-shadow:var(--sh-2);transform:translateY(-1px)}
+  .entry:hover{border-color:var(--accent);box-shadow:var(--sh-2);transform:translateY(-2px)}
   .entry b{font-size:var(--fs-md);color:var(--accent)}
-  .entry p{margin:var(--sp-2) 0 0;font-size:var(--fs-sm);color:var(--ink2);line-height:1.65}
+  .entry p{margin:var(--sp-2) 0 0;font-size:var(--fs-sm);color:var(--ink2);line-height:1.7}
   .kbd{font-size:var(--fs-xs);color:var(--ink3)}
   footer{color:var(--ink3);font-size:var(--fs-sm);margin-top:var(--sp-6);
          border-top:1px solid var(--line);padding-top:var(--sp-4);line-height:var(--lh-loose)}
@@ -103,30 +144,58 @@
         普通人第一屏看到的是三张长表，入口被夹在中间。
         判据 `_check_home.js` 第 8 条钉住这一点：折叠区之外不许出现表格、入口不许藏在折叠区里、
         折叠区之外的可见正文有字数上限（改版前 1 966 汉字 → 现在 <400）。 */
+  /* 首屏第一句：这一页最重要的一句，所以它比正文大一号、行距收紧到 1.45；
+     但**不把它加粗到 700** —— 22px 的 600 已经比满屏 14.5px 的正文强得多，
+     再加粗它就变成"标题"了，而它其实是一句人话。 */
   .lead{margin:0 0 var(--sp-2);font-size:var(--fs-xl);font-weight:600;
-        line-height:1.5;max-width:62ch;letter-spacing:.1px}
+        line-height:1.45;max-width:60ch;letter-spacing:-.2px}
   .hint{margin:var(--sp-3) 0 0;color:var(--ink2);font-size:var(--fs-base)}
   .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--sp-4);
          margin:var(--sp-4) 0 0}
-  .entry .ico{display:block;font-size:24px;line-height:1.15;margin-bottom:var(--sp-1)}
-  .entry b{font-size:var(--fs-lg)}
-  .entry.kids{background:var(--accent2-soft);border-color:#eeddc4}
+  .entry .ico{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;
+              font-size:21px;line-height:1;border-radius:12px;background:var(--accent-soft);
+              margin-bottom:var(--sp-3)}
+  .entry b{display:block;font-size:var(--fs-lg);letter-spacing:-.15px}
+  .entry.kids{border-color:#eeddc4;border-top-color:var(--accent2);background:var(--accent2-soft)}
+  /* 暖色入口卡的图标底片也要是暖的，但底片**不能**用 --accent2-soft（它在同色的卡面上看不出来），
+     所以拿强调色本身兑一点透明度当底 —— 它只是一块"面"，不承载文字。 */
+  .entry.kids .ico{background:rgba(180,92,21,.14)}
   /* 暖色入口卡的标题用 --ink，**不用 --accent2**：后者在 --accent2-soft 上只有 4.18:1，
      低于 AA 的 4.5（这是"美化"时最容易顺手引入的一类回归，和上一轮表头 3.21 同一类）。
      暖色只留在背景与描边上；正文色 15.4:1。判据 _check_home.js 第 5 组钉住了这一对。 */
   .entry.kids b{color:var(--ink)}
+  /* 三条承诺：每条之间给一条虚线，行距放开。原来它们紧贴成三行黑字，
+     读起来像一整段话；分开之后才是"三条"。 */
   .promise{list-style:none;margin:0;padding:0;font-size:var(--fs-base);line-height:var(--lh-loose)}
-  .promise li{margin:var(--sp-1) 0 0}
-  /* 内核在线状态：这个小条是首页对"真在算"最直接的一次证明，所以留在首屏。 */
+  .promise li{margin:0;padding:var(--sp-2) 0;border-bottom:1px dashed var(--line)}
+  .promise li:last-child{border-bottom:0}
+  .promise b{color:var(--ink)}
+  /* 内核在线状态：这一条是首页对"真在算"最直接的一次自证，所以它要像一条**读数**，
+     而不是一段说明 —— 左侧一条实线把它从周围的白底上"钉"住。
+     ⚠ 左侧线用 --line2 而**不用** --ok 绿：这里不给任何颜色承诺。
+       在线 / 未就绪 / 问不到三种状态的真实性全部来自下面那段脚本的文字，
+       一个恒亮的绿点会把"问不到"也画成"在线"——那是这一页最不该犯的错。
+     overflow-wrap:anywhere 是为了那条 Windows 绝对路径（窄屏上原来会顶破卡片）。 */
   .kbar{margin:var(--sp-4) 0 var(--sp-6);padding:var(--sp-3) var(--sp-4);
-        background:var(--card2);border:1px solid var(--line);border-radius:var(--r-2);
-        font-size:var(--fs-sm);color:var(--ink2);line-height:var(--lh-body)}
-  /* —— 折叠区：标题一行说清里面有什么，点开才展开。
-        键盘可达（focus-visible 在下面统一给了），触屏的 44px 最小高度由 pointer:coarse 那一档管。 */
-  details.card{padding:0}
-  details.card>summary{padding:var(--sp-4) var(--sp-5);cursor:pointer;
-        font-size:var(--fs-md);font-weight:650;color:var(--ink);line-height:var(--lh-tight)}
-  details.card>summary::marker{color:var(--ink3)}
+        background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--line2);
+        border-radius:var(--r-1);
+        font-size:var(--fs-sm);color:var(--ink2);line-height:var(--lh-body);
+        overflow-wrap:anywhere}
+  /* —— 折叠区：四条"档案抽屉"。它们是这一页信息量最大的四块，默认却只有一行标题，
+        所以标题行必须自己说明"我是可点的"：去掉系统三角（换成跟着开合转的雪佛龙）、
+        加悬停底色、展开时把标题与内容用一条线切开。
+        ⚠ 判据 _check_home.js 读的是 <summary> 里的**纯文本**（正则里不含标签），
+          所以这里一个标签都不能往里塞，只能动 CSS。 */
+  details.card{padding:0;overflow:hidden}
+  details.card>summary{padding:var(--sp-4) var(--sp-5);cursor:pointer;list-style:none;
+        display:flex;align-items:center;gap:var(--sp-3);
+        font-size:var(--fs-md);font-weight:650;color:var(--ink);line-height:var(--lh-tight);
+        transition:background var(--dur) var(--ease)}
+  details.card>summary::-webkit-details-marker{display:none}
+  details.card>summary::before{content:'\25B8';flex:0 0 auto;color:var(--ink3);
+        line-height:1;transition:transform var(--dur) var(--ease)}
+  details.card[open]>summary::before{transform:rotate(90deg)}
+  details.card>summary:hover{background:var(--card2)}
   details.card[open]>summary{border-bottom:1px solid var(--line)}
   details.card>.dbody{padding:var(--sp-4) var(--sp-5) var(--sp-3)}
   /* —— 可访问性：键盘焦点必须看得见 —— */

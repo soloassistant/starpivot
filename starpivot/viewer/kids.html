@@ -14,7 +14,9 @@
   :root{
     /* —— 颜色令牌（暖色版）—— */
     --bg:#fbf8f1; --card:#ffffff; --card2:#fdf7ec;
-    --line:#ece3d3; --line2:#dccdb4;
+    /* 描边只承担分隔，两级各压深一点点（1.20:1 → 1.24:1 / 1.47:1 → 1.53:1）：
+       暖白底上"白卡"本来就更难分辨，卡片边界一淡，整页会像一张没有格子的稿纸。 */
+    --line:#e7ddca; --line2:#d3c2a4;
     /* ink2 / ink3 承载文字，需在暖色底上过 AA：实测最差底色 --card2 #fdf7ec
        → ink 14.39 / ink2 6.37 / ink3 4.68（旧 ink3 #948872 只有 3.27）。 */
     --ink:#2a241d; --ink2:#635a4a; --ink3:#7c6e50;
@@ -24,16 +26,22 @@
     --warn:#b4530a; --warn-soft:#fdf3e7;
     --danger:#b42318; --danger-soft:#fdeceb;
     --grid:#f4efe4;
-    /* —— 字号阶梯（基础字号按本页读者抬高，其余同比例）—— */
-    --fs-xs:12px; --fs-sm:13.5px; --fs-base:17px; --fs-md:18px;
-    --fs-lg:20px; --fs-xl:23px; --fs-2xl:28px; --fs-3xl:40px;
+    /* —— 字号阶梯（基础字号按本页读者抬高，其余同比例）——
+       这一页的读者是孩子，所以整条阶梯比另三页宽一档：最小一级 13px（不是 11.5/12），
+       正文 17px，标题 31px。相邻比值比另三页更大（1.1~1.55），
+       因为"一眼看出哪个更大"比"排得整齐"更重要。 */
+    --fs-xs:13px; --fs-sm:14px; --fs-base:17px; --fs-md:19px;
+    --fs-lg:21px; --fs-xl:25px; --fs-2xl:31px; --fs-3xl:48px;
     /* —— 行高 —— */
-    --lh-tight:1.3; --lh-body:1.7; --lh-loose:1.85;
+    --lh-tight:1.28; --lh-body:1.72; --lh-loose:1.88;
     /* —— 间距刻度 —— */
     --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
     /* —— 圆角与阴影 —— */
-    --r-1:6px; --r-2:10px; --r-3:16px; --r-full:999px;
-    --sh-1:0 1px 2px rgba(80,60,20,.05); --sh-2:0 8px 24px rgba(80,60,20,.09);
+    --r-1:6px; --r-2:10px; --r-3:18px; --r-full:999px;
+    /* 暖色版的阴影：色相跟着底走（用棕而不是蓝灰），否则白卡上会浮出一层"冷灰"。
+       同样两层 —— 近处一条硬边 + 远处一团散光。 */
+    --sh-1:0 1px 2px rgba(80,60,20,.06), 0 2px 7px rgba(80,60,20,.05);
+    --sh-2:0 10px 26px rgba(80,60,20,.11), 0 2px 6px rgba(80,60,20,.07);
     --ring:0 0 0 3px rgba(180,92,21,.30);
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
     --dur:.16s; --ease:cubic-bezier(.2,.6,.2,1);
@@ -47,56 +55,103 @@
        padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
        font:var(--fs-base)/var(--lh-body) -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
   .wrap{max-width:var(--wrap);margin:0 auto;padding:var(--sp-5) var(--sp-4) var(--sp-6)}
-  h1{margin:0 0 var(--sp-2);font-size:var(--fs-2xl);font-weight:700;letter-spacing:.4px;line-height:var(--lh-tight)}
-  .lead{font-size:var(--fs-md);color:var(--ink);line-height:var(--lh-loose);margin-bottom:var(--sp-4)}
+  h1{margin:0 0 var(--sp-3);font-size:var(--fs-2xl);font-weight:700;letter-spacing:-.3px;line-height:var(--lh-tight)}
+  /* 一句导语：给一个行宽上限。原来是整幅 760px 宽的一行字（一行 40 多个汉字），
+     孩子读到一半就丢行；52ch 大约 26 个汉字，正好是一口气的长度。 */
+  .lead{font-size:var(--fs-md);color:var(--ink);line-height:var(--lh-loose);
+        max-width:52ch;margin-bottom:var(--sp-4)}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-3);
         padding:var(--sp-4);margin-bottom:var(--sp-4);box-shadow:var(--sh-1)}
   /* 这一页的玩法是"点一下画面"：必须声明 touch-action，否则触屏会把点按当成滚动意图。
-     用 manipulation（不是 none）—— 点按立刻生效、双击缩放关掉，但页面仍能正常上下滚。 */
+     用 manipulation（不是 none）—— 点按立刻生效、双击缩放关掉，但页面仍能正常上下滚。
+     描边用 outline 而不是 border：画布上的点按坐标是从 getBoundingClientRect() 换算的，
+     border 会让那个矩形与绘制区差 1px，outline 完全不占布局。 */
   canvas{width:100%;display:block;border-radius:var(--r-2);background:#fffdf8;cursor:crosshair;
+         outline:1px solid var(--line);outline-offset:-1px;
          touch-action:manipulation}
-  .knobs{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);margin-top:var(--sp-4)}
-  .knob label{display:block;font-size:var(--fs-base);margin-bottom:2px}
+  /* 旋钮：两个一组，值单独做成小底片（白色 + 描边，和旁边那几个 range 控件同一族）。
+     ⚠ 值不用 --accent 写在 --accent-soft 上（那对只有 4.18:1，小字不够）；
+       写在白底上 accent 是 4.69:1，和其他几处已验过的组合一致。 */
+  .knobs{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4) var(--sp-5);margin-top:var(--sp-4)}
+  .knob label{display:block;font-size:var(--fs-base);margin-bottom:2px;font-weight:600}
   .knob .hint{font-size:var(--fs-sm);color:var(--ink2);margin-bottom:var(--sp-2)}
   input[type=range]{width:100%;accent-color:var(--accent);touch-action:manipulation}
-  .val{font-weight:800;color:var(--accent)}
-  .big{font-size:var(--fs-xl);text-align:center;padding:var(--sp-4) var(--sp-3);
-       border-radius:var(--r-3);background:#fff7ee;border:1px dashed #f0d9bf}
-  .big b{font-size:var(--fs-3xl);color:var(--accent);vertical-align:-2px;font-variant-numeric:tabular-nums}
+  .val{display:inline-block;min-width:2.6em;padding:0 8px;border-radius:var(--r-1);
+       background:var(--card);border:1px solid var(--line2);
+       font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;text-align:center}
+  /* 这一页唯一的一个"结果"：转一圈要多久。原来是虚线框 —— 虚线读起来像"还没算好"，
+     而它恰好是整页最确定的那个数。改成实线 + 一层几乎看不出的暖色柔光 + 更大的数字：
+     孩子第一眼该看到的是这个数，不是画布上那一小段动画。
+     ⚠ 底色的两端都复算过：--accent 在 #fffefb / #fffcf7 上是 4.65 / 4.58，都过 4.5
+       （48px 的大字本来只要 3:1，但这一页不靠"大字豁免"来放行一个 4.3 的组合）。 */
+  .big{font-size:var(--fs-md);text-align:center;padding:var(--sp-5) var(--sp-3);
+       border-radius:var(--r-3);background:linear-gradient(180deg,#fffefb,#fffcf7);
+       border:1px solid #f0dcc0;box-shadow:var(--sh-1)}
+  /* 48px 的数字必须自己定行高：它默认继承 --lh-body 的 1.72，那一行会有 82px 高，
+     数字在盒子里"悬"着、上下都空一大块（截图上一眼就看出来）。 */
+  .big b{font-size:var(--fs-3xl);line-height:1.05;color:var(--accent);vertical-align:-3px;
+         font-variant-numeric:tabular-nums;letter-spacing:-.5px}
   /* 交互控件：字号下限 16px（iOS Safari 在 <16px 的输入框/下拉聚焦时会整页放大）。 */
   input,select,textarea{font-size:max(16px,var(--fs-base));touch-action:manipulation}
-  button{font:inherit;font-size:var(--fs-md);padding:var(--sp-3) var(--sp-5);border-radius:var(--r-2);
+  /* 按钮：手指要按得住，所以 48px 高；给它一点厚度（浅阴影 + 按下时落回去），
+     让"能按"这件事在视觉上就成立 —— 这一页所有玩法入口都是按钮。 */
+  button{font:inherit;font-size:var(--fs-md);font-weight:600;padding:var(--sp-3) var(--sp-5);
+         border-radius:var(--r-2);
          border:1px solid var(--line2);background:var(--card);color:var(--ink);cursor:pointer;
-         touch-action:manipulation;min-height:48px;
-         transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
+         touch-action:manipulation;min-height:48px;box-shadow:var(--sh-1);
+         transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),
+                    box-shadow var(--dur) var(--ease)}
   button:hover{border-color:var(--accent);background:var(--accent-soft)}
-  button:active{transform:translateY(1px)}
-  .found{background:var(--ok-soft);border:1px solid #bbf7d0;border-radius:var(--r-3);
-         padding:var(--sp-4);font-size:var(--fs-base);line-height:var(--lh-loose);color:#14532d}
+  button:active{transform:translateY(1px);box-shadow:none}
+  button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+  /* 两条"结论"（猜对 / 猜错）与另三页的 .okbox/.warnbox 用同一种画法：左侧一条实色。
+     组件层是四页共用的，孩子页也不该长出第二种"结论"的样子。 */
+  .found{background:var(--ok-soft);border:1px solid #bbf7d0;border-left:4px solid var(--ok);
+         border-radius:var(--r-2);padding:var(--sp-4);
+         font-size:var(--fs-base);line-height:var(--lh-loose);color:#14532d}
   .found b{color:#0d5b3e}
   /* —— 玩法层：猜一猜 ——
      这一块是**编排**（好玩的部分），对错由页面按"内核回的两次时间相差多少倍"分档得出；
-     分档规则写在面板里，明说它是玩法规则、不是自然规律。 */
-  .guess{margin-top:var(--sp-4);padding:var(--sp-4);border-radius:var(--r-3);
-         background:var(--accent2-soft);border:1px dashed #b7cdf7}
-  .guess .ask{font-size:var(--fs-md);font-weight:700;margin-bottom:var(--sp-3);text-align:center}
+     分档规则写在面板里，明说它是玩法规则、不是自然规律。
+     面板用这一页唯一的冷色（蓝系）与暖色正文分开；虚线改实线 ——
+     虚线会被读成"还没生成好的占位"，而它是整页最主要的玩法。 */
+  .guess{margin-top:var(--sp-4);padding:var(--sp-4);border-radius:var(--r-2);
+         background:var(--accent2-soft);border:1px solid #c9d9f8}
+  .guess .ask{font-size:var(--fs-md);font-weight:700;margin-bottom:var(--sp-3);text-align:center;
+              color:var(--accent2)}
   .guess .opts{display:flex;gap:var(--sp-2);flex-wrap:wrap;justify-content:center}
   .guess .grule{font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-3);line-height:var(--lh-body)}
-  .miss{background:var(--warn-soft);border:1px solid #efd2ab;border-radius:var(--r-3);
-        padding:var(--sp-4);font-size:var(--fs-base);line-height:var(--lh-loose);color:#6f3a08;margin-top:14px}
+  .miss{background:var(--warn-soft);border:1px solid #efd2ab;border-left:4px solid var(--warn);
+        border-radius:var(--r-2);padding:var(--sp-4);
+        font-size:var(--fs-base);line-height:var(--lh-loose);color:#6f3a08;margin-top:var(--sp-4)}
   .miss b{color:#5d3006}
-  details{margin-top:var(--sp-4);border-top:1px solid var(--line);padding-top:var(--sp-3)}
-  summary{cursor:pointer;font-size:var(--fs-md);color:var(--ink2);font-weight:600;touch-action:manipulation}
-  details .inner{font-size:var(--fs-md);color:var(--ink2);line-height:var(--lh-loose);margin-top:var(--sp-2)}
-  details .inner dt{font-weight:700;color:var(--ink);margin-top:var(--sp-2)}
+  /* 两个折叠区 = 两张"能摊开的卡片"：浅一档的暖面 + 开合时转的雪佛龙。
+     它们原来是"一条横线 + 一行小灰字"，看起来像正文的分隔符而不是可以点开的东西。 */
+  details{margin-top:var(--sp-4);border:1px solid var(--line);border-radius:var(--r-3);
+          background:var(--card2);overflow:hidden}
+  summary{cursor:pointer;font-size:var(--fs-md);color:var(--ink);font-weight:600;
+          padding:var(--sp-4);list-style:none;display:flex;align-items:center;gap:var(--sp-3);
+          touch-action:manipulation;transition:background var(--dur) var(--ease)}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:'\25B8';flex:0 0 auto;color:var(--ink2);line-height:1;
+          transition:transform var(--dur) var(--ease)}
+  details[open]>summary::before{transform:rotate(90deg)}
+  summary:hover{background:var(--card)}
+  details[open]>summary{background:var(--card);border-bottom:1px solid var(--line)}
+  details .inner{font-size:var(--fs-md);color:var(--ink2);line-height:var(--lh-loose);
+                 padding:var(--sp-4)}
+  details .inner dt{font-weight:700;color:var(--ink);margin-top:var(--sp-3)}
+  details .inner dt:first-child{margin-top:0}
   details .inner dd{margin:0}
   code{font-family:var(--mono);font-size:var(--fs-sm);background:var(--grid);
-       padding:1px 6px;border-radius:var(--r-1)}
-  pre{background:#2b2620;color:#f6f1e8;padding:var(--sp-3);border-radius:var(--r-2);
-      overflow-x:auto;font-size:var(--fs-sm);line-height:1.6}
-  footer{color:var(--ink2);font-size:var(--fs-md);margin-top:var(--sp-5);text-align:center;line-height:var(--lh-loose)}
-  .tip{font-size:var(--fs-md);color:var(--ink2);text-align:center;margin-top:var(--sp-3)}
-  a{color:var(--accent2);text-underline-offset:2px;touch-action:manipulation}
+       border:1px solid var(--line);padding:1px 6px;border-radius:var(--r-1)}
+  pre{background:#2b2620;color:#f6f1e8;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-2);
+      border:1px solid #3b342b;overflow-x:auto;font-size:var(--fs-sm);line-height:1.75}
+  footer{color:var(--ink2);font-size:var(--fs-md);margin-top:var(--sp-5);text-align:center;
+         line-height:var(--lh-loose);border-top:1px solid var(--line);padding-top:var(--sp-4)}
+  .tip{font-size:var(--fs-md);color:var(--ink2);text-align:center;margin-top:var(--sp-3);
+       max-width:52ch;margin-left:auto;margin-right:auto}
+  a{color:var(--accent2);text-underline-offset:3px;touch-action:manipulation}
   /* —— 可访问性：键盘焦点必须看得见；正文对比度按暖色底重新取值 —— */
   a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,[tabindex]:focus-visible{
     outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-1)}
