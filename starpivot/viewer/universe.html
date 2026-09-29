@@ -108,7 +108,8 @@
      那 1px 的偏差属于"页面与数据对齐"这条规矩，不值得为一条装饰边去动它。 */
   canvas{width:100%;display:block;border-radius:var(--r-2);background:#070b16;cursor:grab;
          touch-action:none;outline:1px solid var(--line);outline-offset:-1px}
-  #view{height:72vh;min-height:420px}
+  #stagebox{position:relative}   /* 信息卡 absolute 以画布为基准，而非整张卡片 */
+  #view{display:block;height:72vh;min-height:420px}
   /* 放置模式下换成十字准星：光标本身就是"这里能放"的提示。
      写在 .dragging 之前 —— 同一元素同时有两个类时后定义的胜出，而拖动时该显示"抓"。 */
   canvas.placing{cursor:crosshair}
@@ -117,8 +118,21 @@
   button:disabled{opacity:.45;cursor:not-allowed}
   .stage:fullscreen{border-radius:0;padding:var(--sp-2);display:flex;flex-direction:column;justify-content:center;background:var(--bg)}
   .stage:fullscreen canvas{height:calc(100vh - 16px);border-radius:0}
-  /* 全屏时藏掉选中卡：全屏是"只看画面"，而画布本身占满整屏，卡片会把布局顶出去。 */
-  .stage:fullscreen #selcard{display:none !important}
+  /* —— 选中天体的信息框：浮在画面左上角 ——
+     原来它排在画布**下方**（在文档流里），点完天体视线要往下挪一屏才看到数据，
+     而"点一下就能看见"恰恰是这个交互的全部意义。现在做成浮层：点哪颗，数据就在画面左上角出现，
+     视线不用离开画面。⚠ DOM 位置一个字节没挪（判据要求它排在「更多设置」之前）。
+     底用 --card2 的**实底**、不做半透明：半透明会让框里的字压在星空上，
+     对比度随画面内容变化，判据也没法算。 */
+  #stage{position:relative}
+  #selcard{position:absolute;top:var(--sp-5);left:var(--sp-5);z-index:6;
+           width:min(360px,44%);max-height:calc(100% - var(--sp-5) * 2);overflow-y:auto;
+           background:var(--card2);border:1px solid var(--line2);border-radius:var(--r-2);
+           padding:var(--sp-3) var(--sp-4);box-shadow:var(--sh-2)}
+  /* 窄框里标题和关闭按钮要能各占一段，"取消选中"那颗按钮比较长，不能挤成两半 */
+  #selcard h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px}
+  /* 全屏时它已经是浮层、不再顶布局，所以照常显示 —— 全屏恰恰是最需要它的场景。 */
+  .stage:fullscreen #selcard{top:var(--sp-3);left:var(--sp-3)}
   .row{display:flex;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;align-items:flex-end}
   .stat{font-size:var(--fs-sm);color:var(--ink2)}
   .stat b{color:var(--ink);font-family:var(--mono)}
@@ -216,6 +230,8 @@
     h1{font-size:var(--fs-xl)}
     .card{padding:var(--sp-3);border-radius:var(--r-2)}
     #bodytable{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    /* 手机上 44% 只剩 170 来 px，读不了 —— 改成横跨画面顶部、并压住高度上限 */
+    #selcard{width:auto;left:var(--sp-3);right:var(--sp-3);top:var(--sp-3);max-height:58%}
   }
   /* —— 触摸设备（pointer:coarse）：可点区域最小 44×44 —— */
   @media(pointer:coarse){
@@ -261,18 +277,22 @@
 
 
   <div class="card stage" id="stage">
-    <canvas id="view" role="img" aria-label="宇宙模拟主画面：天体在黄道面上的位置与轨道"></canvas>
+    <!-- stagebox 只包住画布 + 信息卡：信息卡 absolute 以它（== 画布）为基准，
+         这样"浮在画面左上角"才真的浮在画面上，而不是浮在整张卡片上（卡还有图例/状态行在画布下方）。 -->
+    <div id="stagebox">
+      <canvas id="view" role="img" aria-label="宇宙模拟主画面：天体在黄道面上的位置与轨道"></canvas>
+      <!-- 选中天体的数据卡浮在画面左上角 —— 点一下画面，数据要在视线里出现才有用；
+           原来它排在页面底部（H-R 图之后，隔着好几屏），点完只看到镜头动了一下。
+           默认 display:none，所以既不占首屏、也不进"首屏可见控件"的预算。 -->
+      <div id="selcard" style="display:none">
+        <h2 style="margin:0 0 6px">选中的天体 <span style="font-size:12px;font-weight:400;color:var(--ink2)">
+          全部来自内核回显，页面不算</span>
+          <span style="margin-left:auto"><button id="selclose" style="font-size:11.5px;padding:3px 9px">✕ 取消选中 · 回全景</button></span></h2>
+        <div id="selbody" class="stat" aria-live="polite" style="font-size:12.5px"></div>
+      </div>
+    </div>
     <div class="legend" id="legend"></div>
     <div class="note" id="statline"></div>
-    <!-- 选中天体的数据卡就在画面正下方 —— 点一下画面，数据要在视线里出现才有用；
-         原来它排在页面底部（H-R 图之后，隔着好几屏），点完只看到镜头动了一下。
-         默认 display:none，所以既不占首屏、也不进"首屏可见控件"的预算。 -->
-    <div id="selcard" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
-      <h2 style="margin:0 0 6px">选中的天体 <span style="font-size:12px;font-weight:400;color:var(--ink2)">
-        全部来自内核回显，页面不算</span>
-        <span style="float:right"><button id="selclose" style="font-size:11.5px;padding:3px 9px">✕ 取消选中 · 回全景</button></span></h2>
-      <div id="selbody" class="stat" aria-live="polite" style="font-size:12.5px"></div>
-    </div>
   </div>
 
   <!-- 演奏条：第一屏只留这几个 —— 播放、拖时间、点画面放行星、看导览。
@@ -2409,7 +2429,7 @@
     return [xr * cw + yr * sw, -xr * sw + yr * cw];
   }
 
-  const PLACE_MIN_AU = 0.02, PLACE_MAX_AU = 60;
+  const PLACE_MIN_AU = 0.02;
   // ---- 落点判定：**预览与真正投放共用这一处** ----
   // 为什么必须只写一份：分成两份迟早会出现"预览显示 2.7 AU、点下去落在 3.1 AU"，
   // 或者更常见的"预览是绿的、点下去却被拒绝" —— 而用户没有任何办法分辨哪个是真的。
@@ -2427,11 +2447,26 @@
     const r = Math.hypot(p[0], p[1]);
     let deg = Math.atan2(p[1], p[0]) * 180 / Math.PI;
     if (deg < 0) deg += 360;
-    if (!(r >= PLACE_MIN_AU) || r > PLACE_MAX_AU)
+    if (!(r >= PLACE_MIN_AU))
       return { ok:false, p, r, deg, short:'超出范围',
-               why:'这个位置离中心 ' + r.toFixed(3) + ' AU —— 超出可放置范围（'
-                 + PLACE_MIN_AU + '–' + PLACE_MAX_AU + ' AU）。太靠里内核要缩很小的步长，'
-                 + '太靠外画面上也看不见。' };
+               why:'这个位置离中心 ' + r.toFixed(3) + ' AU —— 太靠近中心了（最近 '
+                 + PLACE_MIN_AU + ' AU），内核要缩很小的步长，放不了。' };
+    // 投放允许到"画面里看得见的最远处"：中心到画布四角的世界距离。
+    // 原来写死 60 AU，但在宽画布上 fitScale 按短边把系统塞进去、长边映射到的 AU 更多，
+    // 于是右边/左边明明看得见的一大片空间被误判成"超出范围"——点画面放行星却放不进去。
+    // 落点一定在画布内，反算回去也一定在画面上，不会"看不见"，所以上限就该是画布可见范围。
+    let maxVisible = 0;
+    for (const ex of [0, rect.width]) for (const ey of [0, rect.height]){
+      const cp = unprojectToEcliptic(ex, ey);
+      if (cp) maxVisible = Math.max(maxVisible, Math.hypot(cp[0], cp[1]));
+    }
+    if (maxVisible === 0)   // 接近正侧视、四角都反算不出时的兜底
+      maxVisible = Math.hypot(rect.width/2, rect.height/2) /
+        (fitScale() * (+$('zoom').value) / 100 * view.userScale);
+    if (r > maxVisible * 1.001)
+      return { ok:false, p, r, deg, short:'超出范围',
+               why:'这个位置离中心 ' + r.toFixed(3) + ' AU —— 已经超出画面能容纳的范围'
+                 + '（最远约 ' + maxVisible.toFixed(1) + ' AU）。点画面里看得见的地方放。' };
     if (customBodies.length >= PLACE_MAX_BODIES)
       return { ok:false, p, r, deg, short:'已达上限',
                why:'行星表最多 16 行（内核 <code>--body</code> 的上限），已经到顶了。'

@@ -546,22 +546,35 @@ const mouse = (p, x, y) => {
     ok(p.lastPayload().bodies.length === nB3, '退出后再点画面不会误放一颗');
 
     // 7) 越界：预览与点击说的是同一句话（同一判定）。
-    //    要让"超出上限 60 AU"真的落在画面内，得挑一个**大系统**（太阳系到冥王星 39 AU）
-    //    再把缩放拉到最小 —— 否则整屏都到不了 60 AU，这条用例是假的。
+    //    旧代码把上限写死 60 AU：在宽画布上 fitScale 按短边把系统塞进去、长边映射到的 AU 更多，
+    //    于是右边/左边明明看得见的一大片被误判成"超出范围"——点画面放行星却放不进去（用户实踩）。
+    //    修复后上限改为"画面能容纳的最远距离"（中心到画布四角），点画面里看得见的地方都能放。
+    //    为触发旧代码的越界，这里用大系统（太阳系九星，到冥王星 39 AU）把缩放拉到最小：
+    //    旧代码此时整屏都 >60 AU、点哪儿都拒；新代码因为 (760,300) 仍在画布内，应当**允许**。
     p.fire(p.d.querySelectorAll('#presets button')[0], 'click');   // 「太阳系九星」
     await p.settle(1500);
     p.$('zoom').value = '20'; p.fire(p.$('zoom'), 'input'); await p.settle(500);
     p.d.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await p.settle(200);
     p.fire(p.$('placemode'), 'click'); await p.settle(400);
-    p.texts.length = 0; moveTo(760, 300); await p.settle(300);
-    ok(/超出范围/.test(p.texts.join(' ')),
-       '光标落在可放置范围外时，预览当场写明（实测：'
-       + (p.texts.filter(s => /超出/.test(s))[0] || '（没写）') + '）');
     const nB4 = p.lastPayload().bodies.length;
+    p.texts.length = 0; moveTo(760, 300); await p.settle(300);
+    const previewTxt = p.texts.filter(s => /AU · 方位/.test(s)).slice(-1)[0] || '';
+    ok(!/超出范围/.test(p.texts.join(' ')),
+       '宽画布/缩到最小时，光标在画面内（760,300）也应可放，不再误报"超出范围"（预览：'
+       + (previewTxt || '（无）') + '）');
     mouse(p, 760, 300); await p.settle(800);
-    ok(/超出可放置范围/.test(p.$('toolnote').textContent), '点下去被拒绝，且理由与预览一致');
-    ok(p.lastPayload().bodies.length === nB4, '确实没放进去');
+    ok(!/超出可放置范围|超出范围/.test(p.$('toolnote').textContent),
+       '点下去真的放进去了，不再被"超出范围"拦下');
+    ok(p.lastPayload().bodies.length === nB4 + 1, '确实多放进去一颗（可见空间不再被误判成越界）');
+    // 反过来：太靠近中心（<0.02 AU）仍要拒绝 —— 这条下限分支没删，仍然 alive。
+    p.fire(p.$('placemode'), 'click'); await p.settle(200);   // 退出再进，清掉残留 ghost
+    p.fire(p.$('placemode'), 'click'); await p.settle(300);
+    p.texts.length = 0; moveTo(400, 300); await p.settle(250);
+    ok(/超出范围/.test(p.texts.join(' ')),
+       '但点正中心（太靠近中心）预览仍当场写明"超出范围"（下限分支仍生效）');
+    mouse(p, 400, 300); await p.settle(500);
+    ok(p.lastPayload().bodies.length === nB4 + 1, '点正中心没有多放一颗（太靠近中心被拦下，没悄悄放）');
     p.fire(p.$('placemode'), 'click'); await p.settle(200);
     p.$('zoom').value = '100'; p.fire(p.$('zoom'), 'input'); await p.settle(300);
   }
