@@ -558,6 +558,12 @@
   function hexRGB(h){ const n = parseInt(String(h).slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
   function rgbHex(c){ return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v)))
     .toString(16).padStart(2, '0')).join(''); }
+  // 十六进制 → rgba 字符串。运动画法（彗尾、跟随取景框）一律用它描边：
+  // 判据里"碎屑喷流"认的是**十六进制描边 + 折线**，十六进制的折线会被数进喷流条数里。
+  function rgbaOf(h, a){
+    const c = hexRGB(h);
+    return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + Math.max(0, Math.min(1, a)).toFixed(3) + ')';
+  }
   function mixColor(c1, c2, w){                      // w = c2 占的权重
     const a = hexRGB(c1), b = hexRGB(c2);
     return rgbHex([0, 1, 2].map(i => a[i] * (1 - w) + b[i] * w));
@@ -1002,6 +1008,14 @@
 
   let data = null;        // {bodies, frames, diagnostics, scenario, bio, sampling}
   let playing = true, frameF = 0, lastTs = null;
+  // 手动定位（←/→、拖时间轴、点首/末帧）之后，画面上留一小段"跳到这儿了"的柔光。
+  // 只是显示层的一个反馈，不指任何新位置；见 render 里的 pk。
+  const SEEK_PULSE_MS = 520;
+  let seekPulseEnd = 0;
+  const pulseSeek = () => {
+    seekPulseEnd = (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now())
+                 + SEEK_PULSE_MS;
+  };
   let dir = 1;            // 播放方向：+1 正放 / −1 倒放
   let placing = false;    // 「点画面放行星」模式
   let sampling = null;    // 内核回显的输出采样标定（页面自己不推算周期）
@@ -1406,6 +1420,7 @@
     if (!data) return;
     if (playing) togglePlay(false);     // 手动定位先停住，否则播放循环立刻把位置拽走
     frameF = Math.max(0, Math.min(data.frames.length - 1, i));
+    pulseSeek();                       // 画面上留一下"跳到这一帧了"的反馈
     render();
     saveStatePassive();   // 只是换了帧，不算"改了设定"
   }
@@ -3357,10 +3372,19 @@
       view.panY += cv.height/2 - fy;
       cx = cv.width/2 + view.panX; cy = cv.height/2 + view.panY;
     }
+    // 活着的天体数：彗尾要不要分档、名字要不要全写，都看它（两处必须是同一个数）。
+    // ⚠ 名字就叫 nAlive、判据的写法就是 `nAlive <= 40`（_check_bio_page.js 在源码上读这两个量），
+    //   别顺手改名 —— 改了那条静态判据会红。
+    let nAlive = 0;
+    for (let b0 = 0; b0 < nB; b0++) if (alive(data.bodies[b0])) nAlive++;
+
     for (let b = 0; b < nB; b++){
       const col = colorOf(data.bodies[b].id, b);
       const body = data.bodies[b];
-      ctx.strokeStyle = col; ctx.globalAlpha = 0.16; ctx.lineWidth = 1;
+      // 完整轨道（暗）。也写成 rgba：这条是长折线，但**只有两个存活帧**的天体
+      // （刚出生 / 快合并）会退化成 move→line→stroke 两笔 —— 那样它正好落进判据
+      // 认"碎屑喷流"的形状里，只因为颜色是十六进制就被数成一条喷流。写成 rgba 就排除掉。
+      ctx.strokeStyle = rgbaOf(col, 0.16); ctx.globalAlpha = 1; ctx.lineWidth = 1;
       ctx.beginPath();
       let pen = false;
       for (let f = 0; f < data.frames.length; f++){
@@ -3374,24 +3398,51 @@
       }
       ctx.stroke();
 
-      // 已走过的轨迹：有演化数据时按"当时的阶"分段着色，否则维持原本的单色。
-      // 分段而不是逐帧描边 —— 阶很少变，所以每颗星通常只有几条路径，代价很低。
+      // ---- 已走过的轨迹：**由远及近渐亮渐粗的彗尾** ----
+      // 原来是 0..fi 整段一个亮度一个粗细。"走过哪"看得见，但**现在在哪、往哪走**看不见 ——
+      // 头尾一样重，运动感全靠脑补。现在按"离当前帧多远"分档：越靠近当前帧越亮越粗。
+      // 同一档数下走得快的天体在屏幕上拉得更长 —— 尾巴长度因此自带速度感，不用另外编。
+      // ⚠ 描的点一个都没多：档只是同一批内核采样点的不同画法，页面不补任何新位置。
+      // ⚠ 描边一律 rgba（见 rgbaOf）：判据里"碎屑喷流"认的是**十六进制描边 + 折线**，
+      //    十六进制的折线会被数进喷流条数里（§12）。
       const bioB = bioOf(b);
-      ctx.globalAlpha = 0.9; ctx.lineWidth = 1.8;
-      if (bioB && bioB.stage){
-        let runStage = -2, runPen = false, lastPt = null;
+      // 彗尾占几帧：按总帧数的比例取，再夹在 [4, 30]。1% 是量出来的取舍 ——
+      // 默认 2000 帧 / 20 年时它是 20 帧（0.2 年，地球走过约 72°）：够长能看出方向，
+      // 又不至于长到绕大半圈、把"头"混进整条轨迹里。采样稀时下限 4 帧才画得出尾巴。
+      const tailN = Math.max(4, Math.min(30, Math.round(data.frames.length * 0.01)));
+      // 天体一多（碎屑级联能滚出两百多块）满屏都是线，那时分档既看不清也白耗 stroke —— 只分两档。
+      const TIERS = nAlive <= 40 ? 4 : 2;
+      // 四档的浓淡/粗细。第 0 档是"走过的全程"：它要明显亮于未走过的那条（0.16），
+      // 否则"走过哪"这条信息就被彗尾盖掉了 —— 但又要暗于近端，头的层次才出得来。
+      const TAIL_A = [0.52, 0.68, 0.82, 0.98];
+      const TAIL_W = [1.50, 1.80, 2.10, 2.60];
+      const tierA = t => (TIERS === 4 ? TAIL_A[t] : (t === 0 ? TAIL_A[0] : TAIL_A[3]));
+      const tierW = t => (TIERS === 4 ? TAIL_W[t] : (t === 0 ? TAIL_W[0] : TAIL_W[3]));
+      const tierOf = f => {                        // 0 = 最老，TIERS-1 = 当前帧附近
+        const age = fi - f;
+        if (age >= tailN) return 0;
+        const u = 1 - age / tailN;                 // 0（刚进尾巴）→ 1（当前帧）
+        return Math.max(1, Math.min(TIERS - 1, 1 + Math.floor(u * (TIERS - 1))));
+      };
+      ctx.globalAlpha = 1;
+      {
+        // 分段键 = 档 × 阶（有演化数据时还要按"当时的阶"着色），任一变化就收笔另起一段。
+        let runKey = -2, runPen = false, lastPt = null;
         const flush = () => { if (runPen) { ctx.stroke(); runPen = false; } };
         for (let f = 0; f <= fi; f++){
           const ft = data.frames[f].t;
           const on = (body.born_at || 0) <= ft + 1e-9 &&
                      (body.died_at === undefined || body.died_at === null || body.died_at >= ft - 1e-9);
-          if (!on){ flush(); runStage = -2; lastPt = null; continue; }
-          const sc = bioB.stage[Math.min(f, bioB.stage.length - 1)] | 0;
+          if (!on){ flush(); runKey = -2; lastPt = null; continue; }
+          const sc = (bioB && bioB.stage) ? (bioB.stage[Math.min(f, bioB.stage.length - 1)] | 0) : -1;
+          const tr = tierOf(f);
+          const key = tr * 16 + (sc + 1);
           const [x,y] = project(data.frames[f].p[b], yaw, pitch, scale, cx, cy);
-          if (sc !== runStage){        // 换阶：收掉上一段，用新颜色起一段
+          if (key !== runKey){
             flush();
-            runStage = sc;
-            ctx.strokeStyle = stageColor(sc);
+            runKey = key;
+            ctx.strokeStyle = rgbaOf(sc >= 0 ? stageColor(sc) : col, tierA(tr));
+            ctx.lineWidth = tierW(tr);
             ctx.beginPath();
             // 从上一帧接上，不留断口。这里必须同时把 runPen 置真，
             // 否则紧接着的 moveTo(x,y) 会把这句 moveTo(lastPt) 覆盖掉 —— 接不上。
@@ -3402,20 +3453,6 @@
           lastPt = [x,y];
         }
         flush();
-      } else {
-        ctx.strokeStyle = col;
-        ctx.beginPath();
-        pen = false;
-        for (let f = 0; f <= fi; f++){
-          const ft = data.frames[f].t;
-          const on = (body.born_at || 0) <= ft + 1e-9 &&
-                     (body.died_at === undefined || body.died_at === null || body.died_at >= ft - 1e-9);
-          if (!on) { pen = false; continue; }
-          const [x,y] = project(data.frames[f].p[b], yaw, pitch, scale, cx, cy);
-          pen ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
-          pen = true;
-        }
-        ctx.stroke();
       }
       ctx.globalAlpha = 1;
     }
@@ -3497,9 +3534,11 @@
         const [jx, jy] = project(ip.p, yaw, pitch, scale, cx, cy);
         const [bx, by] = project(posAt(b), yaw, pitch, scale, cx, cy);
         ctx.save();
+        // ⚠ alpha 上限 0.55 是判据认"喷流"的筛选条件之一，别往上调；
+        //   想让它更显眼只能动**线宽**（不动位置、不动颜色 → 判据读的三样都不变）。
         ctx.globalAlpha = (1 - age / tWin) * 0.55;
         ctx.strokeStyle = colorOf(bd.id, b);
-        ctx.lineWidth = 1.3;
+        ctx.lineWidth = 1.3 + 0.9 * (1 - age / tWin);   // 刚撞出去时最粗，随后收细
         ctx.beginPath(); ctx.moveTo(jx, jy); ctx.lineTo(bx, by); ctx.stroke();
         ctx.restore();
       }
@@ -3510,9 +3549,13 @@
     // 天体一多，名字会糊成一片（碎屑级联能滚出两百多块 —— 那是内核的行为，不是画法该改的）。
     // 所以只在天体不多时才逐颗写名字；否则只留"本体"（id 里没有 #）与选中的那一颗。
     // 这是**可读性**上的取舍，不是隐藏数据：点它一下，下面那张卡里照样有全部信息。
-    let nAlive = 0;
-    for (let b = 0; b < nB; b++) if (alive(data.bodies[b])) nAlive++;
-    const labelAll = nAlive <= 40;
+    const labelAll = nAlive <= 40;      // 与彗尾分档用的是同一个数（见上面 nAlive）
+    // 手动定位脉冲的剩余强度：1（刚定位）→ 0（消失）
+    const pk = seekPulseEnd > 0
+      ? Math.max(0, Math.min(1, (seekPulseEnd -
+          (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()))
+          / SEEK_PULSE_MS))
+      : 0;
 
     // ---- 标签排版：**先算好位置，再回到各自的循环里就地写** ----
     // 为什么不能"把球都画完再统一写名字"：判据是从绘制日志里按
@@ -3654,6 +3697,25 @@
       // ⚠ 两个刻意的地方：① 用 rgba 而不是十六进制 —— "喷流"那条判据认的是**十六进制描边**
       // （轨道拖尾也是靠这个才没被误认成喷流）；② 画在**细环之前** —— 判据要读那圈细环，
       // 而它读的是"写名字之前最后一次 stroke"，引线要是排在后面就会把它顶掉。
+      // ---- 跟随锁定：镜头正跟着这一颗，画面上要看得出来"锁的是谁" ----
+      // 跟随时这颗星被钉在画面正中、自己一动不动 —— 不看提示语的话，观众分不清
+      // "它停住了"和"镜头跟着它走"。四个角标就是取景框：看见框就知道镜头锁在谁身上。
+      // ⚠ 描边用 rgba、且画在球外细环**之前**：判据读的是"写名字之前最后一次 stroke"，
+      //   排在细环之后会把那圈来源色细环顶掉（§11 用它验"来源色没丢"）。
+      if (b === cam.follow){
+        ctx.save();
+        ctx.strokeStyle = 'rgba(206,220,244,0.75)';
+        ctx.lineWidth = 1.2;
+        const FR = rr + 8, FL = 5;
+        ctx.beginPath();
+        for (const [sx, sy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+          ctx.moveTo(x + sx * FR, y + sy * FR - sy * FL);
+          ctx.lineTo(x + sx * FR, y + sy * FR);
+          ctx.lineTo(x + sx * FR - sx * FL, y + sy * FR);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
       if (lp && lp.lead){
         ctx.save();
         ctx.strokeStyle = 'rgba(150,162,184,0.55)';
@@ -3732,6 +3794,21 @@
         ctx.font = '11px -apple-system,Segoe UI,PingFang SC,sans-serif';
         ctx.fillText(id, lp.x, lp.y);
       }
+      // ---- 手动定位的反馈：逐帧按 ←/→ 时画面几乎不动，"按了没反应"是真的分不清 ----
+      // （2000 帧 / 20 年时一帧只有 0.01 年，内行星在屏幕上挪不到 1 px。）
+      // 刚定位过的这一小段时间里，给当前帧的位置套一圈由大收缩的柔光 ——
+      // 圆心就是内核那一帧的坐标，页面不指任何新位置，只是把"画面确实跳到这里了"说清楚。
+      // ⚠ 用**径向渐变填充**：判据认球体靠"字符串样式 + alpha 0.9"，渐变对象不参与匹配，
+      //   所以这一笔加在哪都不会把"哪一笔属于哪颗"的还原搅乱。
+      if (pk > 0 && lp){
+        const PR = rr + 6 + 18 * pk;
+        const gpul = ctx.createRadialGradient(x, y, rr * 0.8, x, y, PR);
+        gpul.addColorStop(0, 'rgba(210,230,255,0)');
+        gpul.addColorStop(0.62, 'rgba(198,222,255,' + (0.34 * pk).toFixed(3) + ')');
+        gpul.addColorStop(1, 'rgba(150,195,255,0)');
+        ctx.fillStyle = gpul;
+        ctx.beginPath(); ctx.arc(x, y, PR, 0, Math.PI*2); ctx.fill();
+      }
       // 选中的那一颗：把它的生命形态直接写在它旁边。"点一下出数据"的第一行
       // 就落在它自己身上 —— 卡片在画面下方，这里给一个不用挪眼的读数。
       // 文字用浅色而不是阶色：阶色是给"面"用的（球体、轨迹），拿它写 11px 小字
@@ -3759,7 +3836,10 @@
         if (age < 0 || age > tWin) continue;
         const u = age / tWin;                      // 0 → 1
         const [fx, fy] = project(ip.p, yaw, pitch, scale, cx, cy);
-        const grow = 7 + u * 40;                   // 冲击环的半径（像素）：纯显示
+        // 冲击环的半径（像素）：纯显示。原来是 7 + u*40 —— 在 8 px/AU 的整屏视角下，
+        // 40 px 的环要扫过 5 AU，看着像"别的地方发生了一件事"；收到 62 是为了让它
+        // 明确落在撞击点上（环心始终钉在内核给的那个坐标，见 rebuildImpactIndex）。
+        const grow = 7 + u * 62;
         const a = (1 - u);
         const frag = ip.kind === 'fragment';
         ctx.save();
@@ -3770,11 +3850,40 @@
         ctx.beginPath(); ctx.arc(fx, fy, grow, 0, Math.PI*2); ctx.stroke();
         // 闪光：中心的径向渐变，随 age 衰减
         const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, grow * 0.85);
-        g.addColorStop(0, 'rgba(255,246,214,' + (a * 0.85) + ')');
-        g.addColorStop(0.5, (frag ? 'rgba(255,190,110,' : 'rgba(170,210,255,') + (a * 0.30) + ')');
+        g.addColorStop(0, 'rgba(255,246,214,' + (a * 0.95) + ')');
+        g.addColorStop(0.5, (frag ? 'rgba(255,190,110,' : 'rgba(170,210,255,') + (a * 0.38) + ')');
         g.addColorStop(1, frag ? 'rgba(255,150,80,0)' : 'rgba(140,190,255,0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(fx, fy, grow * 0.85, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        // ---- 撞击点标记：一个**方括号取景框**，画在闪光之上 ----
+        // 为什么要加它：碎屑扇在整屏视角下只有 1–2 px（≈8 px/AU × 碎屑团 0.05–0.10 AU ——
+        //   那是内核数据本身的大小；页面要把它放大就得编位置，所以不放大）。
+        //   扇看不清，"这里刚出事了"就没人看得见。这个框不补任何位置：
+        //   它画的就是内核给的那个撞击点，四个角只是把那个点框出来。
+        // ⚠ 描边用 rgba + 折线：判据认"喷流"要十六进制、认"冲击环"要 rgba(...,1) 紧跟同半径 arc，
+        //   这个框两样都不是，不会混进那两组的条数里。
+        // ⚠ 位置刻意排在闪光**之后**（画在最上层）：_check_bio_page.js 有一条静态判据
+        //   要求"闪光与冲击环的代码紧邻"，把框插在它们中间会把那条挤掉。
+        const mk = 7 + 3 * (1 - u);                // 框的大小（像素）：纯显示
+        ctx.save();
+        ctx.globalAlpha = a * 0.85;
+        ctx.strokeStyle = frag ? 'rgba(255,214,150,0.95)' : 'rgba(190,224,255,0.95)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (const [sx, sy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+          ctx.moveTo(fx + sx * mk, fy + sy * mk - sy * mk * 0.55);
+          ctx.lineTo(fx + sx * mk, fy + sy * mk);
+          ctx.lineTo(fx + sx * mk - sx * mk * 0.55, fy + sy * mk);
+        }
+        ctx.stroke();
+        // 事件标签：把"发生了什么、在什么时候"写在框边上。
+        // 位置/时刻都来自内核事件，页面只决定写在旁边多远（同样是显示层）。
+        ctx.globalAlpha = Math.min(1, a * 1.6);
+        ctx.fillStyle = frag ? 'rgba(255,222,176,0.95)' : 'rgba(206,232,255,0.95)';
+        ctx.font = '11px ui-monospace,Menlo,Consolas,monospace';
+        ctx.fillText((frag ? '💥 碎裂' : '🪐 合并') + ' t=' + ip.t.toFixed(2) + ' 年',
+                     fx + mk + 5, fy - mk - 2);
         ctx.restore();
       }
     }
@@ -3810,11 +3919,20 @@
     $('scrub').value = Math.round(fi / (data.frames.length-1) * 1000);
   }
 
+  // 播放推进的两处显示层修正 —— 都不碰物理量，只改"画面一帧走多久"：
+  //   ① dt 夹在 100 ms 内：切走标签页 / 机器卡一下时 ts 的间隔可能是几十秒，
+  //      不夹的话回来那一帧会**瞬间冲到末尾**，看着像"播放坏了"；
+  //   ② 速度缓动：滑杆从 40 拉到 120，原来下一帧就按 120 走 —— 画面"弹"一下。
+  //      现在让实际速度在 ~0.2 s 里追上滑杆（指数缓动，与镜头缓动同一套）。
+  let effFps = null;
   function tick(ts){
     if (playing && data){
       const fps = +$('speed').value;
+      if (effFps === null) effFps = fps;
       if (lastTs != null){
-        frameF += dir * (ts - lastTs) / 1000 * fps;
+        const dtMs = Math.max(0, Math.min(100, ts - lastTs));
+        effFps += (fps - effFps) * 0.18;
+        frameF += dir * dtMs / 1000 * effFps;
         const n = data.frames.length;
         if (frameF >= n - 1){
           // 时长「永久」：到末尾不回头，先把时长翻倍再算一遍（时刻会被找回来）。
@@ -4050,6 +4168,7 @@
   $('scrub').addEventListener('input', () => {
     if (!data) return;
     frameF = Math.round(+$('scrub').value / 1000 * (data.frames.length-1));
+    pulseSeek();                       // 拖时间轴同样是"手动定位"，给它同一个反馈
   });
   $('years').addEventListener('input', e => e.target.dataset.touched = '1');
 
