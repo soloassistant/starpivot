@@ -104,7 +104,7 @@
   input[type=checkbox]{accent-color:var(--accent)}
   select:focus,input:focus{border-color:var(--accent);outline:none}
   /* 画布用 outline 描边而不是 border：outline 不占布局，画布的 getBoundingClientRect()
-     不会因为描边而变化 —— 这一页"点画面放行星"是把屏幕坐标反解回黄道面的，
+     不会因为描边而变化 —— 这一页"双击画面放行星"是把屏幕坐标反解回黄道面的，
      那 1px 的偏差属于"页面与数据对齐"这条规矩，不值得为一条装饰边去动它。 */
   canvas{width:100%;display:block;border-radius:var(--r-2);background:#070b16;cursor:grab;
          touch-action:none;outline:1px solid var(--line);outline-offset:-1px}
@@ -295,7 +295,7 @@
     <div class="note" id="statline"></div>
   </div>
 
-  <!-- 演奏条：第一屏只留这几个 —— 播放、拖时间、点画面放行星、看导览。
+  <!-- 演奏条：第一屏只留这几个 —— 播放、拖时间、双击画面放行星、看导览。
        其余（场景 / 算法 / 碰撞 / 生物 / 视角 / 导出）在下面的「更多设置」里。 -->
   <div class="card">
     <div class="note" id="howto" style="margin:0 0 10px">三步上手：<b>①</b> 下面「一键开局」点一个 —— 马上有画面；　<b>②</b> 想自己放：点一个天体类型，再<b>双击</b>画面空白处；　<b>③</b> 播放 / 拖时间轴，看它们怎么动。</div>
@@ -2471,7 +2471,7 @@
                  + PLACE_MIN_AU + ' AU），内核要缩很小的步长，放不了。' };
     // 投放允许到"画面里看得见的最远处"：中心到画布四角的世界距离。
     // 原来写死 60 AU，但在宽画布上 fitScale 按短边把系统塞进去、长边映射到的 AU 更多，
-    // 于是右边/左边明明看得见的一大片空间被误判成"超出范围"——点画面放行星却放不进去。
+    // 于是右边/左边明明看得见的一大片空间被误判成"超出范围"——双击画面放行星却放不进去。
     // 落点一定在画布内，反算回去也一定在画面上，不会"看不见"，所以上限就该是画布可见范围。
     let maxVisible = 0;
     for (const ex of [0, rect.width]) for (const ey of [0, rect.height]){
