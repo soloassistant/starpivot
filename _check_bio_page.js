@@ -495,7 +495,7 @@ check('页面里没有"指向旧位置"的过期文案（' + STALE.length + ' �
   sHit.length === 0, sHit.join('；'));
 // 负样本走同一个函数：把其中一句塞回一个**会显示出来**的字符串里，必须被抓到。
 check('负样本：把"先在下面的行星表里把天体加好"塞回可见文案会被同一处抓到',
-  staleHits(spoken.replace('点「✛ 点画面放行星」', '先在下面的行星表里把天体加好')).length > 0, '');
+  staleHits(spoken.replace('点「✛ 双击画面放行星」', '先在下面的行星表里把天体加好')).length > 0, '');
 
 fs.writeFileSync(path.join(__dirname, '_check_bio_page.txt'), out.join('\n') + '\n', 'utf8');
 console.log(out.join('\n'));

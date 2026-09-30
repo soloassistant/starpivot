@@ -209,7 +209,7 @@ if [ "${live2:-0}" -gt 0 ]; then
               "_probe_quality.js|画质：默认帧数 / 每圈采样点读数 / 一键推荐 / 帧间插值真的生效" \
               "_probe_nav.js|脏标记 / 逐帧导航 / 跳到事件与阶 / 分享链接（不冲掉对方自己的会话）" \
               "_probe_play_modes.js|预设画廊逐个真跑通 / 稳定性挑战的判定与计分" \
-              "_probe_tools.js|点画面放行星 / 信息卡 / 倒放与键盘 / 等价 CLI 命令真跑比对 / 撞击的瞬时表现" \
+              "_probe_tools.js|双击画面放行星 / 信息卡 / 倒放与键盘 / 等价 CLI 命令真跑比对 / 撞击的瞬时表现" \
               "_probe_dualmode.js|普通人/教授双模式（含\"切模式不改变计算\"）+ 类型调色板" \
               "_probe_tour.js|导览（deep link / 每步真切算法）/ 积分器下拉 / 能量曲线 / CSV / 新预设" \
               "_probe_firstpaint.js|首屏耗时分解：内核 / 网关 / JSON.parse / 首帧渲染（记录用，非门禁）"; do

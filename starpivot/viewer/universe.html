@@ -260,7 +260,7 @@
   <div class="sub simple-only">
     在一颗恒星旁边放几个天体，看它们怎么转、会不会撞上、哪一颗上可能长出生命。
     这里<b>没有</b>可以改坏的物理：所有数字都由本机的一个 C++ 内核算出来，这个页面只负责把结果画出来。
-    <b>怎么开始</b>：下面的「一键开局」点一个，马上就有画面；想自己放，就点一个<a href="#palette">天体类型</a>再点画面。
+    <b>怎么开始</b>：下面的「一键开局」点一个，马上就有画面；想自己放，就点一个<a href="#palette">天体类型</a>再双击画面。
     场景、算法、碰撞、视角这些在「更多设置」里，想调再点开。
   </div>
   <div class="sub pro-only">
@@ -298,7 +298,7 @@
   <!-- 演奏条：第一屏只留这几个 —— 播放、拖时间、点画面放行星、看导览。
        其余（场景 / 算法 / 碰撞 / 生物 / 视角 / 导出）在下面的「更多设置」里。 -->
   <div class="card">
-    <div class="note" id="howto" style="margin:0 0 10px">三步上手：<b>①</b> 下面「一键开局」点一个 —— 马上有画面；　<b>②</b> 想自己放：点一个天体类型，再点画面空白处；　<b>③</b> 播放 / 拖时间轴，看它们怎么动。</div>
+    <div class="note" id="howto" style="margin:0 0 10px">三步上手：<b>①</b> 下面「一键开局」点一个 —— 马上有画面；　<b>②</b> 想自己放：点一个天体类型，再<b>双击</b>画面空白处；　<b>③</b> 播放 / 拖时间轴，看它们怎么动。</div>
     <div class="row">
       <div><button id="play">⏸ 暂停</button></div>
       <div><button id="dirbtn" title="倒放 / 正放">⟲ 倒放</button></div>
@@ -306,8 +306,8 @@
         <input id="scrub" type="range" min="0" max="1000" value="1000" style="width:100%"></div>
       <div><label for="speed">播放速度（帧/秒）</label>
         <input id="speed" type="range" min="2" max="120" value="40" style="width:140px"></div>
-      <div><button id="placemode">✛ 点画面放行星</button></div>
-      <div><button id="unplace" title="撤销刚才点画面放下的那一颗（也可以按 Ctrl+Z）">↩ 撤销上一颗</button></div>
+      <div><button id="placemode">✛ 双击画面放行星</button></div>
+      <div><button id="unplace" title="撤销刚才双击画面放下的那一颗（也可以按 Ctrl+Z）">↩ 撤销上一颗</button></div>
       <div><button id="tourstart">▶ 开始导览</button></div>
       <div><button id="share">🔗 复制分享链接</button></div>
       <div><button id="fs">⛶ 全屏</button></div>
@@ -349,7 +349,7 @@
 
   <div class="card">
     <h2>放什么？<span class="stat" style="font-weight:400">
-      点一个类型，再点画面空白处 —— 就放下一颗。类型表来自内核（<code>starpivot catalog</code>），
+      点一个类型，再双击画面空白处 —— 就放下一颗。类型表来自内核（<code>starpivot catalog</code>），
       半径与光度都由内核按类型算，页面不参与。</span></h2>
     <div id="palette"></div>
     <div class="note" id="typenote" aria-live="polite" style="margin-top:8px">正在读取内核的类型表…</div>
@@ -480,7 +480,7 @@
     </div>
     <div class="note" style="margin-top:8px">
       <b>键盘</b>：空格播放/暂停、← → 逐帧、Shift+←/→ 跳到首尾（在输入框里打字时不接管）。<br>
-      <b>点画面放行星</b>：打开「✛ 点画面放行星」后，在空白处点一下就在那个位置放一颗
+      <b>双击画面放行星</b>：打开「✛ 双击画面放行星」后，在空白处<b>双击</b>就在那个位置放一颗（单击只选中，不会误放）
       （屏幕坐标反解回黄道面，纯几何）；点已有的星体仍然是选中它。<br>
       在画面里<b>点一下任意一个星体</b>：视角会转到<b>它自己那条轨道的正对面</b>
       —— 也就是把相机放到它的轨道法向上，能完整看到这一圈轨道的形状；再点一次（或点空白处）
@@ -1037,7 +1037,7 @@
                  + SEEK_PULSE_MS;
   };
   let dir = 1;            // 播放方向：+1 正放 / −1 倒放
-  let placing = false;    // 「点画面放行星」模式
+  let placing = false;    // 「双击画面放行星」模式（单击只做选中，双击才放）
   let sampling = null;    // 内核回显的输出采样标定（页面自己不推算周期）
   const PAGE_SAMPLES_MAX = 2000;   // 本页愿意一次接收的帧数上限（与输入的 max 保持一致）
 
@@ -1133,8 +1133,9 @@
   const endDrag = () => { drag = null; cv.classList.remove('dragging'); };
   cv.addEventListener('pointerup', e => {
     if (drag && drag.moved <= 4){
-      const hit = pickAt(e.clientX, e.clientY);
-      if (!hit && placing) placePlanetAt(e.clientX, e.clientY);
+      // 单击只做"选中 / 跟随"。放置改到双击（见下面的 dblclick）——
+      // 原来是"单击就放"，太容易在只想选一颗星时误放一颗；双击是个明确的"我要放"。
+      pickAt(e.clientX, e.clientY);
     }
     endDrag();
     saveState();          // 平移量、点击选中的天体都算"上次的样子"
@@ -1175,6 +1176,17 @@
     return true;
   }
 
+  // 纯命中判定（**没有副作用**：不改选中、不摆相机）。
+  // 双击放置前用它判断"双击的是不是空白处" —— 双击在已有天体上应当只是选中它（那两下单击
+  // 已经做了），而不是在它身上再叠一颗。用与 pickAt 相同的半径规则，但不要碰 pickAt 的状态。
+  function hitAt(clientX, clientY){
+    if (!data) return false;
+    const rect = cv.getBoundingClientRect();
+    const mx = clientX - rect.left, my = clientY - rect.top;
+    for (const h of hits) if (Math.hypot(h.x - mx, h.y - my) <= h.r + 4) return true;
+    return false;
+  }
+
   $('resetview').addEventListener('click', () => {
     cam.sel = -1; cam.follow = -1;
     // "复位"就该真的回到原点：原来只复位了角度，平移量留着（拖走之后就回不来了）。
@@ -1194,8 +1206,14 @@
     cam.anim = false;
   });
 
-  // 双击复位视图
-  cv.addEventListener('dblclick', () => {
+  // 双击：**放置模式下 = 在那个位置放一颗**（单击只选中，双击才放，防误放）；
+  // 不在放置模式时 = 复位视图（平移归零、缩放回 1），保持原来的用法。
+  // 只放空白处：双击一颗已有天体 = 那两下单击已经选中它了，不该在它身上再叠一颗。
+  cv.addEventListener('dblclick', e => {
+    if (placing){
+      if (!hitAt(e.clientX, e.clientY)) placePlanetAt(e.clientX, e.clientY);
+      return;
+    }
     view.panX = 0; view.panY = 0; view.userScale = 1;
     render();
   });
@@ -1771,7 +1789,7 @@
       ? ' <b>最佳：' + chBest.score.toFixed(1) + ' 分</b>（' + chBest.summary + '）' : '';
     if (!challenge){
       el.innerHTML = '在给定范围里加天体，看这个系统能撑多久。'
-        + '<b>点「开始挑战」就直接进放置模式</b> —— 用「✛ 点画面放行星」在画面里点几下就行'
+        + '<b>点「开始挑战」就直接进放置模式</b> —— 用「✛ 双击画面放行星」在画面里双击几下就行'
         + '（每放一颗都会自动重算并判定）。'
         + '规则（<b>编排的玩法层</b>，不是物理）：决定失稳的只有两条 —— '
         + '内核报了碰撞/合并，或者你放的天体被甩到主星 ' + ARENA_AU + ' AU 之外（几何代理，'
@@ -1779,7 +1797,7 @@
       return;
     }
     el.innerHTML = '挑战进行中（' + challenge.years + ' 年）。'
-      + '点「✛ 点画面放行星」在画面里放几颗 —— <b>每放一颗都会自动重算并判定一次</b>，'
+      + '点「✛ 双击画面放行星」在画面里双击放几颗 —— <b>每放一颗都会自动重算并判定一次</b>，'
       + '成绩直接出现在这一行下面（要改参数也可以到「更多设置 → 你的行星」里改）。'
       + '天体放在 0.05–2 AU 之间最合适：内核会按最内轨道自动收缩步长，'
       + '太靠里会跑得很慢、甚至被内核的步数上限直接挡下。' + bestLine;
@@ -1887,7 +1905,7 @@
       st: { preset: '行星撞地球' } },
     { id: 'types', title: '想放什么就放什么',
       body: '下面「放什么？」那一排是<b>天体类型</b>，按天文上常用的四个维度分好组：光谱型（温度）、光度与大小、' +
-            '演化阶段、特殊性质。点一个类型再点画面就能放一颗 —— 黑洞、红矮星、红超巨星、' +
+            '演化阶段、特殊性质。点一个类型再双击画面就能放一颗 —— 黑洞、红矮星、红超巨星、' +
             '白矮星、造父变星都在里面。<b>半径不是查表来的</b>：内核按斯特藩–玻尔兹曼从温度和光度推。',
       st: { scenario: 'solar', solarmode: 'full', years: 12, samples: 2000, integ: 'leapfrog' } },
     { id: 'life', title: '哪一颗上可能有生命',
@@ -1901,7 +1919,7 @@
       st: { scenario: 'solar', solarmode: 'full', years: 50, samples: 2000, integ: 'leapfrog' } },
     { id: 'challenge', title: '轮到你：稳定性挑战',
       body: '理论看完了，来一个<b>比一比</b>的玩法：点上面那一行的「🏁 稳定性挑战 → 开始挑战」——'
-            + '它会把你直接放进放置模式，你用「✛ 点画面放行星」在主星周围放几颗，'
+            + '它会把你直接放进放置模式，你用「✛ 双击画面放行星」在主星周围双击放几颗，'
             + '<b>每放一颗都会自动重算并判定一次</b>，成绩就出现在那一行下面。'
             + '主星质量越大、你放的天体越重、撑得越久，分数越高。'
             + '<span class="plainterm">规则是<b>编排的玩法层</b>、不是物理：失稳只有两条判据，'
@@ -1982,7 +2000,7 @@
     // 而加天体最自然的动作是点画面 —— 这里原先的提示是"先去下面的行星表里加好"，
     // 而那张表现在收在「更多设置」里、普通人模式还看不到它：提示与流程早就对不上了。
     setPlacing(true);
-    toolNote('挑战开始：在画面里点几下放天体（<b>0.05–2 AU</b> 最合适）。'
+    toolNote('挑战开始：在画面里<b>双击</b>几下放天体（<b>0.05–2 AU</b> 最合适）。'
       + '<b>每放一颗都会自动重算并判定一次</b>，成绩就在「稳定性挑战」那一行下面。'
       + '放错了按「↩ 撤销上一颗」或 Ctrl+Z；按 Esc 退出放置模式。');
     renderChallenge();
@@ -2141,7 +2159,7 @@
     const el = $('simplebodies');
     if (!el) return;
     if (!customBodies.length){
-      el.innerHTML = '<div class="note">还没有天体。上面点一个类型，再点画面空白处。</div>';
+      el.innerHTML = '<div class="note">还没有天体。上面点一个类型，再双击画面空白处。</div>';
       return;
     }
     el.innerHTML = '';
@@ -2394,16 +2412,16 @@
     const b = $('placemode');
     const t = pendingType ? typeByKey(pendingType) : null;
     b.textContent = placing
-      ? (t ? '✛ 放置中：点画面放一颗' + t.name_zh + '（再点这里取消）'
-           : '✛ 放置中：点画面就加一颗（再点这里取消）')
-      : '✛ 点画面放行星';
+      ? (t ? '✛ 放置中：双击画面放一颗' + t.name_zh + '（再点这里取消）'
+           : '✛ 放置中：双击画面就加一颗（再点这里取消）')
+      : '✛ 双击画面放行星';
     b.classList.toggle('primary', placing);
     cv.classList.toggle('placing', placing);   // 光标变十字：不用看按钮也知道自己在放置模式
     if (placing)
-      toolNote('放置模式：在画面空白处点一下，就在那个位置放一颗'
+      toolNote('放置模式：在画面空白处<b>双击</b>，就在那个位置放一颗'
         + (t ? '<b>' + t.name_zh + '</b>（质量默认 ' + fmt(t.mass_default) + ' M☉）' : '行星')
         + ' —— 位置是<b>把屏幕坐标反解回黄道面</b>得到的（纯几何，不是物理）。'
-        + '点已有的星体仍然是"选中它"，不会放新的。'
+        + '<b>单击</b>是选中已有的星体（不会放新的 —— 免得只想选一颗却误放了一颗）。'
         + '鼠标移到哪儿，画面上会先显示<b>落点与距离</b>（放下去之前就能看清）。'
         + '放错了按 <b>↩ 撤销上一颗</b>（或 Ctrl+Z），按 <b>Esc</b> 退出放置模式。'
         // 碰撞模式在「更多设置」里，而"关"的时候两颗星会**互相穿过** ——
@@ -2466,7 +2484,7 @@
     if (r > maxVisible * 1.001)
       return { ok:false, p, r, deg, short:'超出范围',
                why:'这个位置离中心 ' + r.toFixed(3) + ' AU —— 已经超出画面能容纳的范围'
-                 + '（最远约 ' + maxVisible.toFixed(1) + ' AU）。点画面里看得见的地方放。' };
+                 + '（最远约 ' + maxVisible.toFixed(1) + ' AU）。双击画面里看得见的地方放。' };
     if (customBodies.length >= PLACE_MAX_BODIES)
       return { ok:false, p, r, deg, short:'已达上限',
                why:'行星表最多 16 行（内核 <code>--body</code> 的上限），已经到顶了。'
@@ -2541,7 +2559,7 @@
   // 不好找、也不清楚删的是哪一颗。撤销只针对**用户刚点画面放下的**那些。
   function undoPlace(){
     if (!placedStack.length){
-      toolNote('没有可撤销的投放 —— 只能撤销你刚点画面放下的那些（预设和上次存档恢复来的不算）。');
+      toolNote('没有可撤销的投放 —— 只能撤销你刚双击画面放下的那些（预设和上次存档恢复来的不算）。');
       return;
     }
     const last = placedStack.pop();

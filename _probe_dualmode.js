@@ -117,6 +117,14 @@ const mouse = (p, x, y) => {
   p.d.getElementById('view').dispatchEvent(ev('pointerdown'));
   p.d.getElementById('view').dispatchEvent(ev('pointerup'));
 };
+// 放置改到 canvas 的 dblclick 上（单击只选中）——"放一颗"走这个。jsdom 不会自动合成 dblclick。
+const dblclick = (p, x, y) => {
+  const cv = p.d.getElementById('view');
+  const ev = ty => new p.w.PointerEvent(ty, { clientX: x, clientY: y, bubbles: true, pointerId: 1 });
+  cv.dispatchEvent(ev('pointerdown')); cv.dispatchEvent(ev('pointerup'));
+  cv.dispatchEvent(ev('pointerdown')); cv.dispatchEvent(ev('pointerup'));
+  cv.dispatchEvent(new p.w.MouseEvent('dblclick', { clientX: x, clientY: y, bubbles: true }));
+};
 
 (async () => {
   const p = await open();
@@ -241,7 +249,7 @@ const mouse = (p, x, y) => {
   ok(/放置中/.test(p.$('placemode').textContent), '选类型后自动进入放置模式（少一步操作）');
   ok(/黑洞/.test(p.$('placemode').textContent), '而且按钮上说清了要放的是黑洞');
   const nBefore = p.d.querySelectorAll('#simplebodies .bodycard').length;
-  mouse(p, 620, 300);
+  dblclick(p, 620, 300);
   // 卡片是**同步**加上的（renderSimpleBodies 在放置处理器里就跑了）
   await p.waitFor(() => p.d.querySelectorAll('#simplebodies .bodycard').length === nBefore + 1,
                   20000, '卡片多一张').catch(() => {});
@@ -366,7 +374,7 @@ const mouse = (p, x, y) => {
       r.fire(r.d.querySelector('#bodytable button[data-del]'), 'click');
       await sleep(40);
     }
-    mouse(r, 560, 300);                        // 放一颗红矮星
+    dblclick(r, 560, 300);                     // 双击放一颗红矮星
     await r.waitFor(() => ((r.lastPayload() || {}).bodies || []).length, 30000, '红矮星那一发的 payload');
     await r.settle(300);
     const nm = r.lastPayload().bodies.slice(-1)[0].name;
@@ -382,7 +390,7 @@ const mouse = (p, x, y) => {
     // 换成一颗粒质行星再放一颗 → payload 里应带 primary
     clickType('岩质行星');
     await r.settle(400);
-    mouse(r, 470, 300);
+    dblclick(r, 470, 300);
     const pl = r.lastPayload();
     const pName = (pl.bodies || []).slice(-1)[0].name;
     // 等**带这颗行星的那一份**回执 —— 不赌毫秒数，而且不靠"最后到的那一份"（两份同时在飞时
@@ -445,7 +453,7 @@ const mouse = (p, x, y) => {
     r.texts.length = 0;
     mi.dispatchEvent(new r.w.Event('click', { bubbles: true }));   // 选中类型 → 进放置模式
     await r.settle(400);
-    mouse(r, 520, 300);                                            // 真的点画面放下去
+    dblclick(r, 520, 300);                                         // 真的双击画面放下去
     const rName = ((r.lastPayload() || {}).bodies || []).slice(-1)[0].name;
     await r.waitFor(() => r.respWith(rName), 90000, '回执里出现 ' + rName);
     // H-R 图有 0.7 秒的重绘节流，所以再推一帧 + 等一下再读说明文字（第一版读早了，

@@ -112,6 +112,16 @@ const mouse = (p, x, y) => {
   p.d.getElementById('view').dispatchEvent(ev('pointerdown'));
   p.d.getElementById('view').dispatchEvent(ev('pointerup'));
 };
+// 放置现在绑在 canvas 的 dblclick 上（单击只做选中）——"放一颗"必须走这个。
+// jsdom 不会从两次 click 自动合成 dblclick（真浏览器会自动发），所以要手动派发一次 dblclick。
+// 两次 pointerdown/up 也照样派：那是单击的选中路径，页面会各跑一次，与真双击一致。
+const dblclick = (p, x, y) => {
+  const cv = p.d.getElementById('view');
+  const ev = ty => new p.w.PointerEvent(ty, { clientX: x, clientY: y, bubbles: true, pointerId: 1 });
+  cv.dispatchEvent(ev('pointerdown')); cv.dispatchEvent(ev('pointerup'));
+  cv.dispatchEvent(ev('pointerdown')); cv.dispatchEvent(ev('pointerup'));
+  cv.dispatchEvent(new p.w.MouseEvent('dblclick', { clientX: x, clientY: y, bubbles: true }));
+};
 
 (async () => {
   const p = await open();
@@ -119,7 +129,7 @@ const mouse = (p, x, y) => {
   p.fire(p.$('play'), 'click'); await p.settle(200);   // 暂停，免得帧一直在动
 
   // ---------- 1. 点画面放行星 ----------
-  ok(p.$('placemode').textContent.indexOf('点画面放行星') >= 0, '有「点画面放行星」按钮：' + p.$('placemode').textContent);
+  ok(p.$('placemode').textContent.indexOf('双击画面放行星') >= 0, '有「双击画面放行星」按钮：' + p.$('placemode').textContent);
   ok(p.d.getElementById('bodytable') && !p.$('placemode').classList.contains('primary'),
      '默认不在放置模式');
   // 从太阳系场景进入放置模式：应当自动切到自定义，否则行星表被忽略、点了没反应
@@ -132,7 +142,7 @@ const mouse = (p, x, y) => {
 
   // 点画布中心偏右一点 → 应当放下一个天体
   const before = p.d.querySelectorAll('#bodytable input[data-k="name"]').length;
-  mouse(p, 560, 300);
+  dblclick(p, 560, 300);
   await p.settle(3000);
   const after = p.d.querySelectorAll('#bodytable input[data-k="name"]').length;
   ok(after === before + 1, `点画面后行星表多了一行（${before} → ${after}）`);
@@ -161,7 +171,7 @@ const mouse = (p, x, y) => {
   // 侧视时不该硬算
   p.$('tilt').value = '90'; p.fire(p.$('tilt'), 'input'); await p.settle(150);
   const n0 = p.d.querySelectorAll('#bodytable input[data-k="name"]').length;
-  mouse(p, 300, 200);
+  dblclick(p, 300, 200);
   await p.settle(400);
   ok(p.d.querySelectorAll('#bodytable input[data-k="name"]').length === n0,
      '俯仰到 90°（正侧视）时拒绝放置，没有瞎放一个');
@@ -437,7 +447,7 @@ const mouse = (p, x, y) => {
     // 开着挑战，用鼠标放一颗
     await setPlacing(true);
     ok(placingOn(), '挑战进行中也允许进放置模式');
-    mouse(p, 640, 300);
+    dblclick(p, 640, 300);
     await p.settle(4000);
     const massAfter = (p.$('challengebox').textContent.match(/([\d.]+) 个地球质量/) || [])[1];
     const scoreAfter = (p.$('challengebox').textContent.match(/得分 ([\d.]+)/) || [])[1];
@@ -506,7 +516,7 @@ const mouse = (p, x, y) => {
 
     // 2) 预览的数 == 真落地后的数（共用 placeCandidate 的直接后果）
     const nB0 = p.lastPayload().bodies.length;
-    mouse(p, 620, 330); await p.settle(1200);
+    dblclick(p, 620, 330); await p.settle(1200);
     const placedA = p.lastPayload().bodies.slice(-1)[0].a;
     ok(p.lastPayload().bodies.length === nB0 + 1, '在同一个点按下去，真的多了一颗');
     ok(a1 !== null && sameSpot(a1, placedA),
@@ -531,7 +541,7 @@ const mouse = (p, x, y) => {
        '没有可撤销的投放时按钮禁用（预设那颗没被当成"刚放下的"）');
 
     // 5) Ctrl+Z 走同一条路
-    mouse(p, 640, 340); await p.settle(1200);
+    dblclick(p, 640, 340); await p.settle(1200);
     const nB2 = p.lastPayload().bodies.length;
     p.d.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
     await p.settle(1200);
@@ -542,8 +552,8 @@ const mouse = (p, x, y) => {
     await p.settle(300);
     ok(!/放置中/.test(p.$('placemode').textContent), '按 Esc 退出放置模式（按钮文字回到常态）');
     const nB3 = p.lastPayload().bodies.length;
-    mouse(p, 600, 320); await p.settle(600);
-    ok(p.lastPayload().bodies.length === nB3, '退出后再点画面不会误放一颗');
+    dblclick(p, 600, 320); await p.settle(600);
+    ok(p.lastPayload().bodies.length === nB3, '退出后双击也不会再放一颗');
 
     // 7) 越界：预览与点击说的是同一句话（同一判定）。
     //    旧代码把上限写死 60 AU：在宽画布上 fitScale 按短边把系统塞进去、长边映射到的 AU 更多，
@@ -563,9 +573,9 @@ const mouse = (p, x, y) => {
     ok(!/超出范围/.test(p.texts.join(' ')),
        '宽画布/缩到最小时，光标在画面内（760,300）也应可放，不再误报"超出范围"（预览：'
        + (previewTxt || '（无）') + '）');
-    mouse(p, 760, 300); await p.settle(800);
+    dblclick(p, 760, 300); await p.settle(800);
     ok(!/超出可放置范围|超出范围/.test(p.$('toolnote').textContent),
-       '点下去真的放进去了，不再被"超出范围"拦下');
+       '双击真的放进去了，不再被"超出范围"拦下');
     ok(p.lastPayload().bodies.length === nB4 + 1, '确实多放进去一颗（可见空间不再被误判成越界）');
     // 反过来：太靠近中心（<0.02 AU）仍要拒绝 —— 这条下限分支没删，仍然 alive。
     p.fire(p.$('placemode'), 'click'); await p.settle(200);   // 退出再进，清掉残留 ghost
@@ -573,8 +583,8 @@ const mouse = (p, x, y) => {
     p.texts.length = 0; moveTo(400, 300); await p.settle(250);
     ok(/超出范围/.test(p.texts.join(' ')),
        '但点正中心（太靠近中心）预览仍当场写明"超出范围"（下限分支仍生效）');
-    mouse(p, 400, 300); await p.settle(500);
-    ok(p.lastPayload().bodies.length === nB4 + 1, '点正中心没有多放一颗（太靠近中心被拦下，没悄悄放）');
+    dblclick(p, 400, 300); await p.settle(500);
+    ok(p.lastPayload().bodies.length === nB4 + 1, '双击正中心没有多放一颗（太靠近中心被拦下，没悄悄放）');
     p.fire(p.$('placemode'), 'click'); await p.settle(200);
     p.$('zoom').value = '100'; p.fire(p.$('zoom'), 'input'); await p.settle(300);
   }
@@ -644,7 +654,7 @@ const mouse = (p, x, y) => {
        '「⊙ 黄道复位」真的把平移量也归零了（原来只复位了角度）');
 
     p.fire(p.$('placemode'), 'click'); await p.settle(300);
-    mouse(p, 640, 300); await p.settle(3000);                      // 在那个位置放一颗
+    dblclick(p, 640, 300); await p.settle(3000);                   // 在那个位置放一颗（双击）
     // 放完之后**再**暂停 + 回到第 0 帧：第 0 帧就是它"出生"的那一刻，正好在点击处。
     // （算完会自动续播，3 秒里它已经转开 20 多 px —— 第一版就是因此点空的。）
     if (/暂停/.test(p.$('play').textContent)) { p.fire(p.$('play'), 'click'); await p.settle(200); }
