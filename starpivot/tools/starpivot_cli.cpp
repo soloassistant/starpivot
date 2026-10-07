@@ -35,6 +35,9 @@
 #include "starpivot/time.hpp"
 #include "starpivot/bio.hpp"
 #include "starpivot/bodytype.hpp"
+#include "starpivot/constants.hpp"
+#include "starpivot/lagrange.hpp"
+#include "starpivot/genesis.hpp"
 #include "starpivot/vec3.hpp"
 #include "starpivot/system.hpp"
 #include "starpivot/gravity.hpp"
@@ -45,6 +48,18 @@
 #include <algorithm>
 
 namespace {
+
+using starpivot::LagrangeSolution;
+using starpivot::LagrangePoint;
+using starpivot::solve_lagrange;
+using starpivot::GenesisSystem;
+using starpivot::GenesisBody;
+using starpivot::generate_system;
+namespace mass = starpivot::mass;
+
+/// 把字符串安全地放进 JSON：转义引号/反斜杠/控制字符，并保证输出是合法 UTF-8。
+/// 定义在 cmd_genesis 之前，但 cmd_lagrange 更早就要用它，所以这里先声明。
+static std::string json_safe(const std::string& s, bool* wellformed = nullptr);
 
 using starpivot::Vec3;
 using starpivot::Tle;
@@ -2776,6 +2791,264 @@ static void print_body_types_array(const char* key) {
     std::printf("]");
 }
 
+// ---------------------------------------------------------------------------
+// lagrange：圆型限制性三体问题的五个拉格朗日点
+//
+// 为什么这个命令存在：求解器原先只被 tests/fixtures.hpp 使用，页面拿不到
+// 任何一个 L 点的坐标，于是"拉格朗日点"对用户是个不存在的概念。这里把它
+// 变成产品面：内核给坐标、给距离、给稳定性判据、给残差，页面只画与转述。
+//
+// 关于 --a-au：两星间距**必须显式给**。没有初值时无法从质量反推间距
+// （那是求解问题，不是查表），而默默用一个默认值会让用户以为间距是算出来
+// 的。所以缺省 1.0，但回执里 a_source 明确写 "default"，不装作是给定的。
+// ---------------------------------------------------------------------------
+int cmd_lagrange(const std::vector<std::string>& args) {
+    std::string primary = "Sun", secondary = "Earth";
+    double m1 = mass::SUN, m2 = mass::EARTH, a = 1.0;
+    bool a_given = false;
+
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        const std::string& k = args[i];
+        if (k == "--primary" && i + 1 < args.size()) {
+            primary = args[++i];
+        } else if (k == "--secondary" && i + 1 < args.size()) {
+            secondary = args[++i];
+        } else if (k == "--mass-primary" && i + 1 < args.size()) {
+            m1 = std::atof(args[++i].c_str());
+        } else if (k == "--mass-secondary" && i + 1 < args.size()) {
+            m2 = std::atof(args[++i].c_str());
+        } else if (k == "--a-au" && i + 1 < args.size()) {
+            a = std::atof(args[++i].c_str());
+            a_given = true;
+        } else {
+            std::fprintf(stderr,
+                         "starpivot lagrange: unknown option %s\n"
+                         "usage: starpivot lagrange --primary <name> --secondary <name> "
+                         "[--mass-primary msun] [--mass-secondary msun] [--a-au au]\n",
+                         k.c_str());
+            return 1;
+        }
+    }
+    if (!(m1 > 0.0) || !(m2 > 0.0) || !(a > 0.0)) {
+        std::fprintf(stderr,
+                     "starpivot lagrange: masses and separation must be positive "
+                     "(got m1=%.6g m2=%.6g a=%.6g)\n", m1, m2, a);
+        return 1;
+    }
+
+    const LagrangeSolution sol = solve_lagrange(m1, m2, a);
+    const double au_km = 149597870.7;
+
+    std::printf("{\n");
+    std::printf("  \"status\": \"ok\",\n  \"command\": \"lagrange\",\n");
+    std::printf("  \"primary\": \"%s\",\n  \"secondary\": \"%s\",\n",
+                json_safe(primary).c_str(), json_safe(secondary).c_str());
+    std::printf("  \"mass_primary_msun\": %.10g,\n  \"mass_secondary_msun\": %.10g,\n", m1, m2);
+    std::printf("  \"a_au\": %.10g,\n  \"a_km\": %.10g,\n", sol.a, sol.a * au_km);
+    std::printf("  \"a_source\": \"%s\",\n", a_given ? "given" : "default");
+    std::printf("  \"mu\": %.12g,\n", sol.mu);
+    std::printf("  \"routh_limit\": %.12g,\n", sol.routh_limit);
+    std::printf("  \"triangular_stable\": %s,\n", sol.triangular_stable ? "true" : "false");
+    std::printf("  \"collinear_stable\": %s,\n", sol.collinear_stable ? "true" : "false");
+    // 原本这里用的是 \xNN UTF-8 字节转义。**不能用**：C++ 的十六进制转义是
+    // 贪婪的 —— \x7a8 会被读成三位十六进制 0x7a8（超出一个 char）而不是
+    // \x7a + "8"，于是整个字符串从那里开始就是坏的。要写非 ASCII 就直接写
+    // UTF-8 原文，编译器按源文件编码处理。
+    std::printf("  \"stability_caveat\": \"L4/L5 的稳定是有条件的：mu < routh_limit；超标就会失稳\",\n");
+    std::printf("  \"points\": [\n");
+    for (std::size_t i = 0; i < sol.points.size(); ++i) {
+        const LagrangePoint& p = sol.points[i];
+        std::printf("    {\"key\": \"%s\", \"name_zh\": \"%s\", \"note_zh\": \"%s\", ",
+                    p.key, p.name_zh, p.note_zh);
+        std::printf("\"stable\": %s, ", p.stable ? "true" : "false");
+        std::printf("\"pos_au\": [%.12g, %.12g, %.12g], ", p.pos.x, p.pos.y, p.pos.z);
+        std::printf("\"pos_km\": [%.10g, %.10g, %.10g], ",
+                    p.pos.x * au_km, p.pos.y * au_km, p.pos.z * au_km);
+        std::printf("\"from_primary_au\": %.12g, \"from_secondary_au\": %.12g, ",
+                    p.from_primary, p.from_secondary);
+        std::printf("\"residual\": %.3e}%s\n", p.residual,
+                    (i + 1 < sol.points.size()) ? "," : "");
+    }
+    std::printf("  ]\n}\n");
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// genesis：按种子生成一套物理上合法的系统
+//
+// 可复现是硬性质：同 seed 必须逐位复现。随机源走 splitmix64（纯整数），
+// 刻意不用 <random>——后者不是标准规定的实现，换个标准库就会换一套数，
+// "今天的宇宙"会变。回执里同时给出 seed 与它的哈希，便于发现中途的编码损坏。
+//
+// --seed-hex 是为了绕开一个实测到的坑
+// ------------------------------------
+// Windows 上 argv 是按 ANSI 代码页从宽字符命令行转出来的，非 ASCII 的种子
+// 会在到达 main() **之前**就被改写：实测传"中文种子"，回执里的 seed 不是
+// 逐字相同（哈希自然也跟着错）。这不是本模块的 bug，但它会让"同一种子 =
+// 同一个宇宙"这条承诺在中文/emoji 种子上悄悄失效。
+// 所以加一条 --seed-hex：网关把 seed 的 UTF-8 字节编成十六进制传进来，
+// 内核解码后再哈希。修在真正出错的那一层，而不是在回执里写一句"已知会坏"。
+// ---------------------------------------------------------------------------
+
+/// 十六进制解码。奇数长度、非法字符都返回 false（调用方报错，不猜）。
+static bool hex_decode(const std::string& hex, std::string* out) {
+    if (hex.size() % 2 != 0) return false;
+    out->clear();
+    out->reserve(hex.size() / 2);
+    for (std::size_t i = 0; i < hex.size(); i += 2) {
+        int hi = -1, lo = -1;
+        const char a = hex[i], b = hex[i + 1];
+        if (a >= '0' && a <= '9') hi = a - '0';
+        else if (a >= 'a' && a <= 'f') hi = a - 'a' + 10;
+        else if (a >= 'A' && a <= 'F') hi = a - 'A' + 10;
+        if (b >= '0' && b <= '9') lo = b - '0';
+        else if (b >= 'a' && b <= 'f') lo = b - 'a' + 10;
+        else if (b >= 'A' && b <= 'F') lo = b - 'A' + 10;
+        if (hi < 0 || lo < 0) return false;
+        out->push_back(static_cast<char>((hi << 4) | lo));
+    }
+    return true;
+}
+
+/// 把字符串安全地放进 JSON：转义引号/反斜杠/控制字符，并保证输出是**合法 UTF-8**。
+///
+/// 为什么要专门做这件事：argv 里的非 ASCII 字节是按 Windows 的 ANSI 代码页
+/// 转过来的，可能根本不是合法 UTF-8（实测中文种子经 cp936 回显时 `星` 变成
+/// D0 C7）。stdout 是字节流，一旦回执里混进非法 UTF-8，按 UTF-8 解码它的
+/// 一侧会直接抛异常 —— 于是「种子不支持中文」变成「整个接口报了个看不懂的错」。
+/// 所以：**非法字节一律替换成 U+FFFD，并同时把 wellformed 报成 false**，
+/// 让调用方知道"你传进来的东西在到达我之前已经被改写了"。
+/// 可靠的做法是从一开始就用 --seed-hex（网关正是这么做的）。
+///
+/// @param wellformed 若非空，被置为输入是否本来就是合法 UTF-8。
+static std::string json_safe(const std::string& s, bool* wellformed) {
+    auto cont = [](unsigned char c) { return (c & 0xC0) == 0x80; };
+    std::string out;
+    out.reserve(s.size() + 8);
+    bool ok = true;
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c == '"') { out += "\\\""; continue; }
+        if (c == '\\') { out += "\\\\"; continue; }
+        if (c < 0x20) {
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+            out += buf;
+            continue;
+        }
+        if (c < 0x80) { out.push_back(static_cast<char>(c)); continue; }
+        // 多字节序列：先判长度，再逐个校验续字节
+        int len = 0;
+        if ((c & 0xE0) == 0xC0) len = 2;
+        else if ((c & 0xF0) == 0xE0) len = 3;
+        else if ((c & 0xF8) == 0xF0) len = 4;
+        if (len == 0 || i + static_cast<std::size_t>(len) > s.size()) {
+            out += "\xEF\xBF\xBD";   // U+FFFD
+            ok = false;
+            continue;
+        }
+        bool seq_ok = true;
+        for (int k = 1; k < len; ++k) {
+            if (!cont(static_cast<unsigned char>(s[i + k]))) { seq_ok = false; break; }
+        }
+        if (!seq_ok) {
+            out += "\xEF\xBF\xBD";
+            ok = false;
+            continue;
+        }
+        out.append(s, i, static_cast<std::size_t>(len));
+        i += static_cast<std::size_t>(len) - 1;
+    }
+    if (wellformed) *wellformed = ok;
+    return out;
+}
+
+int cmd_genesis(const std::vector<std::string>& args) {
+    std::string seed;
+    bool have_seed = false;
+    std::string seed_source = "arg";
+    int n_bodies = 4;
+
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        const std::string& k = args[i];
+        if (k == "--seed" && i + 1 < args.size()) {
+            seed = args[++i];
+            have_seed = true;
+            seed_source = "arg";
+        } else if (k == "--seed-hex" && i + 1 < args.size()) {
+            const std::string hex = args[++i];
+            if (!hex_decode(hex, &seed)) {
+                std::fprintf(stderr,
+                             "starpivot genesis: --seed-hex must be an even number "
+                             "of hex digits (got %zu)\n", hex.size());
+                return 1;
+            }
+            have_seed = true;
+            seed_source = "hex";
+        } else if (k == "--bodies" && i + 1 < args.size()) {
+            n_bodies = std::atoi(args[++i].c_str());
+        } else {
+            std::fprintf(stderr,
+                         "starpivot genesis: unknown option %s\n"
+                         "usage: starpivot genesis (--seed <string> | --seed-hex <hex>) "
+                         "[--bodies 2..8]\n",
+                         k.c_str());
+            return 1;
+        }
+    }
+    if (!have_seed || seed.empty()) {
+        // 明确报错，不静默生成一套"默认宇宙"：用户以为是自己点到的种子，
+        // 实际上拿到的是别人的，那比报错坏得多。
+        std::fprintf(stderr,
+                     "starpivot genesis: --seed (or --seed-hex) is required and must "
+                     "not be empty (an empty seed would silently hand out the same "
+                     "universe to everyone)\n");
+        return 1;
+    }
+
+    GenesisSystem g;
+    try {
+        g = generate_system(seed, n_bodies);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "starpivot genesis: %s\n", e.what());
+        return 1;
+    }
+
+    std::printf("{\n");
+    std::printf("  \"status\": \"ok\",\n  \"command\": \"genesis\",\n");
+    // seed 走 json_safe：argv 里的非 ASCII 可能是 ANSI 码页字节而不是 UTF-8，
+    // 直接印出去会让整个回执变成非法 UTF-8（解码方直接抛异常）。
+    // seed_utf8=false 明确告诉调用方"你传的东西在到达内核前已被改写"——
+    // 这种情况只有 --seed 会出现；--seed-hex 一定是 true。
+    bool seed_utf8 = false;
+    const std::string seed_js = json_safe(seed, &seed_utf8);
+    std::printf("  \"seed\": \"%s\",\n  \"seed_hash\": \"%s\",\n  \"seed_source\": \"%s\",\n",
+                seed_js.c_str(), g.seed_hash.c_str(), seed_source.c_str());
+    std::printf("  \"seed_utf8\": %s,\n", seed_utf8 ? "true" : "false");
+    std::printf("  \"primary_name\": \"%s\",\n  \"primary_mass_msun\": %.10g,\n",
+                g.primary_name.c_str(), g.primary_mass_msun);
+    std::printf("  \"placement_attempts\": %d,\n", g.placement_attempts);
+    std::printf("  \"stability\": {\"min_sep_ratio\": %.10g, \"min_margin\": %.10g, "
+                "\"criterion\": \"gladman\", \"note\": \"min_margin "
+                "为最紧的一对实际间距比除以 Gladman 临界值，大于 1 才认定稳定\"},\n",
+                g.min_sep_ratio, g.min_stability_margin);
+    std::printf("  \"bodies\": [\n");
+    for (std::size_t i = 0; i < g.bodies.size(); ++i) {
+        const GenesisBody& b = g.bodies[i];
+        std::printf("    {\"name\": \"%s\", \"type\": \"%s\", \"type_name\": \"%s\", ",
+                    b.name.c_str(), b.type->key, b.type->name_zh);
+        std::printf("\"mass_msun\": %.10g, ", b.mass_msun);
+        std::printf("\"a_au\": %.10g, \"e\": %.10g, ", b.a_au, b.e);
+        std::printf("\"inc_deg\": %.8g, \"raan_deg\": %.8g, ", b.inc_deg, b.raan_deg);
+        std::printf("\"argp_deg\": %.8g, \"M0_deg\": %.8g, ", b.argp_deg, b.M0_deg);
+        std::printf("\"radius_km\": %.10g, \"t_eff_K\": %.8g, \"lum_lsun\": %.10g}%s\n",
+                    b.radius_km, b.t_eff_K, b.lum_lsun,
+                    (i + 1 < g.bodies.size()) ? "," : "");
+    }
+    std::printf("  ]\n}\n");
+    return 0;
+}
+
 int cmd_catalog(const std::vector<std::string>&) {
     std::printf("{\n");
     std::printf("  \"status\": \"ok\",\n  \"command\": \"catalog\",\n");
@@ -2817,6 +3090,8 @@ void usage() {
         "  verify-tle  SGP4/SDP4: parse a TLE and propagate to TEME state vectors\n"
         "  conj        conjunction screening: closest approach (TCA + miss) of two TLEs\n"
         "  groundtrack sub-satellite lat/lon track of one or two TLEs (for maps)\n"
+        "  lagrange    the five Lagrange points of a circular restricted 3-body system\n"
+        "  genesis     generate a physically valid system from a seed string (reproducible)\n"
         "  nbody       universe simulation: N-body integration (solar system / figure-8)\n"
         "  catalog     body types: mass range, radius model, whether it emits light\n"
         "  about       version, modules, unit systems, known gaps\n"
@@ -2987,6 +3262,8 @@ int main(int argc, char** argv) {
     if (cmd == "conj") return cmd_conj(args);
     if (cmd == "groundtrack") return cmd_groundtrack(args);
     if (cmd == "nbody") return cmd_nbody(args);
+    if (cmd == "lagrange") return cmd_lagrange(args);
+    if (cmd == "genesis") return cmd_genesis(args);
     if (cmd == "catalog") return cmd_catalog(args);
     if (cmd == "about") return cmd_about(args);
     if (cmd == "help" || cmd == "--help" || cmd == "-h") {

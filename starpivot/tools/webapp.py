@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import os
 import subprocess
@@ -76,6 +77,15 @@ MIME = {
     ".ico": "image/x-icon",
 }
 
+# 静态资源的缓存策略。
+# 原来这里对**一切**响应都回 `Cache-Control: no-store`，后果是：
+#   1) 边缘 CDN 完全没有可存的东西（实测每一次都是 `Eo-Cache-Status: MISS`）；
+#   2) 每次回访都要重下整份页面 —— universe.html 一个文件 264KB。
+# 页面与数据文件只在发布时变，所以给一个短 TTL + ETag 是安全的：
+# 5 分钟内由边缘直接吐（不再回源），超过 5 分钟用 ETag 条件请求拿 304（几百字节）。
+# 想更保守就把 300 调小或改成 0；只要 ETag 在，条件请求这条路就一直有效。
+STATIC_CACHE = "public, max-age=300, must-revalidate"
+
 
 def log(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
@@ -85,26 +95,116 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     # ------------------------------------------------------------- helpers
-    def _send(self, code: int, body: str, ctype: str = "application/json; charset=utf-8") -> None:
-        data = body.encode("utf-8")
+    # 小于这个体积的响应压了不划算：gzip 头和查表都要钱，省下的几十字节没人感觉得到。
+    GZIP_MIN = 512
+    # 这些后缀本身已经是压缩格式，再压一遍只是白烧 CPU。
+    NO_GZIP_EXT = {".png", ".ico", ".jpg", ".jpeg", ".webp", ".gz", ".zip",
+                   ".woff", ".woff2", ".mp4", ".webm"}
+
+    def _accepts_gzip(self) -> bool:
+        return "gzip" in (self.headers.get("Accept-Encoding") or "").lower()
+    # 本次响应带的 ETag 不用存在 self 上：条件请求的判断只在这一处发生，
+    # 把它当参数传比留一份可变状态清楚，也不会在并发连接之间串味。
+    def _etag_matches(self, etag: str) -> bool:
+        """If-None-Match 命中当前这份资源吗（比较时忽略 W/ 前缀与两端空白）。"""
+        raw = self.headers.get("If-None-Match") or ""
+        if not raw or not etag:
+            return False
+        for cand in raw.split(","):
+            cand = cand.strip()
+            if cand == "*":
+                return True
+            if cand.startswith("W/"):
+                cand = cand[2:].strip()
+            if cand == etag:
+                return True
+        return False
+
+    def _send(self, code: int, body: str,
+              ctype: str = "application/json; charset=utf-8",
+              *, cache: str = "no-store", etag: str | None = None,
+              compressible: bool = True) -> None:
+        raw = body.encode("utf-8")
+        # 条件请求：客户端手里这份已经是最新版，一个字节都不用再发。
+        # 这条是"缓存真的生效"的前提 —— 只给 max-age 而不做条件请求，
+        # 过期之后仍然要把整份文件重传一遍（270KB 的 universe.html 就是这个代价）。
+        # If-None-Match 按 RFC 可以是逗号分隔的列表，也可以是 `*`，
+        # 所以不能只做整串相等 —— 那样代理改写过的头会静默退化成永远 200。
+        if etag and self._etag_matches(etag):
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", cache)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        data = raw
+        encoding = ""
+        # 边缘与网关都不压缩（实测带 `Accept-Encoding: gzip, deflate, br` 仍回 264KB 原文），
+        # 而这些响应里 HTML 与 JSON 的压缩率很高：universe.html -63%、
+        # 一次 1.53MB 的 nbody 回执 -72%。gzip 在标准库里，不引任何依赖。
+        if compressible and len(raw) >= self.GZIP_MIN and self._accepts_gzip():
+            data = gzip.compress(raw, 6)   # 实测 level 9 相比 6 只多省 0.1%，不值那份 CPU
+            encoding = "gzip"
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache)
+        if encoding:
+            self.send_header("Content-Encoding", encoding)
+        if etag:
+            self.send_header("ETag", etag)
+        # Vary 不能省：同一份资源对"支持 gzip"与"不支持 gzip"的客户端是两个不同的字节流，
+        # 中间任何一层缓存都必须按这个头分开存，否则会给不支持压缩的客户端
+        # 发一份它解不开的响应 —— 那是个只在特定客户端上出现的坏，且很难查。
+        if compressible:
+            self.send_header("Vary", "Accept-Encoding")
         self.end_headers()
         self.wfile.write(data)
 
     def _json_error(self, code: int, msg: str) -> None:
         self._send(code, json.dumps({"error": msg}, ensure_ascii=False))
 
-    def _read_body(self) -> dict:
+    def _drain_body(self) -> dict:
+        """把请求体从 socket 上完整读掉并解析。
+
+        为什么要"完整读掉"而不只是"能解析就解析"：这是 HTTP/1.1 keep-alive。
+        处理器若没把 Content-Length 那么多字节从 rfile 读干净，剩下的字节就留在
+        连接缓冲里；下一个请求到达时，服务器会拿这段残留当**请求行**去解析 ——
+        实测踩到过：页面对还不存在的 /api/lagrange 发 POST，旧网关 404 且不读 body，
+        于是 `{...}POST /api/nbody` 变成"方法名"，回 501，后续真请求全被这条假
+        请求顶掉（表现是重算 200ms 秒回一张 HTML 错误页，前端当成内核拒绝）。
+        所以哪怕是 404 / 未知路由，也必须把 body 消费掉。
+        """
         n = int(self.headers.get("Content-Length") or 0)
-        if n <= 0 or n > 1_000_000:
+        if n <= 0:
             return {}
+        # 分块读完，read() 一次拿 n 字节在 keep-alive 下也可靠，但分块对异常
+        # Content-Length 更宽容（对方少发也不至于把连接卡死）。
+        remaining = n
+        buf = bytearray()
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 65536))
+            if not chunk:
+                break
+            buf += chunk
+            remaining -= len(chunk)
+        if n > 1_000_000:
+            return {}          # 太大了不解析，但上面已经消费干净，连接不受污染
         try:
-            return json.loads(self.rfile.read(n).decode("utf-8"))
+            parsed = json.loads(bytes(buf).decode("utf-8"))
+            return parsed if isinstance(parsed, dict) else {}
         except Exception:  # noqa: BLE001
             return {}
+
+    def _read_body(self) -> dict:
+        """返回（并缓存）本次请求体。
+
+        do_POST 在最前面已经排空过一次，这里只负责把结果交出去；懒初始化是为了
+        万一某条路径没经过 do_POST 顶部也不至于 AttributeError。
+        """
+        if not hasattr(self, "_body"):
+            self._body = self._drain_body()
+        return self._body
 
     # ------------------------------------------------------------- static
     # 具名路由 vs 直接给文件：这是**信息结构**的区别，不是美观问题。
@@ -131,7 +231,14 @@ class Handler(BaseHTTPRequestHandler):
         if not p.is_file():
             return self._json_error(404, f"not found: {path}")
         ctype = MIME.get(p.suffix, "application/octet-stream")
-        self._send(200, p.read_text(encoding="utf-8"), ctype)
+        st = p.stat()
+        # ETag 取 mtime+size：够用，且不用为了算哈希把 270KB 的页面读两遍。
+        # 依据未压缩内容算，所以与是否压缩无关 —— 换句话说客户端拿到的 ETag
+        # 在开不开 gzip 两种情况下是同一个，不会因为压缩方式变化而全部失效。
+        etag = f'"{st.st_mtime_ns:x}-{st.st_size:x}"'
+        self._send(200, p.read_text(encoding="utf-8"), ctype,
+                   cache=STATIC_CACHE, etag=etag,
+                   compressible=p.suffix.lower() not in self.NO_GZIP_EXT)
 
     # ------------------------------------------------------------- APIs
     def _run_cli(self, argv: list[str], timeout: float) -> tuple[int, str, str]:
@@ -218,7 +325,12 @@ class Handler(BaseHTTPRequestHandler):
         p = ROOT / "data" / f"{name}.json"
         if not p.is_file():
             return self._json_error(500, f"找不到数据文件 {p}")
-        self._send(200, p.read_text(encoding="utf-8"))
+        # 数据文件是磁盘上的静态文件，只在发布时变 —— 和 viewer/ 用同一套缓存语义。
+        # 这一条收益不小：universe.html 打开时就要拉这两个文件，原来每次都是 no-store。
+        st = p.stat()
+        etag = f'"{st.st_mtime_ns:x}-{st.st_size:x}"'
+        self._send(200, p.read_text(encoding="utf-8"),
+                   cache=STATIC_CACHE, etag=etag)
 
     # ------------------------------------------------------------- verbs
     def do_GET(self) -> None:  # noqa: N802
@@ -239,6 +351,11 @@ class Handler(BaseHTTPRequestHandler):
         return self._static(u.path)
 
     def do_POST(self) -> None:  # noqa: N802
+        # 先把请求体消费掉，再决定路由。这是 keep-alive 的硬要求：
+        # 任何一条走到 404 / 未知 api 的路径，若没读 body，残留字节会被下一个
+        # 请求当请求行解析（见 _drain_body 的说明）。所以这里无条件先排空，
+        # 各 handler 里再用 _read_body() 取缓存，保证"只读一次"。
+        self._body = self._drain_body()
         if self.path == "/api/conj":
             return self.api_cli("conj")
         if self.path == "/api/verify-tle":
@@ -247,7 +364,87 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_groundtrack()
         if self.path == "/api/nbody":
             return self.api_nbody()
+        if self.path == "/api/lagrange":
+            return self.api_lagrange()
+        if self.path == "/api/genesis":
+            return self.api_genesis()
         return self._json_error(404, f"unknown api: {self.path}")
+
+    def api_lagrange(self) -> None:
+        """拉格朗日点：转发 starpivot lagrange。
+
+        五个点的坐标、到两星的距离、稳定性判据与解的残差全部由内核算，
+        网关只拼 argv、只转发 JSON —— 与 api_nbody 同一套做法，本层不做计算。
+
+        a_au 的缺省是内核的缺省（1.0），回执里 a_source 会写 "default"。
+        网关**不**替它猜一个间距：没有初值时从质量反推间距是求解问题，
+        默默代一个值会让用户以为那是算出来的。
+        """
+        body = self._read_body()
+        primary = str(body.get("primary") or "Sun")
+        secondary = str(body.get("secondary") or "Earth")
+        if not EXE.is_file():
+            return self._json_error(500, f"找不到 {EXE} —— 请先编译")
+        argv = [str(EXE), "lagrange", "--primary", primary, "--secondary", secondary]
+        for key, flag in (("mass_primary", "--mass-primary"),
+                          ("mass_secondary", "--mass-secondary"),
+                          ("a_au", "--a-au")):
+            v = body.get(key)
+            if v is not None:
+                try:
+                    argv += [flag, f"{float(v):.12g}"]
+                except (TypeError, ValueError):
+                    return self._json_error(400, f"{key} 不是数字: {v!r}")
+        try:
+            r = subprocess.run(argv, capture_output=True, encoding="utf-8",
+                               errors="replace", timeout=60)
+        except subprocess.TimeoutExpired:
+            return self._json_error(504, "lagrange 超时")
+        if r.returncode != 0 or not r.stdout.strip():
+            return self._json_error(400, r.stderr.strip() or "lagrange 运行失败")
+        try:
+            json.loads(r.stdout)
+        except Exception:  # noqa: BLE001
+            return self._json_error(500, "lagrange 输出不是合法 JSON")
+        self._send(200, r.stdout)
+
+    def api_genesis(self) -> None:
+        """随机宇宙：转发 starpivot genesis。
+
+        种子走 `--seed-hex`，不是 `--seed`。原因是一个**实测到**的坑：Windows 上
+        argv 是按 ANSI 代码页从宽字符命令行转出来的，非 ASCII 的种子会在到达
+        main() 之前被改写 —— 传"中文种子"，回执里的 seed 不是逐字相同。
+        那会让"同一种子 = 同一个宇宙"这条承诺在中文种子上悄悄失效。
+        所以这里把种子的 UTF-8 字节编成十六进制再传，内核解码后哈希。
+        回执里的 seed_source 会写 "hex"，一眼看得出走的哪条路。
+        """
+        body = self._read_body()
+        seed = body.get("seed")
+        if seed is None or not isinstance(seed, str) or not seed:
+            return self._json_error(400, "需要非空字符串 seed")
+        n_bodies = body.get("bodies", 4)
+        try:
+            n = int(n_bodies)
+        except (TypeError, ValueError):
+            return self._json_error(400, f"bodies 不是整数: {n_bodies!r}")
+        if not 2 <= n <= 8:
+            return self._json_error(400, "bodies 必须在 2..8 之间")
+        if not EXE.is_file():
+            return self._json_error(500, f"找不到 {EXE} —— 请先编译")
+        argv = [str(EXE), "genesis", "--seed-hex", seed.encode("utf-8").hex(),
+                "--bodies", str(n)]
+        try:
+            r = subprocess.run(argv, capture_output=True, encoding="utf-8",
+                               errors="replace", timeout=60)
+        except subprocess.TimeoutExpired:
+            return self._json_error(504, "genesis 超时")
+        if r.returncode != 0 or not r.stdout.strip():
+            return self._json_error(400, r.stderr.strip() or "genesis 运行失败")
+        try:
+            json.loads(r.stdout)
+        except Exception:  # noqa: BLE001
+            return self._json_error(500, "genesis 输出不是合法 JSON")
+        self._send(200, r.stdout)
 
     def api_groundtrack(self) -> None:
         """星下点地面轨迹：转发 starpivot groundtrack（经纬度全部由内核算）。"""

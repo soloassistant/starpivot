@@ -46,4 +46,22 @@ python tools/webapp.py --port 8765      # 然后打开 http://127.0.0.1:8765/
 语义与无障碍方面对照 WCAG 的实测清单（`aria-live` 缺失、36 个 `<label>` 没有 `for`、
 画布无替代文本、两处标题跳级）见
 [`../docs/review-2026-09-28-frontend-a11y.md`](../docs/review-2026-09-28-frontend-a11y.md)。
-这份清单**只列事实与建议，尚未动手改**。
+
+> **状态：清单里的建议 1–4 已全部落地**（2026-09-28 晚，四页共 65 处改动，
+> 全部是加属性或改一个非视觉标签，没有动过任何一条样式值）。
+> 处置记录与三处刻意偏离原建议的理由见该文档 §6。
+> 仍未验的是：没有用真读屏软件（NVDA / VoiceOver）实际听过。
+
+## 网关侧的两个改动（2026-10-05）
+
+`tools/webapp.py` 的 `_send()` 现在会做两件以前没做的事：
+
+1. **gzip 压缩**（标准库 `gzip`，不引依赖）。以前边缘与网关都不压缩，
+   `universe.html` 实测 264KB 原文；现在约 100KB（-63%），
+   一次 1.53MB 的 `nbody` 回执降到约 441KB（-72%）。
+2. **静态资源可缓存**：以前对一切响应都回 `Cache-Control: no-store`，
+   边缘因此完全存不下东西（每次都是 `Eo-Cache-Status: MISS`）。
+   现在静态页与 `data/*.json` 带 `ETag` + `max-age=300`，
+   重复访问走条件请求拿 304（几百字节）。`/api/health` 仍是 `no-store` —— 它是活状态。
+
+改动理由与取舍见 `tools/webapp.py` 里对应注释；`STATIC_CACHE` 的 300 秒可按需调小。

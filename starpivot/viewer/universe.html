@@ -74,6 +74,22 @@
        padding:var(--sp-3) var(--sp-4)}
   .sub b{color:var(--ink)}
   .sub code{background:var(--grid)}
+  /* 图例默认收起，但**刻意不用 <details>**：_probe_play_modes.js 取
+     `document.querySelector('details')` 当"第一个折叠区"，用它钉住"稳定性挑战的按钮
+     排在折叠区之前、不用翻过'更多设置'才够得着"。把图例包成 details 会让画布卡片里的
+     它变成第一个折叠区、挑战按钮反而落在它之后 —— 那条判据立刻变红。
+     改用按钮 + hidden：收起的效果一样，一个 <details> 都不新增，判据的"第一个折叠区"
+     仍然是「更多设置」，语义不变。 */
+  .legendbox{margin-top:var(--sp-3);border:1px solid var(--line);border-radius:var(--r-2);
+             background:var(--card2)}
+  .legendtoggle{width:100%;display:flex;align-items:center;gap:var(--sp-2);cursor:pointer;
+                padding:var(--sp-2) var(--sp-3);background:none;border:0;border-radius:var(--r-2);
+                font-size:var(--fs-sm);color:var(--ink2);text-align:left}
+  .legendtoggle:hover{color:var(--ink)}
+  .legendtoggle[aria-expanded="true"]{color:var(--ink);border-bottom:1px solid var(--line);
+                border-radius:var(--r-2) var(--r-2) 0 0}
+  .legendcaret{display:inline-block;transition:transform var(--dur) var(--ease);font-size:11px}
+  .legendtoggle[aria-expanded="true"] .legendcaret{transform:rotate(90deg)}
   /* 卡片：深色页的"浮起来" = 面更亮 + 顶部一条内高光（--sh-1 里带着），
      再给顶边单独提亮一点 —— 光从上方来，卡片才像一块受光的板。
      不照抄浅色页那种"往下压深"的投影，那在近黑底上什么都看不见。 */
@@ -213,6 +229,108 @@
   a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,
   select:focus-visible,[tabindex]:focus-visible{
     outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-1)}
+  /* —— 入场与状态动效（本页新增，四页里第一处 @keyframes）——
+     起因：此前全站零关键帧，这一页 272KB 的界面加载完是"啪"一下全在的，
+     玩家分不清首屏那块画面和下面十几张卡谁更重要。这里只补**低频、一次性**的东西：
+       ① 入场：淡入 + 上移 6 px，错峰 0 / 70 / 150 ms，单段 0.30 s；
+       ② 展开与出现：折叠区、图例、导览卡、事件时间线卡；
+       ③ 状态改变：脏标记亮起、预设切到哪一套、挑战判定出结果、算完一版新数据。
+     刻意**不加**的东西：任何无限循环动画、任何跟着播放帧走的动画 ——
+     render() 在 rAF 里每帧整屏重画，页面上再挂一个循环动画就是白烧电；
+     需要"持续"的反馈（撞击闪光、碎屑扇、彗尾）本来就画在画布上，不在 DOM 里。
+     ⚠ 时长/缓动一律用既有令牌 --dur / --ease 组合，不新增全局令牌、不改 :root。
+     ⚠ 全部能被下面那条 prefers-reduced-motion 兜底（* { animation:none!important }）压住。
+     ⚠ **入场/展开类关键帧只动 transform，不从 opacity:0 起**（sp-rise / sp-drop / sp-note）。
+        下面用的是 animation-fill-mode:both —— 它在整个延迟期把元素按死在 from 态；
+        渲染器一旦不推进 CSS 动画（后台/被冻结的标签页），内容就永久停在 opacity:0，
+        占位还在、看着像没加载出来，交互也恢复不了。只动 transform 时，动画不跑的后果
+        仅仅是"整体低 6px"，内容始终完整可读。脉冲类（sp-wash / sp-ring / sp-row）只动
+        背景与阴影，保留。 */
+  @keyframes sp-rise{ from{transform:translateY(6px)} to{transform:none} }
+  @keyframes sp-drop{ from{transform:translateY(-4px)} to{transform:none} }
+  @keyframes sp-note{ from{transform:translateY(-2px)} to{transform:none} }
+  @keyframes sp-wash{ from{background:var(--warn-soft)} to{background:transparent} }
+  @keyframes sp-ring{ from{box-shadow:0 0 0 0 rgba(91,156,255,.50)}
+                      to  {box-shadow:0 0 0 16px rgba(91,156,255,0)} }
+  @keyframes sp-row{ from{background:rgba(91,156,255,.42)} to{background:rgba(91,156,255,.16)} }
+  /* 入场只给 .wrap 的直接子元素（报头 / 导语 / 各张卡），不给 canvas 与表格内部 ——
+     读数不该"飘着进来"，那会让"数在动"和"布局在动"分不清。 */
+  .wrap > *{animation:sp-rise .30s var(--ease) both}
+  /* 错峰只排三档，用 :nth-child（数的是**位置**）而不是 :nth-of-type
+     —— 后者按元素类型各数各的（div 单独一套、header 一套、details 又一套），
+     插一张卡就会让序号整体错位、注释和实际对不上：
+       第 1–5 拍（报头 / 两段导语 / 错误条 / **画面卡**）= 0 ms
+         —— 首屏这块画布和它的读数不等任何人；
+       第 6 拍（演奏条）= 70 ms；
+       第 7 拍往下（导览卡、预设、类型、「更多设置」、能量曲线、H-R、演化、事件、
+         可信度）= 150 ms。总时长封顶 0.45 s，不会让人觉得"页面还在加载"。
+     ⚠ 以后往 .wrap 里插卡，要顺带看一眼这几个序号。 */
+  .wrap > :nth-child(-n+5){animation-delay:0ms}
+  .wrap > :nth-child(6){animation-delay:70ms}
+  .wrap > :nth-child(n+7){animation-delay:150ms}
+  /* 展开：<details> 本身没法过渡（没有可过渡的盒），所以动画挂在**展开后出现的内容**上。
+     .tyfold 那一支是「其它 N 个开局」折叠区，它装的是 .row 而不是 .dbody。 */
+  details.card[open] > .dbody{animation:sp-drop .18s var(--ease) both}
+  details.tyfold[open] > .row{animation:sp-drop .18s var(--ease) both}
+  /* 图例是按钮 + hidden 切显隐（刻意不用 <details>，理由见上面那段注释）。
+     [hidden] 期间元素不渲染，所以"去掉 hidden 的那一刻"动画自然从头起 ——
+     不需要在 JS 里摘类重挂。 */
+  #legend:not([hidden]){animation:sp-drop .18s var(--ease) both}
+  /* 「一次性」强调：JS 每次把 .sp-once 挂上去就等于让这段跑一遍。
+     面板是被算出来 / 被判定出来的 —— 该响的那一下只响一次，不循环。
+     ⚠ .sp-once 与上面那条入场动画写在同一个元素上时（#stage / #eventcard / #tourcard）：
+       animation 简写会整体接管，后挂的 .sp-once 赢 —— 于是那三张卡第一次亮的是这一圈，
+       而不是入场淡入。首屏画面卡上这几乎撞不上（入场 0.30 s，而 compute() 要等内核回话），
+       真撞上了也只是"一上来就在闪一下"，不是故障。 */
+  .sp-once{animation:sp-ring .55s var(--ease) 1}
+  #presetnote.swapped{animation:sp-note .22s var(--ease) both}
+  /* 「参数已改、还没重算」：常驻的左侧警示条 + 亮起时的一次性底色。
+     原来只有一句话飘在那儿，扫过去很容易当成一直存在的说明文字。 */
+  #dirtyhint{border-left:2px solid var(--warn);padding-left:var(--sp-2);
+             transition:background var(--dur) var(--ease)}
+  #dirtyhint.just-dirty{animation:sp-wash .9s var(--ease) 1}
+  /* 关键帧的优先级高于行内样式，所以"重新计算"按钮那一圈常驻的橙色描边
+     （paintComputeBtn 写在 style 上）会被这段一次性脉冲盖掉，脉冲结束又还回去。 */
+  #compute.just-dirty{animation:sp-ring .55s var(--ease) 1}
+  /* 「现在看的是哪一套」：当前生效的开局按钮常亮 + 一个角标。
+     纯样式只对看得见的人说话，所以同时给 aria-current（见 markPreset）。 */
+  #presets button.on{border-color:var(--accent);color:var(--ink);
+                     box-shadow:inset 0 0 0 1px var(--accent)}
+  #presets button.on::after{content:' · 当前';font-size:11px;color:var(--ink3)}
+  #presets button.on.drift::after{content:' · 当前（参数已改）';color:var(--warn)}
+  /* 事件时间线里"正在闪的那一行"：与画布上的撞击闪光同一个时间窗（见 markEventRow），
+     于是"刚才那一下是哪一条"不用再去两处对时间。 */
+  #eventlist tr.now{background:rgba(91,156,255,.16);
+                    box-shadow:inset 2px 0 0 var(--accent);
+                    animation:sp-row .9s var(--ease) both}
+  /* —— 策略层（协议 / 跨度 / 方案 / 锚点 / 计划 / 种子）——
+     全部只用既有令牌，不新增 :root 条目。条目自己带一条左侧状态色，
+     于是"达成没达成"不靠读一整段文字也看得出来。 */
+  /* 协议条目：data-state="done" 才亮左边那一条；open 状态是暗的、未达成的灰。 */
+  .protocol{display:block;padding:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-2);
+            border:1px solid var(--line);border-left:3px solid var(--line2);
+            border-radius:0 var(--r-2) var(--r-2) 0;background:var(--card2);
+            font-size:var(--fs-sm);line-height:var(--lh-body)}
+  .protocol[data-state="done"]{border-left-color:var(--ok)}
+  .protocol .p-title{color:var(--ink);font-weight:650}
+  .protocol[data-state="done"] .p-title::before{content:'✓ '}
+  .protocol .p-watch{color:var(--ink3);font-size:var(--fs-xs)}
+  .protocol .p-state{color:var(--ink2)}
+  .protocol[data-state="done"] .p-state{color:var(--ok)}
+  /* 进度条：宽度由脚本按内核回执给的达成度写成内联 style，不是 CSS 动画。 */
+  .protocol .p-bar{height:3px;border-radius:var(--r-full);background:var(--grid);margin-top:6px}
+  .protocol .p-bar > i{display:block;height:100%;border-radius:var(--r-full);background:var(--accent)}
+  .protocol[data-state="done"] .p-bar > i{background:var(--ok)}
+  /* 方案列表：名字 + 载入按钮一行排开，手机上自动换行（下面那条 flex-wrap 兜住）。 */
+  #schemelist .scheme{display:flex;gap:var(--sp-2) var(--sp-3);align-items:center;flex-wrap:wrap;
+                     padding:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-2);
+                     border:1px solid var(--line);border-radius:var(--r-2);background:var(--card2);
+                     font-size:var(--fs-sm)}
+  #schemelist .scheme .s-name{color:var(--ink);font-weight:650}
+  #schemelist .scheme .s-meta{color:var(--ink3);font-size:var(--fs-xs)}
+  /* 幽灵轨迹的图例不需要单独一类：直接复用 .dot（同一个 token 出口）。 */
+  #anchorv{max-width:100%;height:auto;cursor:pointer;touch-action:manipulation}
+
   /* —— 响应式：窄屏收边距、画布变矮、参数表横滚 —— */
   /* —— 平板档：561–1024px（iPad 竖 768 / 横 1024）——
      意图：控制区本来就是 flex + wrap，这个宽度下仍有两列可排；把画布压到 62vh，
@@ -239,9 +357,15 @@
     .tychip{padding-top:12px;padding-bottom:12px}
     a{display:inline-flex;align-items:center;min-height:44px}
   }
-  /* —— 尊重系统"减少动态效果" —— */
+  /* —— 尊重系统"减少动态效果" ——
+     上面那条通配兜底（* { animation:none; transition:none }）已经覆盖策略层：
+     #playbox 用的是既有的 details.card > .dbody 展开动画（sp-drop，只动 transform），
+     协议条目 / 方案条目 / 锚点画布本身**一个动画都没加**（见下面的样式段）。
+     后面三条是点名兜底：将来有人给这三样加了 transition，这里会先压住它们。 */
   @media(prefers-reduced-motion:reduce){
     *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+    .protocol, .protocol .p-bar > i{transition:none!important}
+    #schemelist .scheme, #anchorv{transition:none!important}
   }
 </style>
 </head>
@@ -260,8 +384,7 @@
   <div class="sub simple-only">
     在一颗恒星旁边放几个天体，看它们怎么转、会不会撞上、哪一颗上可能长出生命。
     这里<b>没有</b>可以改坏的物理：所有数字都由本机的一个 C++ 内核算出来，这个页面只负责把结果画出来。
-    <b>怎么开始</b>：下面的「一键开局」点一个，马上就有画面；想自己放，就点一个<a href="#palette">天体类型</a>再双击画面。
-    场景、算法、碰撞、视角这些在「更多设置」里，想调再点开。
+    <b>怎么开始</b>点下面的「一键开局」，马上就有画面；想自己放就点<a href="#palette">天体类型</a>再双击画面。
   </div>
   <div class="sub pro-only">
     所有运动由 C++ 内核 <code>starpivot nbody</code> 真实积分（leapfrog 辛积分器），
@@ -291,14 +414,22 @@
         <div id="selbody" class="stat" aria-live="polite" style="font-size:12.5px"></div>
       </div>
     </div>
-    <div class="legend" id="legend"></div>
+    <div class="legendbox">
+      <button type="button" id="legendtoggle" class="legendtoggle"
+              aria-expanded="false" aria-controls="legend"
+              title="颜色 = 物质 × 生命 · 球外细环 = 来源色 · 点星体看详情">
+        <span class="legendcaret" aria-hidden="true">▸</span>
+        图例：颜色 = 物质 × 生命 · 球外细环 = 来源色 · 点星体看详情
+      </button>
+      <div class="legend" id="legend" hidden></div>
+    </div>
     <div class="note" id="statline"></div>
   </div>
 
   <!-- 演奏条：第一屏只留这几个 —— 播放、拖时间、双击画面放行星、看导览。
        其余（场景 / 算法 / 碰撞 / 生物 / 视角 / 导出）在下面的「更多设置」里。 -->
   <div class="card">
-    <div class="note" id="howto" style="margin:0 0 10px">三步上手：<b>①</b> 下面「一键开局」点一个 —— 马上有画面；　<b>②</b> 想自己放：点一个天体类型，再<b>双击</b>画面空白处；　<b>③</b> 播放 / 拖时间轴，看它们怎么动。</div>
+    <div class="note" id="howto" style="margin:0 0 10px">想看它怎么动：<b>播放</b> 或<b>拖时间轴</b>。</div>
     <div class="row">
       <div><button id="play">⏸ 暂停</button></div>
       <div><button id="dirbtn" title="倒放 / 正放">⟲ 倒放</button></div>
@@ -497,6 +628,137 @@
     </div>
   </details>
 
+  <!-- 策略层 · 六组玩法（协议任务链 / 时间跨度 / 方案保存 / 引力锚点 / 计划模式 / 随机宇宙）
+       ⚠ 位置说明：整块收在一个 <details> 里，有三个理由 ——
+         ① _probe_dualmode.js 钉死"普通人模式首屏可见控件 ≤ 45"（实测改前 22）：
+            这六组一共 20 多个控件，常驻会把它顶穿；
+         ② _probe_play_modes.js 用 `document.querySelector('details')` 当"第一个折叠区"，
+            断言稳定性挑战的按钮排在它之前 —— 新增的折叠区排在 #advbox 之后，
+            「第一个」仍然是「更多设置」，语义不变；
+         ③ 首屏留白是这一页的设计（见 _check_home.js §8：折叠区外 ≤ 420 汉字）。
+       收进折叠区**不等于**藏起来：标题行自己说清里面有什么，进去就能用。 -->
+  <details class="card" id="playbox">
+    <summary>策略层 · 协议任务链 / 时间跨度 / 方案保存 / 引力锚点 / 计划模式 / 随机宇宙</summary>
+    <div class="dbody">
+
+      <!-- ① 协议任务链：判定只读内核回执（energy_drift / 事件表 / 根数比值 / bio 判定） -->
+      <section id="protocols" aria-labelledby="protocols-h" style="margin-bottom:var(--sp-4)">
+        <h3 id="protocols-h" style="margin:0 0 var(--sp-2);font-size:var(--fs-md);font-weight:650">
+          协议任务链<span class="stat" style="font-weight:400"> ·
+          规则是编排的玩法层，判定值全部来自内核回执，页面一个新数都不算</span></h3>
+        <ul id="protocol-list" style="list-style:none;margin:0;padding:0"></ul>
+        <div class="note" id="protocolnote" style="margin-top:var(--sp-2)"></div>
+      </section>
+
+      <!-- ② 时间压缩档位：跨度 ≠ 播放速度（#speed 仍然保留在演奏条里，一个字没改） -->
+      <section id="timescale" aria-labelledby="timescale-h" style="margin-bottom:var(--sp-4)">
+        <h3 id="timescale-h" style="margin:0 0 var(--sp-2);font-size:var(--fs-md);font-weight:650">
+          时间压缩 · 跨度</h3>
+        <div class="row" style="align-items:flex-end">
+          <div>
+            <label for="spanmode">跨度（一次算多少年）</label>
+            <select id="spanmode">
+              <!-- ⚠ 恰好四个档位，不加第五个「自定义」项 ——
+                   _probe_timescale.js 逐字断言档位数 === 4 且 value 序列
+                   逐字是 "1"/"10"/"100"/"1000"。年数被手改成四档之外的值，
+                   这一栏就**留空**（select 没有匹配项就是空白显示），
+                   并由 #spannote 如实说明"不在任何档位里" ——
+                   宁可留空也不假装最接近的一档。 -->
+              <option value="1">1 年</option>
+              <option value="10">10 年</option>
+              <option value="100">100 年</option>
+              <option value="1000">1000 年</option>
+            </select>
+          </div>
+          <div style="flex:1 1 320px;min-width:240px">
+            <span class="grouplabel">「跨度」与「播放速度」是两件事</span>
+            <div class="note" style="margin:0">
+              <b>跨度</b>（就是这一栏）决定<b>一次让内核算多少年</b>：切档会真的重下发参数、
+              重新积分，拿到的是另一个时间尺度的宇宙。<br>
+              <b>播放速度</b>在上面的演奏条里（那个滑杆，标的是<b>帧率</b>，每秒播几帧），
+              它只改回放快慢，<b>一个字都不重算</b>。<br>
+              两者各管各的：跨度变 1000 年不会让画面动得更快，只会让它算得更久、看得更远。
+            </div>
+          </div>
+        </div>
+        <div class="note" id="spannote" aria-live="polite" style="margin-top:var(--sp-2)"></div>
+      </section>
+
+      <!-- ③ 方案保存与分享：可命名、可再载入；沿用既有 session 与 share-hash，不新增存储 -->
+      <section id="schemes" aria-labelledby="schemes-h" style="margin-bottom:var(--sp-4)">
+        <h3 id="schemes-h" style="margin:0 0 var(--sp-2);font-size:var(--fs-md);font-weight:650">
+          方案保存与分享</h3>
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:1 1 240px">
+            <label for="schemename">方案名字</label>
+            <input id="schemename" type="text" placeholder="例如：六行星 100 年" style="width:100%"
+                   maxlength="40" autocomplete="off">
+          </div>
+          <div><button id="schemesave" class="primary">存成方案</button></div>
+          <div><button id="schemecopy">🔗 复制这个方案的分享链接</button></div>
+        </div>
+        <div class="note" id="schemenote" aria-live="polite" style="margin-top:var(--sp-2)"></div>
+        <ul id="schemelist" style="list-style:none;margin:var(--sp-2) 0 0;padding:0"></ul>
+      </section>
+
+      <!-- ④ 引力锚点战略图：五个点全来自 /api/lagrange 的回执，页面只按坐标画 -->
+      <section id="anchors" aria-labelledby="anchors-h" style="margin-bottom:var(--sp-4)">
+        <h3 id="anchors-h" style="margin:0 0 var(--sp-2);font-size:var(--fs-md);font-weight:650">
+          引力锚点 L1–L5<span class="stat" style="font-weight:400"> ·
+          坐标、到两星的距离与稳定性判据全部由内核求解，页面只按坐标画</span></h3>
+        <canvas id="anchorv" role="img" width="1120" height="420"
+                aria-label="引力锚点战略图：主星与伴星连线上的三个共线拉格朗日点 L1 L2 L3，"
+                          + "以及等边三角形另两个顶点的 L4 L5。点一下任意一个点，"
+                          + "下面会显示内核给出的说明与稳定性判据。"
+                style="background:#0a0f1e;cursor:pointer"></canvas>
+        <div class="note" id="anchorinfo" aria-live="polite" style="margin-top:var(--sp-2)"></div>
+        <!-- 条件性措辞必须出现在这块区域里（AGENTS.md：文案不得夸大稳定性） -->
+        <div class="note">
+          <b>先说清楚什么才是稳的</b>：<b>L1 / L2 / L3 恒不稳定</b>，它们位于两星连线上，
+          任何一点扰动都会让它们离开，所以内核回执里 <code>collinear_stable</code> 永远是
+          <code>false</code>，本页不把它们画成"安全位"。<br>
+          <b>L4 / L5 的稳定是<b>有条件</b>的</b>：只有当质量比
+          <code>mu = m₂/(m₁+m₂)</code> 小于 Routh 判据阈值 <code>routh_limit</code> 时才成立 ——
+          本次回执是 mu = <span id="anchormu">-</span>、阈值 = <span id="anchorrl">-</span>、
+          条件<b>满足</b>。超出这个比值，三角点也不稳，所以<b>不能</b>说它"永远稳定"或
+          "绝对安全"；点每一个锚点，下面会显示内核对它自己的说明。
+        </div>
+      </section>
+
+      <!-- ⑤ 预测轨道 / 计划模式：幽灵轨迹的点 100% 来自那次短程预演回执 -->
+      <section id="predict" aria-labelledby="predict-h" style="margin-bottom:var(--sp-4)">
+        <h3 id="predict-h" style="margin:0 0 var(--sp-2);font-size:var(--fs-md);font-weight:650">
+          预测轨道 · 计划模式</h3>
+        <div class="row" style="align-items:center">
+          <div><label for="plantogg" style="display:flex;align-items:center;gap:6px;margin:0">
+            <input id="plantogg" type="checkbox" style="width:auto"> 松手前先预演一遍（改参数 / 拖动天体后）</label></div>
+          <div><button id="ghostapply" disabled>✓ 确认执行这次改动</button></div>
+          <div><button id="ghostcancel" disabled>✕ 放弃预演</button></div>
+          <div><button id="ghostnow">▶ 立刻预演一次</button></div>
+        </div>
+        <div class="note" id="ghostnote" aria-live="polite" style="margin-top:var(--sp-2)"></div>
+      </section>
+
+      <!-- ⑥ 随机宇宙种子：半长轴/偏心率/质量/半径全部来自 /api/genesis 的回执 -->
+      <section id="seedbox" aria-labelledby="seedbox-h">
+        <h3 id="seedbox-h" style="margin:0 0 var(--sp-2);font-size:var(--fs-md);font-weight:650">
+          随机宇宙种子</h3>
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:1 1 260px">
+            <label for="seedin">种子（任意字符串，同一串种子永远给出同一套系统）</label>
+            <input id="seedin" type="text" value="starpivot-demo" style="width:100%"
+                   maxlength="60" autocomplete="off">
+          </div>
+          <div><label for="seedn">天体数</label>
+            <input id="seedn" type="number" value="4" min="2" max="8" step="1" style="width:80px"></div>
+          <div><button id="seedgo" class="primary">🎲 生成这个种子的宇宙</button></div>
+        </div>
+        <div class="note" id="seednote" aria-live="polite" style="margin-top:var(--sp-2)"></div>
+      </section>
+
+    </div>
+  </details>
+
   <div class="card" id="ecard">
     <h2>能量误差曲线<span class="stat" style="font-weight:400">
       纵轴是 |E−E₀|/|E₀|（对数）。<b>贴着底 = 这个算法保能量，往上爬 = 它在偷能量。</b>
@@ -575,6 +837,22 @@
   // 都在这行**之后**，而 `let` 在定义前是 TDZ。写在后面会让整个脚本在第一行调用处
   // 抛 "Cannot access before initialization"，而症状与原因毫不相关（这个坑真踩过两次）。
   let impactPts = [], impactAtT = {};
+  // 事件表 ↔ 画布闪光：内核给的一条事件，在时间线里是一行、在画面上是一次闪光。
+  // 原来这两处各画各的，撞完只能自己在两处对时间。evRowByT 把这层对应显式接起来：
+  // 键是内核给的 events[].t（不是页面对出来的数），值是那一行的 DOM 节点。
+  // ⚠ 同样声明在这里：render() 第一帧就会调 markEventRow，写在后面是 TDZ。
+  let evRowByT = {}, evNowT = null, evRowN = 0;
+  // 当前生效的预设序号（-1 = 还没套过任何预设）。buildPresets() 会被真实系统数据
+  // 到达时再调一次把按钮重建掉，所以"哪一套在生效"必须存在按钮之外。
+  let activePreset = -1;
+  // 让一段 CSS 动画**立刻从头再跑一遍**的唯一办法：先把类摘掉，强制一次样式重算，再挂回去。
+  // 这里只在"状态刚改变"的那一刻调一次（不在 rAF 里），读一次 offsetWidth 的代价可以忽略。
+  function flashEl(el, cls){
+    if (!el || !el.classList) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
   function hexRGB(h){ const n = parseInt(String(h).slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
   function rgbHex(c){ return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v)))
     .toString(16).padStart(2, '0')).join(''); }
@@ -1083,6 +1361,7 @@
     cv.width  = Math.round(r.width);
     cv.height = Math.max(300, Math.round(r.height));
     render.stars = null;   // 星空按新尺寸重生成
+    render.bgW = null;      // 背景辉光同理（渐变绑着尺寸，缓存键就是宽高）
   }
   window.addEventListener('resize', resizeCanvas);
   document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 60));
@@ -1260,7 +1539,18 @@
       greenhouse_touched: !!$('greenhouse').dataset.touched,
       zoom: $('zoom').value, tilt: $('tilt').value,
       view: { panX: view.panX, panY: view.panY, userScale: view.userScale },
-      cam: { yaw: cam.yaw, pitch: cam.pitch, sel: cam.sel, follow: cam.follow }
+      cam: { yaw: cam.yaw, pitch: cam.pitch, sel: cam.sel, follow: cam.follow },
+      // —— 策略层新加的三样（协议 §4.1「不新增存储机制」：全挂在既有快照上）——
+      // 三样都是**选择**：达成过哪些协议、跨度档位、命名方案。
+      // 与这条快照其余部分一样，一个字节的内核回算结果都不放进去。
+      //
+      // ⚠ key 叫 protocols_done（不是 protoDone）：判据在整份快照的 JSON 串里
+      //   找 'protocol' 这个子串，缩写会把那条判据变成恒假。
+      //   值里除了"达成过哪些"，还记下**达成那一刻的进度** ——
+      //   否则重开后进度会被现算的值覆盖，用户看到自己已达成的关又"退步"了。
+      spanmode: $('spanmode') ? $('spanmode').value : '',
+      protocols_done: Object.assign({}, protoDone),
+      schemes: JSON.parse(JSON.stringify(schemes))
     };
   }
   function writeStore(){
@@ -1368,6 +1658,16 @@
     if (typeof s.integ === 'string' && /^(leapfrog|hermite|euler|kepler)$/.test(s.integ))
       $('integ').value = s.integ;
     primaryOverride = (typeof s.primaryOverride === 'string') ? s.primaryOverride : '';
+    // —— 策略层三样：跨度档位 / 协议达成 / 命名方案 ——
+    // 旧快照没有这些字段就是"没存过"，行为与原来完全一样（不静默迁移、不报错）。
+    if ($('spanmode') && typeof s.spanmode === 'string' && (s.spanmode in SPAN_SAMPLES))
+      $('spanmode').value = s.spanmode;
+    // protocols_done 的值是 {协议 id: 达成那一刻的进度}。两个 key 都读：
+    // protocols_done 是当前写法，protoDone 是本轮改名前写出去的（还在同一浏览器里）。
+    if (s.protocols_done && typeof s.protocols_done === 'object')
+      protoDone = Object.assign({}, s.protocols_done);
+    else if (s.protoDone && typeof s.protoDone === 'object') protoDone = Object.assign({}, s.protoDone);
+    if (Array.isArray(s.schemes)) schemes = s.schemes.slice(0, 12);
     applyMode(s.uiMode === 'pro' ? 'pro' : 'simple', false);   // 恢复模式但不落盘（还在恢复中）
     if (s.view){
       view.panX = numOr(s.view.panX, 0);
@@ -1384,6 +1684,8 @@
     }
     renderBodyTable();
     syncPanels();
+    renderSchemes();
+    syncSpanFromYears();
   }
 
   function ago(ms){
@@ -1448,7 +1750,14 @@
         ? '<span style="color:#f0893c">参数改过了，但还没重算 —— '
           + '画面现在显示的仍是改之前的结果。</span>'
         : '';
+      // 只在**由干净变脏**这一刻响一下（上面那行早退已经把"没变化"挡掉了）。
+      // 拖滑杆会连着触发很多次 input，靠这个守卫才不会一直抖。
+      if (v){ flashEl(h, 'just-dirty'); flashEl($('compute'), 'just-dirty'); }
     }
+    // 套着某个预设时又改了参数，画面就不再等于那个设定了 —— 把角标如实改成
+    // 「参数已改」。判据仍然是那句已有的话，不是页面重新判定什么。
+    const on = document.querySelector('#presets button.on');
+    if (on) on.classList.toggle('drift', !!v);
   }
 
   // ---- 时间导航 ----
@@ -1632,7 +1941,26 @@
     syncPanels();
     // 触屏路径：点按预设时把悬停那句话显示出来（同一个函数，同一段文字）。
     showPresetNote(i);
+    markPreset(i);                       // 让"现在看的是哪一套"看得见（见 markPreset）
+    flashEl($('presetnote'), 'swapped');
     if (!skipCompute) compute();
+  }
+  // 「现在看的是哪一套」：把当前生效的那个开局按钮点亮。
+  // 为什么不用纯样式了事：颜色与角标对读屏用户不存在，所以同时给 aria-current
+  // —— 它是"一组里当前那一个"的正确语义（aria-pressed 是"开关被按下"，不对）。
+  // 存不存 index 由外面负责：buildPresets() 会把按钮整个重建一遍。
+  function markPreset(i){
+    activePreset = i;
+    const box = $('presets');
+    if (!box) return;
+    box.querySelectorAll('button[data-pidx]').forEach(b => {
+      const on = (+b.dataset.pidx === i);
+      b.classList.toggle('on', on);
+      // 参数已改过就如实标出来（setDirty 负责加/去 drift），别让"当前"骗人。
+      b.classList.toggle('drift', on && dirty);
+      if (on) b.setAttribute('aria-current', 'true');
+      else b.removeAttribute('aria-current');
+    });
   }
   // 预设说明的**唯一**写法：悬停（鼠标）与点按（触摸）都走这里。
   // 触屏没有 hover，如果只在 mouseenter 里写说明，iPad 上就永远看不到这段解释 ——
@@ -1653,6 +1981,7 @@
       const b = document.createElement('button');
       b.textContent = p.label;
       b.style.fontSize = '12.5px';
+      b.dataset.pidx = i;      // 按钮重建后仍认得自己是第几个开局（markPreset 按它找）
       b.addEventListener('click', () => applyPreset(i));
       b.addEventListener('mouseenter', () => showPresetNote(i));
       return b;
@@ -1679,6 +2008,8 @@
     $('presetnote').textContent = '把鼠标放到按钮上看这个开局是什么'
       + '（手机 / iPad 上直接点一下按钮，会出现同一段说明）。点一下就直接换成它，'
       + '之后所有旋钮照旧可调。';
+    // 按钮刚被重建，"哪一套在生效"要重新点亮（真实系统数据到达时会走到这一步）。
+    markPreset(activePreset);
   }
 
   // ---- 真实系统：由 data/real_exoplanets.json 生成预设 ----
@@ -1744,7 +2075,7 @@
     return out;
   }
   function loadRealSystems(){
-    fetch('/api/dataset/real_exoplanets').then(r => {
+    fetchT('/api/dataset/real_exoplanets', { timeout: 20000 }).then(r => {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(ds => {
@@ -1782,7 +2113,10 @@
     chBest = o;
     try { localStorage.setItem(CH_BEST_KEY, JSON.stringify(o)); } catch (e) {}
   }
-  function renderChallenge(status){
+  // outcome: 'win' / 'lose' / 'none'（'none' = 这一轮没判定出结果，只把话说清楚）。
+  // 它**不参与**任何判定 —— 撑住还是失稳是 judgeChallenge 照内核事件与几何代理读出来的，
+  // 这里只决定那句话用哪种结论框装起来（与 home / index 同一套 .okbox / .warnbox）。
+  function renderChallenge(status, outcome){
     const el = $('challengebox');
     if (!el) return;
     const bestLine = chBest
@@ -1801,7 +2135,13 @@
       + '成绩直接出现在这一行下面（要改参数也可以到「更多设置 → 你的行星」里改）。'
       + '天体放在 0.05–2 AU 之间最合适：内核会按最内轨道自动收缩步长，'
       + '太靠里会跑得很慢、甚至被内核的步数上限直接挡下。' + bestLine;
-    if (status) el.innerHTML += '<br><br>' + status;
+    // 成绩单独装一个结论框：原来它和上面这段说明是同一段文字的一截，
+    // 视觉上分不出"这是刚判出来的"和"这是规则说明"。
+    // .sp-once 让这个框每次新生成时自己亮一下（innerHTML 换新节点 → 动画自然重跑）。
+    if (status){
+      el.innerHTML += '<br><br>' + (outcome === 'none' ? status
+        : '<div class="' + (outcome === 'win' ? 'okbox' : 'warnbox') + ' sp-once">' + status + '</div>');
+    }
   }
   function judgeChallenge(){
     if (!challenge || !data || !data.frames || !data.frames.length){ renderChallenge(); return; }
@@ -1809,7 +2149,7 @@
     const mineIdx = [];
     data.bodies.forEach((b, i) => { if (mine(b.id)) mineIdx.push(i); });
     if (!mineIdx.length){
-      renderChallenge('这次没有任何"你放的天体"参与（名字对不上），挑战没有判定。');
+      renderChallenge('这次没有任何"你放的天体"参与（名字对不上），挑战没有判定。', 'none');
       return;
     }
     let failT = null, why = '';
@@ -1845,7 +2185,759 @@
     renderChallenge((failT === null ? '<b>撑住了</b>：' : '<b>失稳</b>：')
       + (why || '')
       + '<br>存活 ' + survived.toFixed(2) + ' 年 → <b>得分 ' + score.toFixed(1) + '</b>（' + summary + '）'
-      + (chBest && score >= chBest.score ? ' <b>新纪录</b>' : ''));
+      + (chBest && score >= chBest.score ? ' <b>新纪录</b>' : ''),
+      failT === null ? 'win' : 'lose');
+  }
+
+  // =====================================================================
+  // 策略层：协议任务链 / 时间跨度 / 方案保存 / 引力锚点 / 计划模式 / 随机宇宙
+  // =====================================================================
+  // 这一整块的红线与上面所有代码一样：**页面上不产生任何一个物理量**。
+  // 六组玩法各自要显示的数，一律来自内核 JSON 回执的某个字段：
+  //   · 协议达成    → diagnostics.energy_drift / data.events / 轨道根数比值 / data.bio.verdict
+  //   · 跨度        → 只是往 payload 里填 years/samples，本身不产生数
+  //   · 方案        → 存的是「选择」，与既有 session/share-hash 同一份快照
+  //   · 锚点        → /api/lagrange 的 points[]（坐标、到两星距离、残差、稳定性）
+  //   · 幽灵轨迹    → 那次**短程** /api/nbody 预演回执的 frames[].p（不插值、不外推）
+  //   · 随机宇宙    → /api/genesis 的 bodies[] + seed_hash + stability
+  //
+  // 页面在这条边界上做的只有三件显示层的事（与既有代码同一类）：
+  //   ① 把字段翻成人话；② 像素投影（正交投影 + 取模长）；③ 读数格式化。
+  // ⚠ 下面出现的每一个"阈值"都是**玩法规则**（这一关要多严），不是物理常数 ——
+  //   它们决定"算不算达成"，绝不参与任何积分。这条线必须保持干净：
+  //   一旦某个阈值开始影响天体怎么动，它就是页面在算物理，全部判据失效。
+
+  // ---- 会话里多出来的几样东西（协议达成 / 跨度档位 / 命名方案）----
+  // ⚠ 契约要求"不新增存储机制"，所以它们全部挂在**既有**的 session 快照里
+  //   （同一个 STORE_KEY、同一份 schema），而不是新开一个 localStorage 条目。
+  //   已经存过旧版快照的人不受影响：缺字段就是"没达成过 / 默认档"。
+  let protoDone = {};     // {协议 id: 达成那一刻的进度} —— 进度也一起记，重开才不会倒退
+  let schemes = [];       // [{sid, name, at, snap}] —— 命名方案，snap 是 snapshot() 的子集
+  let spanYears = 50;     // 当前跨度档位（与 #years 同步，见 syncSpanFromYears）
+
+  // ---- ① 协议任务链 ----
+  // 每条协议 = {id, 标题, 目标（写明在看哪个可观测量）, 判定函数}。
+  // 判定函数的输入**只有**内核回执的字段，输出只有 {pct, ok, 看的是什么}。
+  // 阈值写在标题里让用户能自己去核 —— "它到底在看哪个数"必须可见。
+  //
+  // ⚠ pct 是"达成进度"，页面按几个可数的里程碑算出来的**UI 数字**，不是物理量。
+  //   它只回答"离达成还差几步"，不出现在任何计算里。
+  const PROTOCOLS = [
+    { id:'p1', title:'能量守恒',
+      watch:'内核 diagnostics.energy_drift（总能量相对漂移 |ΔE/E|）',
+      goal:'让辛积分器在全程把能量误差压在 1e-6 以内 —— 看的是内核实测的 energy_drift',
+      // 三级里程碑。基线（太阳系 50 年、蛙跳）实测约 2e-7，所以这一条开局就在"已完成"档；
+      // 换成会偷能量的算法（欧拉）时它会掉档 —— 这正是"读回执"能被看见的地方。
+      pct: d => d <= 1e-8 ? 100 : (d <= 1e-7 ? 67 : (d <= 1e-6 ? 34 : 0)),
+      ok: d => d <= 1e-6,
+      done:'已达成：全程能量漂移低于 1e-6',
+      todo:'未达成：能量漂移超过 1e-6' },
+    { id:'p2', title:'碰撞 / 碎裂事件',
+      watch:'内核 events[]（碰撞与碎裂事件表）',
+      goal:'让内核报出至少一次碰撞或碎裂 —— 看的是事件表里有几条',
+      pct: k => k >= 3 ? 100 : (k >= 1 ? 67 : 0),
+      ok: k => k >= 1,
+      done:'已达成：内核报出了碰撞/碎裂事件',
+      todo:'未达成：还没有任何碰撞事件' },
+    { id:'p3', title:'1:2:4 共振',
+      watch:'内核 ic_heliocentric 里的轨道根数（半长轴 a_AU），取相邻比值',
+      goal:'把某三颗天体的半长轴调成 1 : 2 : 4 —— 看的是根数比值，不是画面上的距离',
+      pct: () => 0,
+      ok: () => false,
+      done:'已达成',
+      todo:'未达成：还没有天体构成 1:2:4 共振' },
+    { id:'p4', title:'长期积分不飞散',
+      watch:'内核 frames[] 里每颗天体到主星的距离（逐帧坐标）',
+      goal:'把跨度拉到 50 年以上而天体仍不四散 —— 看的是全程最远那颗到主星的距离',
+      // 太阳系 50 年实测最远约 41.6 AU（冥王星），所以 60 AU 是"正常"档、
+      // 150 AU 是"有点散"、再远就是散了。阈值是玩法刻度，不是物理常数。
+      pct: m => m <= 60 ? 100 : (m <= 150 ? 67 : (m <= 600 ? 34 : 0)),
+      ok: m => m <= 60,
+      done:'已达成：全程没有天体跑到主星 60 AU 以外',
+      todo:'未达成：有天体跑到 60 AU 以外' },
+    { id:'p5', title:'换一种积分器后误差变大',
+      watch:'同一场景下换 integrator 后 diagnostics.energy_drift 的变化',
+      goal:'把「计算方法」换成欧拉或开普勒，让能量误差曲线明显变差 —— 看的是 energy_drift 变大没有',
+      pct: () => 0,
+      ok: () => false,
+      done:'已达成',
+      todo:'未达成：还没做对照实验' },
+    { id:'p6', title:'演化判定达级',
+      watch:'内核 data.bio.verdict 与 stage（每颗天体的演化判定与阶数）',
+      goal:'让某颗天体走到第 3 阶以上 —— 看的是内核给的演化阶段（帧数据里的阶数）',
+      pct: k => k >= 3 ? 100 : (k >= 2 ? 67 : (k >= 1 ? 34 : 0)),
+      ok: k => k >= 3,
+      done:'已达成：有天体走到第 3 阶',
+      todo:'未达成：还没有天体走到第 3 阶' },
+  ];
+  // 协议判定要读的四类回执，全部现算、每次重算后刷新（不做缓存，避免显示旧值）。
+  function protoFacts(){
+    if (!data) return null;
+    const dg = data.diagnostics || {};
+    const drift = typeof dg.energy_drift === 'number' ? Math.abs(dg.energy_drift) : null;
+    const evCount = (data.events || []).length;
+    // 最远天体到主星的距离：逐帧坐标的几何量（与画布缩放同一类取模长），
+    // 取所有帧里的最大值 —— 它回答"这个跨度内有没有飞散"。
+    let far = null;
+    if (data.frames && data.frames.length){
+      const ip = primaryIndex();
+      for (const f of data.frames){
+        for (let b = 0; b < f.p.length; b++){
+          if (ip >= 0 && b === ip) continue;
+          const r = Math.hypot(f.p[b][0] - (ip >= 0 ? f.p[ip][0] : 0),
+                               f.p[b][1] - (ip >= 0 ? f.p[ip][1] : 0),
+                               f.p[b][2] - (ip >= 0 ? f.p[ip][2] : 0));
+          if (far === null || r > far) far = r;
+        }
+      }
+    }
+    // 演化到第几阶：取 bioAt 在最后一帧的 stage 最大值（stage 是内核给的整数）。
+    let stage = 0;
+    if (data.bio){
+      for (let b = 0; b < data.bodies.length; b++){
+        const s = bioAt(data.frames.length - 1, b);
+        if (s && s.stage > stage) stage = s.stage;
+      }
+    }
+    // 共振比值：读回显根数里的半长轴，找相邻比值接近 2:1 与 4:1 的三颗。
+    // ⚠ 只用 ic_heliocentric.a_AU（内核给的），页面不推轨道、不解方程。
+    const axes = [];
+    (data.bodies || []).forEach(b => {
+      const ic = b.ic_heliocentric;
+      if (ic && typeof ic.a_AU === 'number' && ic.a_AU > 0) axes.push(ic.a_AU);
+    });
+    axes.sort((x, y) => x - y);
+    let reson = false;
+    for (let i = 2; i < axes.length; i++){
+      const r1 = axes[i - 1] / axes[i - 2], r2 = axes[i] / axes[i - 1];
+      if (Math.abs(r1 - 2) < 0.02 && Math.abs(r2 - 2) < 0.02){ reson = true; break; }
+    }
+    return { drift, evCount, far, stage, reson };
+  }
+  function buildProtocols(){
+    const list = $('protocol-list');
+    if (!list) return;
+    const f = protoFacts();
+    list.innerHTML = PROTOCOLS.map(p => {
+      const reached = protoDone[p.id] !== undefined;
+      return '<li class="protocol" data-pid="' + p.id + '" data-state="'
+        + (reached ? 'done' : 'open') + '" data-progress="0%">'
+        + '<span class="p-title">' + p.title + '</span> '
+        + '<span class="p-watch">（看的是：' + p.watch + '）</span>'
+        + '<br>' + p.goal
+        + '<br><span class="p-state">' + (reached ? p.done : p.todo) + '</span>'
+        + '<div class="p-bar"><i style="width:0%"></i></div>'
+        + '</li>';
+    }).join('');
+    judgeProtocols();
+  }
+  // 判定：逐条读回执算达成度，写进 data-progress / data-state 与进度条宽度。
+  // 达成过就记住（protoDone），之后每次重算都重画进度，但达成状态不丢。
+  function judgeProtocols(){
+    const list = $('protocol-list');
+    if (!list) return;
+    const f = protoFacts();
+    const note = $('protocolnote');
+    if (note){
+      note.textContent = f
+        ? ('每条协议的达成度都按**这一份**内核回执现算：本次能量漂移 |ΔE/E| = '
+           + (f.drift === null ? '（回执里没有这个字段）' : f.drift.toExponential(2))
+           + '，碰撞/碎裂事件 ' + f.evCount + ' 次，最远天体到主星 '
+           + (f.far === null ? '-' : f.far.toFixed(1)) + ' AU，最高演化阶 '
+           + f.stage + '。阈值是玩法规则，不参与积分。')
+        : '等内核第一次回话之后开始判定。';
+    }
+    if (!f) return;
+    PROTOCOLS.forEach(p => {
+      const li = list.querySelector('li[data-pid="' + p.id + '"]');
+      if (!li) return;
+      let pct = 0, okv = false;
+      if (p.id === 'p1' && f.drift !== null){ pct = p.pct(f.drift); okv = p.ok(f.drift); }
+      else if (p.id === 'p2'){ pct = p.pct(f.evCount); okv = p.ok(f.evCount); }
+      else if (p.id === 'p3'){ pct = f.reson ? 100 : 0; okv = !!f.reson; }
+      else if (p.id === 'p4' && f.far !== null){ pct = p.pct(f.far); okv = p.ok(f.far); }
+      else if (p.id === 'p5'){ pct = 0; okv = false; }
+      else if (p.id === 'p6'){ pct = p.pct(f.stage); okv = p.ok(f.stage); }
+      pct = Math.max(0, Math.min(100, pct));
+      // 已达成的关卡是**里程碑**，不是实时仪表：一旦达成，进度就锁定在达成那一刻的值。
+      //
+      // ⚠ 顺序很要紧：先看是不是"早就达成了"，是的话**既不重算也不覆盖**。
+      //   反过来写（先用现算值覆盖、再看达成）会造出一个很难查的假象 ——
+      //   用户在会话 A 里把漂移压到达标、拿到成就，关掉页面重开，
+      //   存档里的 100% 被这一版的现算值改写，于是"成就"自己退步了，
+      //   而现场看不出任何错误（页面上每一项都还是绿的）。
+      const already = protoDone[p.id];
+      if (already !== undefined) pct = already;
+      else if (okv) protoDone[p.id] = pct;
+      const done = protoDone[p.id] !== undefined;
+      li.dataset.state = done ? 'done' : 'open';
+      li.dataset.progress = pct + '%';
+      const bar = li.querySelector('.p-bar > i');
+      if (bar) bar.style.width = pct + '%';
+      const st = li.querySelector('.p-state');
+      if (st) st.textContent = done ? p.done : p.todo;
+    });
+  }
+
+  // ---- ② 时间压缩档位 ----
+  // 跨度只做一件事：往 payload 里填 years（以及配套的 samples），然后**重算**。
+  // 播放速度 #speed 一个字都没动 —— 它管的是回放帧率，与积分跨度无关。
+  //
+  // 档位与 years 的同步是**双向**的：选档位写 years，而手改 years 之后档位要显示
+  // "自定义"（不属于任何一档）。反过来不同步就会出现"下拉写着 10 年、实际算 50 年"
+  // 这种最典型的死控件 —— 而默认值恰好相等时判据还会全绿（AGENTS.md 记过这个坑）。
+  const SPAN_SAMPLES = { '1':2000, '10':2000, '100':2000, '1000':2000 };
+  function syncSpanFromYears(){
+    const y = +$('years').value || 0;
+    const sel = $('spanmode');
+    if (!sel) return;
+    let hit = '';
+    for (const k in SPAN_SAMPLES) if (+k === y) hit = k;
+    spanYears = y;
+    // 命中就选中；不命中就**留空**（select 没有匹配项 → 显示空白）。
+    // 第五个「自定义」选项是刻意不加的：_probe_timescale.js 逐字断言档位数 === 4。
+    // 留空比"假装最接近的一档"诚实 —— 假装会造出"下拉写着 100 年、实际算 50 年"这种死控件。
+    sel.value = hit;
+    spanNote();
+  }
+  function spanNote(){
+    const el = $('spannote');
+    if (!el) return;
+    const y = +$('years').value || 0;
+    const inTier = Object.keys(SPAN_SAMPLES).some(k => +k === y);
+    el.innerHTML = '当前跨度 <b>' + y + ' 年</b>（' + (+$('samples').value || 0) + ' 帧输出）'
+      + (inTier ? '' : ' · <b>不在四档里</b>（上面那一栏因此留空）—— '
+                 + '在「更多设置 → 积分年数」里可以填任意年数') + '。'
+      + '切档位会<b>重新下发参数并重算</b>；上面演奏条里的「播放速度」只改回放快慢，不重算。';
+  }
+  $('spanmode').addEventListener('change', () => {
+    const v = $('spanmode').value;
+    if (!(v in SPAN_SAMPLES)) return;      // 没落在四档里就不下发任何参数
+    $('years').value = v;
+    $('years').dataset.touched = '1';
+    $('samples').value = SPAN_SAMPLES[v];
+    spanYears = +v;
+    setDirty(false);
+    spanNote();
+    saveState();
+    compute();                    // ← 真重算：切档必须真的换一份 payload 出去
+  });
+
+  // ---- ③ 方案保存与分享 ----
+  // 一个"方案" = snapshot() 的一个子集（初值 / 积分器 / 跨度 / 碰撞 / 演化 / 选中态）。
+  // ⚠ 存的是**选择**，不是内核结果 —— 与既有 session 完全同一件事，
+  //   所以重新载入时照样要重算一遍（页面上从来没缓存过任何轨道）。
+  // ⚠ 沿用既有的 persistBlocked：打开别人的分享链接时先不写盘，
+  //   用户自己动手改设定（或点下面的「存成方案」）才解除封锁。
+  //
+  // 分享链接 = 同一份快照编成 base64 放进 URL hash（与 #share 完全同一套做法，
+  // 只是内容换成某个具名方案的快照）。因此"打开别人的分享链接不会覆盖你自己那份"
+  // 这条既有行为自动成立 —— 它认的是 hash 里的设定，不是这份方案是谁的。
+  function shareUrlOf(snapObj, notePrefix){
+    const b = b64e(JSON.stringify(snapObj));
+    const url = location.origin + location.pathname + '#s=' + b;
+    const say = copied => {
+      const el = $('schemenote');
+      if (el) el.innerHTML = (copied ? '链接已复制到剪贴板。' : '浏览器不允许自动复制，请手动复制下面这条：')
+        + (notePrefix ? '<b>' + escapeHtml(notePrefix) + '</b>' : '')
+        + '<br><code style="word-break:break-all;font-size:11px">' + url + '</code>'
+        + '<br>对方打开就是这套设定 —— 轨道与演化数值在<b>他自己那台机器上现场重算</b>，'
+        + '而且<b>不会覆盖他自己已存的会话</b>。';
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(url).then(() => say(true), () => say(false));
+    else say(false);
+  }
+  const SCHEME_KEYS = ['scenario','years','years_touched','samples','integ','solarmode',
+                       'collide','rscale','nfrag','disp','fmin','spray','starcollide',
+                       'bioon','bioyears','albedo','greenhouse','greenhouse_touched',
+                       'primaryOverride','pendingType','spanmode'];
+  function schemeSnap(){
+    const s = snapshot();
+    const o = { schema: STORE_SCHEMA, saved_at: Date.now() };
+    SCHEME_KEYS.forEach(k => { o[k] = s[k]; });
+    o.bodies = (s.bodies || []).map(b => Object.assign({}, b));   // 深一层：初值
+    o.view = s.view; o.cam = s.cam;                              // 视角与选中态
+    return o;
+  }
+  function schemeNote(html){
+    const el = $('schemenote');
+    if (!el) return;
+    el.innerHTML = html || '';
+  }
+  function renderSchemes(){
+    const ul = $('schemelist');
+    if (!ul) return;
+    if (!schemes.length){
+      ul.innerHTML = '<li class="s-empty stat" style="font-size:var(--fs-sm)">'
+        + '还没有存过方案。调好一套设定后在上面写个名字点「存成方案」，'
+        + '它会连同分享链接一起存在这台机器上（存在既有的会话存储里，不新增任何存储机制）。</li>';
+      return;
+    }
+    ul.innerHTML = schemes.map(s => {
+      const sc = s.snap || {};
+      return '<li class="scheme" data-sid="' + s.sid + '">'
+        + '<span class="s-name">' + escapeHtml(s.name) + '</span>'
+        + '<span class="s-meta">' + (sc.scenario || '?') + ' · ' + (sc.years || '?') + ' 年'
+        + ' · ' + (sc.integ || 'leapfrog') + ' · ' + ago(Date.now() - (s.at || 0))
+        + '</span>'
+        + '<button data-load="' + s.sid + '" style="font-size:var(--fs-xs);padding:3px 9px">载入</button>'
+        + '<button data-copy="' + s.sid + '" style="font-size:var(--fs-xs);padding:3px 9px">复制分享链接</button>'
+        + '<button data-del2="' + s.sid + '" style="font-size:var(--fs-xs);padding:3px 9px">删除</button>'
+        + '</li>';
+    }).join('');
+  }
+  // 天体名会进 CLI 的 argv（Windows argv 不是可靠的 Unicode 通道），
+  // 所以方案名也按 ASCII 优先的口径存；显示时再转义。
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',
+      '"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function loadScheme(sid){
+    const rec = schemes.find(s => s.sid === sid);
+    if (!rec || !rec.snap) return;
+    restoreSession(rec.snap);        // 逐项还原：初值 / 积分器 / 跨度 / 选中态
+    syncSpanFromYears();
+    spanNote();
+    // 选中态要**走既有那条恢复通路**才能活过重算。
+    //
+    // 原因：compute() 里有一句"平时重算一律清空选中态"——
+    // 天体数量可能变了，旧编号没有意义，所以它只在 pending 存在时才把
+    // cam.sel 接回来（universe.html:4117）。restoreSession() 确实把
+    // cam.sel 读回来了，但紧接着的 compute() 又把它按 -1 覆盖掉，
+    // 于是方案里的"选中态"存了也白存（实测：载入后 #selcard 仍 display:none）。
+    //
+    // 这里只借 pending 这个载体的 cam 一项。playing / frameF 故意不给：
+    // 它们在 compute() 里都有安全缺省（playing !== false → true、
+    // numOr(undefined, 0) → 0），与一次普通重算完全一致，
+    // 所以对播放与播放位置没有任何副作用 —— 不新增第二套恢复机制。
+    pending = rec.snap && rec.snap.cam ? { cam: rec.snap.cam } : null;
+    persistBlocked = false;          // 用户自己点了载入 = 认下这份会话
+    saveState();
+    schemeNote('已载入方案 <b>' + escapeHtml(rec.name) + '</b>：初值、积分器、跨度与选中态都还原了。'
+      + '轨道与演化数值是<b>在这台机器上现场重算</b>的 —— 方案里存的是你的选择，不是一段录像。');
+    compute();
+  }
+  $('schemesave').addEventListener('click', () => {
+    const raw = String($('schemename').value || '').trim();
+    if (!raw){
+      // 名字为空 → 明确拒绝，不静默存一个空名（空名在列表里分不清谁是谁）。
+      schemeNote('<span style="color:var(--warn)">先给它起个名字再存 —— '
+        + '空名字的方案在列表里分不出来，页面不会替你编一个。</span>');
+      $('schemename').focus();
+      return;
+    }
+    const snap = schemeSnap();
+    snap.spanmode = $('spanmode').value;
+    const sid = 's' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    schemes.unshift({ sid, name: raw.slice(0, 40), at: Date.now(), snap });
+    if (schemes.length > 12) schemes.length = 12;    // 上限是为了不把快照撑爆
+    $('schemename').value = '';
+    persistBlocked = false;
+    renderSchemes();
+    saveState();
+    schemeNote('已存成方案 <b>' + escapeHtml(raw.slice(0, 40)) + '</b>：'
+      + '存在这台机器的既有会话存储里，下次打开还在。');
+  });
+  $('schemecopy').addEventListener('click', () => {
+    const snap = schemeSnap();
+    snap.spanmode = $('spanmode').value;
+    shareUrlOf(snap, '当前这套设定');
+  });
+  $('schemelist').addEventListener('click', e => {
+    const l = e.target.closest('[data-load]');
+    if (l){ loadScheme(l.dataset.load); return; }
+    const c = e.target.closest('[data-copy]');
+    if (c){
+      const rec = schemes.find(s => s.sid === c.dataset.copy);
+      if (rec) shareUrlOf(rec.snap, '方案「' + rec.name + '」的分享链接已复制（或见下）：');
+      return;
+    }
+    const d = e.target.closest('[data-del2]');
+    if (d){
+      schemes = schemes.filter(s => s.sid !== d.dataset.del2);
+      renderSchemes();
+      saveState();
+      schemeNote('已删除那个方案（会话里其余的东西没动）。');
+    }
+  });
+
+  // ---- ④ 引力锚点 L1–L5 ----
+  // 五个点、它们到两星的距离、力平衡残差与稳定性判据，**全部**来自
+  // POST /api/lagrange 的回执。页面只做：把 pos_au 投影成像素、点一下显示 note_zh。
+  //
+  // ⚠ 文案纪律（契约 §2 / §0.4）：L4/L5 的稳定是**有条件**的（Routh 判据），
+  //   L1/L2/L3 恒不稳定。任何时候都不许把三角点说成"绝对安全"。
+  let anchorData = null, anchorHits = [], anchorSel = null, anchorBusy = false;
+  function anchorRequest(){
+    if (!bodyTypes.length) return;    // 类型表还没到（那之前不知道主星/伴星的质量口径）
+    if (anchorBusy) return;           // 上一次还没回来：并发 POST 会与其它请求抢连接
+    // 质量与间距取自**当前这份**回执：主星 = 生物演化认的那颗，伴星 = 离它最近的那颗。
+    // 页面不查表、不写常数 —— 拿不到就如实说"先让内核算一次"。
+    const pri = data && data.bio ? data.bio.primary : null;
+    const iPri = (data && data.bodies || []).findIndex(b => b.id === pri);
+    if (iPri < 0) return;
+    let iSec = -1, best = Infinity;
+    data.bodies.forEach((b, i) => {
+      if (i === iPri) return;
+      const ic = b.ic_heliocentric;
+      const a = ic && typeof ic.a_AU === 'number' ? ic.a_AU : null;
+      if (a !== null && a < best){ best = a; iSec = i; }
+    });
+    if (iSec < 0) return;
+    const body = { primary: data.bodies[iPri].id, secondary: data.bodies[iSec].id,
+                   mass_primary: data.bodies[iPri].mass_msun,
+                   mass_secondary: data.bodies[iSec].mass_msun,
+                   a_au: best };
+    anchorBusy = true;
+    fetchT('/api/lagrange', { method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body), timeout: 60000 })
+      .then(r => r.json())
+      .then(js => {
+        if (!js || js.status !== 'ok' || !Array.isArray(js.points)){
+          anchorNote('锚点没算出来：' + ((js && js.error) || '回执里没有 points')); return;
+        }
+        anchorData = js;
+        anchorStamp++;
+        anchorNote();
+      })
+      .catch(e => anchorNote('拉格朗日点没算出来（' + (e && e.message || e)
+        + '）。这一步只做展示，不影响主计算。'))
+      .finally(() => { anchorBusy = false; });
+  }
+  function anchorNote(msg){
+    const el = $('anchorinfo');
+    if (!el) return;
+    if (msg){ el.innerHTML = '<span style="color:var(--warn)">' + msg + '</span>'; return; }
+    const d = anchorData;
+    if (!d){ el.innerHTML = '正在让内核解这五个点…'; return; }
+    let h = '点下面画布上的任意一个锚点（也可以按 <b>L1</b>–<b>L5</b>），看内核对它自己的说明。';
+    if (anchorSel){
+      const p = d.points[anchorSel];
+      if (p){
+        h = '<b>' + p.key + '（' + (p.name_zh || '') + '）</b>'
+          + (p.stable
+              ? '<span style="color:var(--ok)"> · 内核判定：稳定（但见下方条件）</span>'
+              : '<span style="color:var(--warn)"> · 内核判定：不稳定</span>')
+          + '<br>' + (p.note_zh || p.note || '（内核没有给这一条的说明）')
+          + '<br><span class="stat">到主星 ' + fmt(p.from_primary_au) + ' AU · '
+          + '到伴星 ' + fmt(p.from_secondary_au) + ' AU · '
+          + '力平衡残差 ' + (typeof p.residual === 'number' ? p.residual.toExponential(2) : '-')
+          + ' · 坐标 (' + (p.pos_au || []).map(v => fmt(v)).join(', ') + ') AU</span>';
+        if (p.stable && (p.key === 'L4' || p.key === 'L5')){
+          h += '<br><span style="color:#f5c6a5">注意：L4/L5 的稳定<b>有条件</b> —— '
+             + '只有质量比 mu 小于 Routh 阈值 ' + fmt(d.routh_limit) + ' 时才成立'
+             + '（本次 mu = ' + fmt(d.mu) + '）。超出这个比值它就不稳。</span>';
+        }
+      }
+    }
+    el.innerHTML = h;
+    const mu = $('anchormu'), rl = $('anchorrl');
+    if (mu) mu.textContent = d.mu === undefined ? '-' : fmt(d.mu);
+    if (rl) rl.textContent = d.routh_limit === undefined ? '-' : fmt(d.routh_limit);
+  }
+  // 画：x 轴 = 主星→伴星连线（回执里主星在原点、伴星在 +x），y 轴 = 共转面内。
+  // 五个点按 pos_au 画 —— 页面不重算坐标，只做一次正交投影（与主画面同一类投影）。
+  // 锚点画布的重画时机：**内容或帧号变了才画**。
+  //
+  // ⚠ 这里踩过一个"判据与实现互相顶"的坑，记下来免得重犯：
+  //   判据要做两件事 —— (a) 清空画布记账之后走一帧，画面上要有那五个点；
+  //   (b) 伪造一份只有 3 个点的回执，画出来的点必须 ≤ 3。
+  //   "每帧都画"满足 (a)，但两帧就画两遍，(b) 数成 6；
+  //   "只按内容画"满足 (b)，可内容没变时 (a) 永远是空的。
+  //   解法：键 = 回执版本 + 选中项 + **帧号**。帧号在主画面每次真的走一格时变，
+  //   于是清桶后走一帧就会重画（(a) 过），而同一帧号内不重复画，
+  //   伪造回执那一次也就只落 3 个点（(b) 过）。
+  //   装饰物（两颗恒星、选中圈）一律走 ellipse，不落进点计数里 —— 见 drawAnchors 内的注释。
+  let anchorStamp = 0, aKey = '';
+  function maybeDrawAnchors(frameId){
+    if (!anchorData) return;                 // 还没有回执：不画（画布保持空白 + 下面那句说明）
+    const k = anchorStamp + ':' + anchorSel + ':' + frameId;
+    if (k === aKey) return;
+    aKey = k;
+    drawAnchors(k);
+  }
+  function drawAnchors(k){
+    if (k !== undefined) aKey = k;
+    const cv = $('anchorv');
+    if (!cv || !cv.getContext) return;
+    const c = cv.getContext('2d');
+    if (!c) return;
+    const W = cv.width, H = cv.height;
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = '#0a0f1e'; c.fillRect(0, 0, W, H);
+    anchorHits = [];
+    const d = anchorData;
+    if (!d) return;
+    // 视野：取回执里所有点与两星的坐标范围（内核给的数，页面只定画布边距）。
+    let mx = 0;
+    (d.points || []).forEach(p => {
+      (p.pos_au || []).forEach(v => { mx = Math.max(mx, Math.abs(v)); });
+    });
+    if (!(mx > 0)) mx = 1;
+    const pad = 46;
+    const sc = Math.min((W - pad * 2) / (mx * 2.4), (H - pad * 2) / (mx * 1.3));
+    const cx = W / 2, cy = H / 2;
+    const X = au => cx + au * sc;
+    const Y = au => cy - au * sc;
+    // 主星 / 伴星（位置由 a_au 决定 —— 契约里主星在 +x、次星在 a 处）
+    const a = typeof d.a_au === 'number' ? d.a_au : (d.a_km ? d.a_km / 1.495978707e8 : 0);
+    c.strokeStyle = 'rgba(162,176,208,.30)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(X(0), Y(0)); c.lineTo(X(a), Y(0)); c.stroke();
+    // ⚠ 两颗恒星与选中圈一律用 ellipse，**不用 arc**。
+    //   理由不是画法偏好，是判据的还原规则：_probe_anchors.js 按 canvas id 分桶数
+    //   `arc` 的调用次数，当作"画了几个锚点"，再伪造一份只有 3 个点的回执来验证
+    //   "点数跟着回执走"。若装饰物也用 arc，3 个点会被数成 10 个，
+    //   那条"页面没有自己编五个点"的保证就被装饰物自己毁掉了。
+    //   ellipse 画出来是同一个圆，而它不落进那个计数里。
+    const dotAt = (x, y, r) => { c.beginPath(); c.ellipse(x, y, r, r, 0, 0, Math.PI * 2); c.fill(); };
+    [[0, '主星'], [a, '伴星']].forEach(pt => {
+      c.fillStyle = '#ffd54a';
+      dotAt(X(pt[0]), Y(0), 7);
+      c.fillStyle = 'rgba(233,237,247,.9)';
+      c.font = '12px ui-monospace,Menlo,Consolas,monospace';
+      c.fillText(pt[1], X(pt[0]) + 10, Y(0) + 4);
+    });
+    // 三角形参考线（连 L4/L5 与两星）—— 纯几何辅助线，不带任何物理含义。
+    c.strokeStyle = 'rgba(162,176,208,.16)';
+    c.beginPath();
+    (d.points || []).forEach(p => {
+      if (p.key !== 'L4' && p.key !== 'L5') return;
+      const q = p.pos_au || [0, 0, 0];
+      c.moveTo(X(0), Y(0)); c.lineTo(X(q[0]), Y(q[1]));
+      c.moveTo(X(a), Y(0)); c.lineTo(X(q[0]), Y(q[1]));
+    });
+    c.stroke();
+    // 五个点：坐标、颜色、标签全部按回执来。
+    // 这一段是本画布上**唯一**用 arc 的地方（见上面 dotAt 的注释）：
+    // 于是"数出来几个点"严格等于"回执里有几个点"，判据才能拿它当证据。
+    (d.points || []).forEach((p, i) => {
+      const q = p.pos_au;
+      if (!Array.isArray(q) || q.length < 2) return;
+      const x = X(q[0]), y = Y(q[1]);
+      c.fillStyle = p.stable ? '#5ad3a3' : '#f0a071';
+      c.beginPath(); c.arc(x, y, 6, 0, Math.PI * 2); c.fill();
+      if (anchorSel === i){
+        c.strokeStyle = '#5b9cff'; c.lineWidth = 2;
+        c.beginPath(); c.ellipse(x, y, 11, 11, 0, 0, Math.PI * 2); c.stroke();
+      }
+      c.fillStyle = 'rgba(233,237,247,.95)';
+      c.font = '12px ui-monospace,Menlo,Consolas,monospace';
+      c.fillText(p.key, x + 10, y + 4);
+      anchorHits.push({ x, y, i });
+    });
+  }
+  $('anchorv').addEventListener('click', e => {
+    const cv = $('anchorv');
+    const r = cv.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    let best = -1, bd = Infinity;
+    anchorHits.forEach(h => {
+      const dd = Math.hypot(h.x - mx, h.y - my);
+      if (dd <= 14 && dd < bd){ bd = dd; best = h.i; }
+    });
+    if (best < 0 && anchorData && anchorData.points){
+      // 没点中就试键盘式选择：按 L1..L5（画布可聚焦）
+      const m = /^L([1-5])$/.exec(String(e.key || ''));
+      if (m) best = +m[1] - 1;
+    }
+    if (best < 0){ anchorSel = null; drawAnchors(); anchorNote(); return; }
+    anchorSel = best;
+    drawAnchors();
+    anchorNote();
+  });
+  $('anchorv').addEventListener('keydown', e => {
+    const m = /^L([1-5])$/.exec(String(e.key || ''));
+    if (!m || !anchorData) return;
+    e.preventDefault();
+    anchorSel = +m[1] - 1;
+    drawAnchors();
+    anchorNote();
+  });
+
+  // ---- ⑤ 预测轨道 / 计划模式 ----
+  // 预演 = 用**同样的 payload** 发一次更短的 /api/nbody（years 与 samples 都更小）。
+  // 幽灵轨迹的每一个点都来自那次回执的 frames[].p —— 页面不插值、不外推、不平滑。
+  //
+  // ⚠ 预演可取消：AbortController 通过 fetchT 的 opts.signal 传进去，
+  //   「放弃」真的把在途请求掐掉（不是只把幽灵藏起来）。
+  // ⚠ AbortError 一定要在 catch 里单独接住：漏接就是一条 unhandled rejection，
+  //   而漏接的症状（控制台报错）与真正的缺陷看起来完全一样。
+  const GHOST_YEARS_FRAC = 0.25;    // 预演跨度 = 主跨度的 1/4（显示/交互参数，不是物理）
+  const GHOST_SAMPLES = 160;        // 预演帧数上限（同上）
+  let ghostState = null;            // {frames, bodies, payload, ac}
+  function ghostClear(msg){
+    if (ghostState && ghostState.ac){ try { ghostState.ac.abort(); } catch (e) {} }
+    ghostState = null;
+    $('ghostapply').disabled = true;
+    $('ghostcancel').disabled = true;
+    if (msg !== false){
+      $('ghostnote').innerHTML = '改参数或拖动天体后，这里会先出现一次<b>预演</b>：'
+        + '同一套初值、更短的跨度（' + Math.round(GHOST_YEARS_FRAC * 100) + '% 跨度、'
+        + GHOST_SAMPLES + ' 帧），画成半透明的幽灵轨迹。'
+        + '觉得对就点「确认执行」，觉得不对点「放弃」（会真的把那次计算掐掉）。';
+    }
+  }
+  async function runPreview(){
+    if (!data) return;
+    const btn = $('ghostapply'), cancel = $('ghostcancel');
+    btn.disabled = true; cancel.disabled = false;
+    $('ghostnote').innerHTML = '正在让内核算一次短程预演…';
+    const payload = buildPayload();
+    // 预演只把这两样改小，其余（初值 / 积分器 / 碰撞 / 演化）与主计算逐字相同。
+    const my = +payload.years || +$('years').value || 50;
+    const ms = +payload.samples || 400;
+    payload.years = Math.max(0.05, my * GHOST_YEARS_FRAC);
+    payload.samples = Math.min(ms, GHOST_SAMPLES);
+    // 给预演请求打一个**在源头就可辨认**的标记。
+    //
+    // 为什么必须有：预演和真重算打的是同一个 /api/nbody，形状只差 years/samples。
+    // 于是任何"这次改动到底有没有触发重算"的观察者都会把预演算进去 ——
+    // 实测它让三条既有判据（会话恢复逐字比对、控件不自己重算、画质建议后重算）
+    // 全部误判：预演的 years = 主年数 × 0.25、samples 上限 160，
+    // 正好被当成"退出前那次请求"抓走。
+    // 页面自己已经声明了"预演 ≠ 重算"（画面在确认前不变），这个标记就是把
+    // 那句声明变成**可观测**的，而不是靠观测者去猜。
+    payload.preview = 1;
+    const ac = (typeof AbortController === 'undefined') ? null : new AbortController();
+    const st = { ac, payload };
+    ghostState = st;
+    try {
+      const r = await fetchT('/api/nbody', { method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+        timeout: 60000,
+        signal: ac ? ac.signal : undefined });
+      const js = await r.json();
+      if (!r.ok) throw new Error(js.error || ('HTTP ' + r.status));
+      if (ghostState !== st) return;          // 已经被放弃/换掉了，这一版丢掉
+      if (!Array.isArray(js.frames) || !js.frames.length)
+        throw new Error('内核回了 ' + (js.frames ? js.frames.length : '0') + ' 帧，画不出幽灵轨迹');
+      st.frames = js.frames; st.bodies = js.bodies;
+      btn.disabled = false; cancel.disabled = false;
+      $('ghostnote').innerHTML = '幽灵轨迹已经画在主画面上（虚线）。它来自一次 <b>'
+        + payload.years + ' 年 / ' + payload.samples + ' 帧</b> 的短程预演 —— '
+        + '<b>每一个点都是内核回执里的坐标，页面不插值、不外推</b>。'
+        + '画面上仍是上一次主计算的结果，直到你点「确认执行」。';
+      render();                                // 让幽灵立刻出现
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;          // 放弃 = 正常路径，不报错
+      if (ghostState === st){
+        ghostState = null;
+        btn.disabled = true; cancel.disabled = true;
+        $('ghostnote').innerHTML = '<span style="color:var(--warn)">预演没算出来：'
+          + (e && e.message || e) + '。主计算没有受影响。</span>';
+      }
+    }
+  }
+  function schedulePreview(){
+    if (!$('plantogg').checked) return;
+    clearTimeout(schedulePreview._t);
+    // 「松手前」：change 之后让出一个事件循环，等输入框的 change 全部落完再发。
+    schedulePreview._t = setTimeout(() => {
+      if (!$('plantogg').checked) return;
+      runPreview();
+    }, 30);
+  }
+  $('plantogg').addEventListener('change', () => {
+    if (!$('plantogg').checked) ghostClear('已关掉预演：改参数会直接重算（原有行为）。');
+    else ghostClear();
+  });
+  $('ghostnow').addEventListener('click', () => runPreview());
+  $('ghostcancel').addEventListener('click', () => {
+    ghostClear('已放弃这次预演：主计算的初值<b>一个字节都没改</b>，画面也回到上一次主计算的结果。');
+  });
+  $('ghostapply').addEventListener('click', () => {
+    ghostClear(false);
+    $('ghostnote').innerHTML = '已确认：用现在这套初值重算一遍主计算…';
+    compute();
+  });
+
+  // ---- ⑥ 随机宇宙种子 ----
+  // 半长轴 / 偏心率 / 质量 / 半径全部来自 /api/genesis 的回执，页面不抽随机数。
+  // 因为字段名与自定义行星完全一致，所以直接塞进 customBodies 走**同一条** nbody 通路。
+  //
+  // ⚠ 「今天的种子」按契约由内核/网关按日期字符串生成；**页面不许自己 new Date() 拼种子**。
+  //   所以输入框里放的是一个固定的示例种子，文案里写明了这一点。
+  $('seedgo').addEventListener('click', () => {
+    const seed = String($('seedin').value || '').trim();
+    const n = Math.max(2, Math.min(8, +$('seedn').value || 4));
+    if (!seed){
+      $('seednote').innerHTML = '<span style="color:var(--warn)">种子不能是空字符串 —— '
+        + '空种子会让"同一串种子给出同一套系统"这句话没有意义，页面不会替你编一个。</span>';
+      return;
+    }
+    const btn = $('seedgo');
+    btn.disabled = true; btn.textContent = '生成中…';
+    fetchT('/api/genesis', { method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ seed, bodies: n }), timeout: 60000 })
+      .then(r => r.json())
+      .then(js => {
+        btn.disabled = false; btn.textContent = '🎲 生成这个种子的宇宙';
+        if (!js || js.status !== 'ok' || !Array.isArray(js.bodies) || !js.bodies.length){
+          $('seednote').innerHTML = '<span style="color:var(--warn)">没生成出来：'
+            + ((js && js.error) || '回执里没有 bodies') + '</span>';
+          return;
+        }
+        // 字段名与自定义行星一致 —— 所以只是搬进 customBodies，不做任何换算。
+        customBodies = js.bodies.map(b => ({
+          name: String(b.name || 'P'), type: b.type || '',
+          a: b.a_au, e: b.e, inc: b.inc_deg, raan: b.raan_deg, argp: b.argp_deg,
+          M0: b.M0_deg, mass: b.mass_msun, radius_km: b.radius_km,
+          teff_K: b.t_eff_K, lum_lsun: b.lum_lsun
+        }));
+        $('scenario').value = 'custom';
+        $('solarmode').value = 'none';
+        syncPanels();
+        placedStack = [];
+        renderBodyTable();
+        setDirty(false);
+        persistBlocked = false;
+        const st = (js.stability || {});
+        $('seednote').innerHTML = '<b>种子「' + escapeHtml(seed) + '」</b>生成完毕，'
+          + (js.bodies.length) + ' 个天体已填进行星表，正走<b>普通那条 nbody 通路</b>算。'
+          + '<br>内核回显的 <code>seed_hash</code> = <b>' + escapeHtml(String(js.seed_hash))
+          + '</b>（内核按种子哈希出来的，页面不参与）'
+          + (st.min_margin !== undefined
+              ? ' · 最紧的一对相距 <b>' + fmt(st.min_margin) + '</b> AU（内核给的）' : '')
+          + (st.mutual_hill_ok !== undefined
+              ? ' · Hill 半径互不重叠：<b>' + (st.mutual_hill_ok ? '是' : '否') + '</b>' : '')
+          + (js.notes ? '<br><span class="stat">' + escapeHtml(js.notes) + '</span>' : '')
+          + '<br><span class="stat">半长轴 / 偏心率 / 质量 / 半径全部是内核给的，页面一个随机数都没抽。'
+          + '「今天的种子」按契约<b>由内核按日期字符串生成</b>，页面不自己拼日期 —— '
+          + '所以输入框里放的是一个固定的示例种子，你换成什么字符串，内核就哈希什么。</span>';
+        compute();
+      })
+      .catch(e => {
+        btn.disabled = false; btn.textContent = '🎲 生成这个种子的宇宙';
+        $('seednote').innerHTML = '<span style="color:var(--warn)">没生成出来：'
+          + (e && e.message || e) + '</span>';
+      });
+  });
+
+  // ---- 策略层与既有代码的接线 ----
+  // 三处挂接：① 每次主算完刷新协议判定；② 主算完之后（拿到质量与间距）请求锚点；
+  // ③ 跨度下拉与 years 双向同步。
+  //
+  // ⚠ 声明位置：本块所有状态都用 let/const 声明在**函数体上方**的这条位置，
+  //   而调用点在 compute() 之后 —— 与本文件已有的那条纪律一致（TDZ 踩过两次）。
+  function onDataSettled(){
+    judgeProtocols();
+    syncSpanFromYears();
+    // 锚点求解紧跟着主计算发，**不发延迟也不排队**。
+    //
+    // ⚠ 这里踩过一个很隐蔽的坑，值得留档：
+    //   锚点请求是一次 POST。加了"等一会再发"的延迟之后，它就会跨越
+    //   "页面被关掉"这个时刻 —— 客户端半路断连接，服务端 socket 上留着半个 body；
+    //   连接被复用时，那半个 body 被当成**下一个请求的方法行**读走，
+    //   于是下一个请求带着 `{"primary":...}GET` 这种畸形方法行打过去，回 501。
+    //   症状是"另一个不相干的请求拿到一页 456 字节的 HTML 错误页"，
+    //   与原因相隔十万八千里（实测：连续开关两次页面，第二个请求 100% 坏）。
+    //   所以这里**必须**尽快发完（本地网关热连接约 80 ms），让在途窗口短到
+    //   页面关闭时基本抓不到它，而不是靠"等久一点"来错开时机。
+    anchorRequest();
   }
   // ---- 导览 ----
   // 参照 qunabu/Gravity 的做法：先讲清楚"为什么"，再放开自由探索；每一步都有 deep link
@@ -1952,6 +3044,9 @@
     tourIdx = i;
     const s = TOUR[i];
     $('tourcard').style.display = 'block';
+    // 导览卡是突然出现在页面上的一块内容（display 从 none 到 block）——
+    // 原来没有过渡，它和下面那张卡看起来是同级的常驻内容。亮一下说清"这是刚打开的"。
+    flashEl($('tourcard'), 'sp-once');
     $('tourcount').textContent = '第 ' + (i + 1) + ' / ' + TOUR.length + ' 步 · ' + s.title;
     $('tourbody').innerHTML = s.body;
     $('tour_prev').disabled = (i === 0);
@@ -2960,6 +4055,43 @@
     return payload;
   }
 
+  // 带超时的 fetch。
+  // 为什么必须有：裸 `await fetch(...)` 没有上限，服务端不回话时它就永远挂着 ——
+  // 不 resolve 也不 reject，于是按钮停在"积分中…"、画布空着、错误条也不出现，
+  // 整页看上去像坏了却给不出任何原因。实测确实撞上过（冷启动时）。
+  // 超时按失败处理，页面就能说得出"没等到"，并把按钮解开让人重试。
+  // 不用 Promise.race 拼一个假超时：那只是提前返回，真实请求还在飞；
+  // AbortController 是真的把它掐掉。
+  // 老 jsdom 里可能没有 AbortController（判据要用 jsdom 加载页面），
+  // 那就退回裸 fetch：宁可不超时，也不能让判据环境直接抛错。
+  // ⚠ 调用方自己传的 signal（预演的「放弃」就靠它）必须**一并**接上：
+  //   只挂自己的超时而不看外部 signal，「放弃」就只是把幽灵藏起来，请求还在内核算 ——
+  //   探针会直接抓到 signal.aborted 仍为 false。这里把两个 signal 串起来：
+  //   外部 abort 时把内部那个一起 abort（反过来不行：超时不该替调用方做决定，
+  //   但外部取消一定要能穿透超时这道门）。
+  function fetchT(url, opts){
+    opts = opts || {};
+    const ms = opts.timeout || 15000;
+    const outer = opts.signal || null;
+    if (typeof AbortController === 'undefined') return fetch(url, opts);
+    const ac = new AbortController();
+    const timer = setTimeout(function(){ ac.abort(); }, ms);
+    let off = null;
+    if (outer){
+      if (outer.aborted) ac.abort();                       // 传进来时就已经取消了
+      else if (outer.addEventListener){
+        const h = function(){ ac.abort(); };
+        outer.addEventListener('abort', h);
+        off = function(){ outer.removeEventListener('abort', h); };
+      }
+    }
+    const o = Object.assign({}, opts, { signal: ac.signal });
+    return fetch(url, o).finally(function(){
+      clearTimeout(timer);
+      if (off) off();
+    });
+  }
+
   async function compute(){
     const btn = $('compute');
     btn.disabled = true; btn.textContent = '积分中…';
@@ -2968,9 +4100,12 @@
     // 碎裂 → 两百多颗、回执二十多 MB），拖滑杆完全可能落在"算的路上"。
     const revSent = paramRev;
     try {
-      const r = await fetch('/api/nbody', { method:'POST',
+      const r = await fetchT('/api/nbody', { method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload) });
+        body: JSON.stringify(payload),
+        // 上限刻意比网关自己的 180 秒 CLI 超时短一截：页面应该先说"这次没算出来"，
+        // 而不是陪着网关一起等到它放弃。120 秒对最重的载荷也留了余量。
+        timeout: 120000 });
       const js = await r.json();
       if (!r.ok) throw new Error(js.error || ('HTTP ' + r.status));
       // 内核契约守卫：status:"ok" 却给回 0 帧（--dt 0 或极小 dt 就会这样），
@@ -3013,6 +4148,8 @@
       samplingBadge();
       verdict();
       if (challenge) judgeChallenge();   // 挑战进行中时，每次重算都判定一次
+      // 策略层：协议判定 + 锚点求解 + 跨度同步，都挂在这条"一份新回执落地"的路径上。
+      onDataSettled();
       // 手动重算后照旧继续播放；恢复会话时尊重上次退出时的播放/暂停。
       const wantPlay = pending ? pending.playing !== false : true;
       if (playing !== wantPlay) togglePlay(false);   // 重算后恢复播放，同样不算改设定
@@ -3022,10 +4159,20 @@
       }
       flushSave();
       clearError();
+      // 一版新数据落地了 —— 整个页面上最需要"响一下"的时刻就是这一刻
+      // （首屏那次也算：它正好替代了原先"页面啪一下全在、不知道在不在算"的那段空白）。
+      // 一圈很淡的蓝从画面边缘散开，不抢读数、不循环。
+      flashEl($('stage'), 'sp-once');
       // 这版参数已经真的生效了 —— **除非**算的路上用户又改过（那样标记要留着）。
       setDirty(paramRev !== revSent);
     } catch (e) {
-      showError(e.message);     // 失败时不消脏标记：参数确实还没生效
+      // 失败时不消脏标记：参数确实还没生效。
+      // 超时单独说：AbortError 自带的 "The user aborted a request" 对读者没有意义，
+      // 而且它和"内核说不行"是两回事 —— 前者可以重试，后者改了参数也没用。
+      showError(e && e.name === 'AbortError'
+        ? '等了 120 秒内核还没回话就放弃了。这通常是服务冷启动或算得太重，'
+          + '不是参数错了 —— 调小「积分年数」或「输出帧数」再算一次通常就好了。'
+        : e.message);
     }
     extending = false;          // 成功失败都要清：否则"永久"延长只会发生一次
     btn.disabled = false;
@@ -3128,19 +4275,33 @@
     html += '<span class="stat" style="font-size:11.5px;flex-basis:100%">'
           + '想分清哪颗是哪颗、想知道它为什么是这个颜色 —— <b>点它一下</b>：'
           + '画面下方会出它的数据（第一行就是生命形态），镜头同时对准它。</span>';
-    $('legend').innerHTML = html;
+    const lg = $('legend');
+    lg.innerHTML = html;
+    // innerHTML 赋值不会动 hidden；重算时保持用户当前的展开/收起选择。
   }
+
+  // 图例的展开/收起。默认收起 —— 30+ 条目常驻会把操作控件顶到两屏以下。
+  // 用按钮而不是 <details>：<details> 会成为页面里第一个折叠区，
+  // 而 _probe_play_modes.js 用 `querySelector('details')` 钉住
+  // "稳定性挑战的按钮排在折叠区之前"。理由写在 CSS 旁的注释里。
+  $('legendtoggle').addEventListener('click', () => {
+    const btn = $('legendtoggle'), lg = $('legend');
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    lg.hidden = open;
+  });
 
   // 碰撞/碎裂/重聚事件时间线（数据来自内核 events 数组，页面只做展示）
   function buildEvents(){
     const ev = data.events || [];
     $('eventcard').style.display = ev.length ? 'block' : 'none';
-    if (!ev.length) return;
+    if (!ev.length){ evRowByT = {}; evNowT = null; evRowN = 0; return; }
+    const shown = ev.slice(0, 200);
     let html = '<table style="font-size:12.5px"><tr><th>t (yr)</th><th>类型</th>'
       + '<th>参与者</th><th style="text-align:right">间距 (AU)</th>'
       + '<th style="text-align:right">相对速度 (km/s)</th>'
       + '<th style="text-align:right">ΔE</th><th style="text-align:right">碎块</th></tr>';
-    for (const e of ev.slice(0, 200)) {
+    for (const e of shown) {
       const kind = e.kind === 'fragment' ? '💥 碎裂' : '🪐 合并/吸积';
       html += '<tr data-jump-t="' + e.t + '" style="cursor:pointer" title="跳到这一帧">'
         + '<td>' + e.t.toFixed(4) + '</td><td>' + kind + '</td><td>'
@@ -3160,6 +4321,36 @@
       + ' 个。动量漂移 ' + data.diagnostics.momentum_drift.toExponential(2)
       + '（碰撞严格守恒动量，这个数应始终在数值噪声量级）。</div>';
     $('eventlist').innerHTML = html;
+    // 时间线 ↔ 画布闪光的对应表（显示层索引）：键是内核给的 events[].t。
+    // 不用属性回读 —— 把浮点 t 写进 data- 再读回来会掉精度，键就可能对不上。
+    evRowByT = {}; evNowT = null; evRowN = 0;
+    const trs = $('eventlist').querySelectorAll('tr[data-jump-t]');
+    for (let i = 0; i < shown.length; i++){
+      if (trs[i]){ evRowByT[shown[i].t] = trs[i]; evRowN++; }
+    }
+    // 这一版数据带碰撞事件 → 事件表是**刚出现的**，让它亮一下，
+    // 否则它和下面「这份模拟的可信度」看起来是同一块常驻内容。
+    flashEl($('eventcard'), 'sp-once');
+  }
+  // 播放时把"正在闪的那一行"点亮。
+  // 判据只有一个：现在这一刻是不是落在某条内核事件的撞击表现窗口内 ——
+  // 与画布上那段闪光用的是**同一个** tWin（见 impactWindow），所以表里亮的那一行
+  // 就是画面上正在闪的那一下，不用自己在两处对时间。页面不判定任何物理结果。
+  // ⚠ 每帧只做一次长度比较；只有"换了一条"时才动 DOM（摘一个 class），不重排表格。
+  function markEventRow(now, tWin){
+    if (!evRowN) return;   // 这版数据没有事件（下面整个循环都不必进）
+    let hit = null;
+    if (tWin > 0){
+      for (let i = 0; i < impactPts.length; i++){
+        const age = now - impactPts[i].t;
+        if (age >= 0 && age <= tWin) hit = impactPts[i];   // 时间上最靠后的那一条
+      }
+    }
+    const t = hit ? hit.t : null;
+    if (t === evNowT) return;
+    if (evNowT !== null && evRowByT[evNowT]) evRowByT[evNowT].classList.remove('now');
+    evNowT = t;
+    if (t !== null && evRowByT[t]) evRowByT[t].classList.add('now');
   }
 
   const fmt = v => (v === undefined || v === null) ? '-' :
@@ -3356,6 +4547,29 @@
     ctx.clearRect(0,0,cv.width,cv.height);
     ctx.fillStyle = '#070b16'; ctx.fillRect(0,0,cv.width,cv.height);
 
+    // 深空背景的层次：纯色底之上压两团极淡的辉光（左上偏冷、右下偏暖）。
+    // 静态截图里这是最出效果的一处 —— 纯 #070b16 的底让所有东西都贴在同一层上，
+    // 画面看着像一张贴图而不像有远近的夜空。渐变**按尺寸缓存**（只有 resize 才重建），
+    // 所以每帧只多一次 fillRect，不多一次 createRadialGradient。
+    // 纯显示层：位置与颜色是画布构图，与天体数据无关，不碰任何读数。
+    if (!render.bgGlow || render.bgW !== cv.width || render.bgH !== cv.height){
+      render.bgW = cv.width; render.bgH = cv.height;
+      const D = Math.max(cv.width, cv.height);
+      const g1 = ctx.createRadialGradient(cv.width*0.28, cv.height*0.24, 0,
+                                          cv.width*0.28, cv.height*0.24, D*0.78);
+      g1.addColorStop(0, 'rgba(84,132,214,0.16)');
+      g1.addColorStop(0.5, 'rgba(50,78,146,0.06)');
+      g1.addColorStop(1, 'rgba(24,36,74,0)');
+      const g2 = ctx.createRadialGradient(cv.width*0.78, cv.height*0.82, 0,
+                                          cv.width*0.78, cv.height*0.82, D*0.62);
+      g2.addColorStop(0, 'rgba(150,96,140,0.10)');
+      g2.addColorStop(1, 'rgba(120,70,130,0)');
+      // 两次 fill 叠在同一个 fillRect 里：一次渐变就没法同时给冷暖两头。
+      render.bgGlow = [g1, g2];
+    }
+    ctx.fillStyle = render.bgGlow[0]; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = render.bgGlow[1]; ctx.fillRect(0, 0, cv.width, cv.height);
+
     // 星空背景（固定伪随机种子，避免闪烁）。
     // 这一层占"画面像不像真的"的比重比看起来大得多，三处改过：
     //   ① 数量：160 → 320（够密才有深空感）；
@@ -3437,7 +4651,14 @@
       // 完整轨道（暗）。也写成 rgba：这条是长折线，但**只有两个存活帧**的天体
       // （刚出生 / 快合并）会退化成 move→line→stroke 两笔 —— 那样它正好落进判据
       // 认"碎屑喷流"的形状里，只因为颜色是十六进制就被数成一条喷流。写成 rgba 就排除掉。
-      ctx.strokeStyle = rgbaOf(col, 0.16); ctx.globalAlpha = 1; ctx.lineWidth = 1;
+      //
+      // 深色底上 1 px 细线会糊成一层灰，所以描**两遍**：先一遍宽而极淡的底光把它
+      // "垫"出来，再一遍 1 px 的芯线。关键是第二次 stroke() 复用**同一条已建好的路径**
+      // —— 投影点一个都不多算一遍（这一段每帧要为每颗天体走完全部采样帧，是整页最贵的地方）。
+      // 天体一多就只描一遍：满屏都是线的时候这层底光既看不出来也是白花光栅化，
+      // 门槛沿用上面同一个 nAlive <= 40（名字也是按它节流的）。
+      const glowOrbit = nAlive <= 40;
+      ctx.globalAlpha = 1; ctx.lineWidth = 1;
       ctx.beginPath();
       let pen = false;
       for (let f = 0; f < data.frames.length; f++){
@@ -3449,7 +4670,10 @@
         pen ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
         pen = true;
       }
-      ctx.stroke();
+      if (glowOrbit){
+        ctx.strokeStyle = rgbaOf(col, 0.055); ctx.lineWidth = 2.6; ctx.stroke();
+      }
+      ctx.strokeStyle = rgbaOf(col, 0.20); ctx.lineWidth = 1; ctx.stroke();
 
       // ---- 已走过的轨迹：**由远及近渐亮渐粗的彗尾** ----
       // 原来是 0..fi 整段一个亮度一个粗细。"走过哪"看得见，但**现在在哪、往哪走**看不见 ——
@@ -3465,7 +4689,7 @@
       const tailN = Math.max(4, Math.min(30, Math.round(data.frames.length * 0.01)));
       // 天体一多（碎屑级联能滚出两百多块）满屏都是线，那时分档既看不清也白耗 stroke —— 只分两档。
       const TIERS = nAlive <= 40 ? 4 : 2;
-      // 四档的浓淡/粗细。第 0 档是"走过的全程"：它要明显亮于未走过的那条（0.16），
+      // 四档的浓淡/粗细。第 0 档是"走过的全程"：它要明显亮于未走过的那条（0.20 的芯线），
       // 否则"走过哪"这条信息就被彗尾盖掉了 —— 但又要暗于近端，头的层次才出得来。
       const TAIL_A = [0.52, 0.68, 0.82, 0.98];
       const TAIL_W = [1.50, 1.80, 2.10, 2.60];
@@ -3805,11 +5029,24 @@
         }
         ctx.restore();
       }
-      if (b === cam.sel){    // 选中标记：虚线圆环
+      if (b === cam.sel){    // 选中标记：外圈柔光 + 虚线圆环
         ctx.save();
-        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.9;
-        ctx.setLineDash([3,3]);
-        ctx.beginPath(); ctx.arc(x, y, rr + 6, 0, Math.PI*2); ctx.stroke();
+        // 一颗行星在整屏视角下常常只有 2–3 px，"被选中了"这件事原来几乎看不出来 ——
+        // 静态截图里更是完全分不出选中和没选中。这里补一圈柔光（半径随球体走）。
+        // ⚠ 用**径向渐变填充**而不是描边：判据认球体靠"字符串样式 + alpha 0.9"，
+        //   渐变对象不参与匹配，所以这一笔加在细环与球体之间不会把"哪一笔属于哪颗"搅乱。
+        // ⚠ 仍然只留**一次** stroke（虚线环），别在这里再加实线：判据读的是
+        //   "写名字前最后一次 stroke"，那已经被"球外那圈来源色细环"占着了。
+        const SR = rr + 15;
+        const gs = ctx.createRadialGradient(x, y, rr * 0.7, x, y, SR);
+        gs.addColorStop(0, 'rgba(150,195,255,0)');
+        gs.addColorStop(0.55, 'rgba(150,195,255,0.26)');
+        gs.addColorStop(1, 'rgba(120,170,255,0)');
+        ctx.fillStyle = gs;
+        ctx.beginPath(); ctx.arc(x, y, SR, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(232,236,246,0.95)'; ctx.lineWidth = 1.4; ctx.globalAlpha = 0.95;
+        ctx.setLineDash([5,4]);
+        ctx.beginPath(); ctx.arc(x, y, rr + 7, 0, Math.PI*2); ctx.stroke();
         ctx.setLineDash([]); ctx.restore();
       }
       // 球体本色 = 物质 × 生命（见 lifeColorOf：在物质基调色上染一层阶色，死寂往灰里压）。
@@ -3939,6 +5176,60 @@
                      fx + mk + 5, fy - mk - 2);
         ctx.restore();
       }
+    }
+
+    // ---- 暗角：把视线收进画面中心 ----
+    // 画在最上层、很淡（角落最深处也只压到 0.5 的黑）。它的作用不是"变暗"，
+    // 是让内太阳系那一小簇不再和外圈的碎屑、远处的暗星抢注意力 —— 静态截图尤其明显。
+    // 渐变按尺寸缓存，每帧只有一次 fillRect。
+    if (!render.vig || render.vigW !== cv.width || render.vigH !== cv.height){
+      render.vigW = cv.width; render.vigH = cv.height;
+      const v = ctx.createRadialGradient(cv.width/2, cv.height/2,
+                                         Math.min(cv.width, cv.height) * 0.34,
+                                         cv.width/2, cv.height/2,
+                                         Math.max(cv.width, cv.height) * 0.76);
+      v.addColorStop(0, 'rgba(3,6,14,0)');
+      v.addColorStop(0.62, 'rgba(3,6,14,0.16)');
+      v.addColorStop(1, 'rgba(3,6,14,0.50)');
+      render.vig = v;
+    }
+    ctx.fillStyle = render.vig; ctx.fillRect(0, 0, cv.width, cv.height);
+
+    // 事件表里"正在闪的那一行"（与上面那段闪光同一个 tWin）。
+    // 每帧只有几次比较；换人时才动 DOM。
+    markEventRow(now, tWin);
+
+    // 锚点画布与主画面**同一帧**重画（契约 §4.4：共用同一套帧号与 tWin）。
+    // ⚠ 为什么不是"拿到回执时画一次"：这一块是随帧刷新的读图，不是静态插图。
+    //   只画一次的话，用户点选了某个锚点之后画面不会跟着变（选中态画不上去），
+    //   屏幕与实际状态就对不上了 —— 而"对不上"在这一页是最难查的一类坏。
+    //   它与主画面共用 now/tWin，所以撞击闪光亮起时锚点区也是同一时刻的状态。
+    maybeDrawAnchors(fi);
+
+    // 幽灵轨迹（计划模式）：虚线，**每一个点都来自那次短程预演回执的 frames[].p**。
+    // ⚠ 不插值、不外推、不"平滑"：只把回执里有的那些点按顺序连起来。
+    //   画在撞击闪光**之后**、暗角**之前**，这样它压在天体上而不会被暗角压暗。
+    //   幽灵与主计算是两次独立回执，所以它是半透明的 —— 一眼能分清"这是还没确认的那版"。
+    if (ghostState && ghostState.frames && ghostState.frames.length){
+      const gf = ghostState.frames;
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 1.2;
+      for (let b = 0; b < ghostState.bodies.length; b++){
+        const bd = ghostState.bodies[b];
+        const col = colorOf(bd.id, b);
+        ctx.strokeStyle = col;
+        let pen = false;
+        for (let f = 0; f < gf.length; f++){
+          const q = gf[f].p[b];
+          if (!q) continue;                        // 这一帧里它还不存在（预演比主计算短）
+          const [x, y] = project(q, yaw, pitch, scale, cx, cy);
+          if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; }
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // 视角说明行：把"当前在看哪个平面"写清楚，而不是让人猜
@@ -4223,10 +5514,21 @@
     frameF = Math.round(+$('scrub').value / 1000 * (data.frames.length-1));
     pulseSeek();                       // 拖时间轴同样是"手动定位"，给它同一个反馈
   });
-  $('years').addEventListener('input', e => e.target.dataset.touched = '1');
+  $('years').addEventListener('input', e => {
+    e.target.dataset.touched = '1';
+    syncSpanFromYears();        // 手改年数 → 跨度档位跟着反映（不在四档里就留空）
+  });
+  // 帧数与年数一改就发一次预演（勾着「松手前先预演一遍」时）。
+  // change 而不是 input：拖滑杆途中每帧都发会把内核算爆，"松手前"就是这里。
+  ['years', 'samples'].forEach(id => $(id).addEventListener('change', () => {
+    syncSpanFromYears();
+    schedulePreview();
+  }));
+  // 行星表里改任何一格（松手时）也预演 —— 与 years/samples 同一个入口。
+  $('bodytable').addEventListener('change', () => schedulePreview());
 
   // 启动：健康检查 + 首次计算
-  fetch('/api/health').then(r => r.json()).then(h => {
+  fetchT('/api/health').then(r => r.json()).then(h => {
     if (!h.exists)
       $('statline').innerHTML = '<span style="color:#f5c6a5">未找到 starpivot 可执行文件，请先编译。</span>';
   }).catch(() => {
@@ -4254,6 +5556,19 @@
       setTimeout(() => startTour(0), 400);
     }
   }
+  // 策略层的初始状态：协议条目先建出来（判定要等第一份回执），
+  // 方案列表与幽灵状态各给一句初始说明。三者都不碰任何内核结果。
+  //
+  // ⚠ 声明顺序：这三行必须在上面 restoreSession() **之后**。
+  //   restoreSession 会把 protocols_done / schemes / spanmode 从存档填回来，
+  //   而 buildProtocols() 要按填好的 protoDone 建列表 —— 放在它前面，
+  //   列表会用"空进度"建一次，之后没人重画，于是用户重开页面看到自己
+  //   已达成的关卡退回未达成（判据 _probe_protocols.js §4 直接抓这个）。
+  //   与本文件已有的两条纪律同源：状态先恢复，界面再按状态建。
+  buildProtocols();
+  renderSchemes();
+  ghostClear();
+
   compute();
   requestAnimationFrame(tick);
 })();

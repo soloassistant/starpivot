@@ -47,6 +47,10 @@
     --dur:.16s; --ease:cubic-bezier(.2,.6,.2,1);
     --wrap:760px;
   }
+  /* —— 本页专用动效令牌（只在这一页，不进 :root）——
+     下面这两个量只有这一页的动效用得到。:root 里那 48 个令牌是四页共用的，
+     改它们的值要四页一起改 —— 那是另一个任务的事，不该由一页偷偷加。 */
+  body{--k-rise:10px;--k-lift:.5s}
   *{box-sizing:border-box}
   /* 触屏：点按不闪系统灰；刘海屏 / Home 指示条处留安全区，内容不被压住。 */
   html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:rgba(180,92,21,.18)}
@@ -68,7 +72,10 @@
      border 会让那个矩形与绘制区差 1px，outline 完全不占布局。 */
   canvas{width:100%;display:block;border-radius:var(--r-2);background:#fffdf8;cursor:crosshair;
          outline:1px solid var(--line);outline-offset:-1px;
-         touch-action:manipulation}
+         touch-action:manipulation;
+         /* 刚放下一颗行星：边框亮一下又退回去。纯"这里可以点"的提示，一次 0.5 秒。 */
+         transition:outline-color var(--dur) var(--ease)}
+  canvas.k-land{outline:2px solid var(--accent)}
   /* 旋钮：两个一组，值单独做成小底片（白色 + 描边，和旁边那几个 range 控件同一族）。
      ⚠ 值不用 --accent 写在 --accent-soft 上（那对只有 4.18:1，小字不够）；
        写在白底上 accent 是 4.69:1，和其他几处已验过的组合一致。 */
@@ -104,6 +111,11 @@
   button:hover{border-color:var(--accent);background:var(--accent-soft)}
   button:active{transform:translateY(1px);box-shadow:none}
   button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+  /* 按住不放的那种"现在开着"（并排模式）：底色 + 双线描边 + 加粗。
+     字色仍用 --ink（白卡上 14.39:1）；不用 --accent —— 它在 --accent-soft 上只有 4.18:1。 */
+  button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink);
+       font-weight:700;box-shadow:var(--sh-1),inset 0 0 0 1px var(--accent)}
+  button[aria-pressed="true"]:hover{background:var(--accent-soft);border-color:var(--accent)}
   /* 两条"结论"（猜对 / 猜错）与另三页的 .okbox/.warnbox 用同一种画法：左侧一条实色。
      组件层是四页共用的，孩子页也不该长出第二种"结论"的样子。 */
   .found{background:var(--ok-soft);border:1px solid #bbf7d0;border-left:4px solid var(--ok);
@@ -125,6 +137,16 @@
         border-radius:var(--r-2);padding:var(--sp-4);
         font-size:var(--fs-base);line-height:var(--lh-loose);color:#6f3a08;margin-top:var(--sp-4)}
   .miss b{color:#5d3006}
+  /* "你试过的每一步"：把内核回显的那些年数画成一排长短不同的横条。
+     条长只按同一批里回显数字的相对长短画（最长的那条画满），不换算成任何单位、
+     不做外推 —— 条子旁边写着的那个年数才是真的，条子只是把它画出来。 */
+  .bars{margin-top:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2)}
+  .bar{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm);color:#14532d}
+  .bar .lab{flex:0 0 4.4em;font-weight:700}
+  .bar .track{flex:1 1 auto;min-width:0}
+  .bar .fill{display:block;height:14px;border-radius:var(--r-full);
+             background:linear-gradient(90deg,#f3ab4a,var(--accent))}
+  .bar .num{flex:0 0 auto;font-weight:700;font-variant-numeric:tabular-nums}
   /* 两个折叠区 = 两张"能摊开的卡片"：浅一档的暖面 + 开合时转的雪佛龙。
      它们原来是"一条横线 + 一行小灰字"，看起来像正文的分隔符而不是可以点开的东西。 */
   details{margin-top:var(--sp-4);border:1px solid var(--line);border-radius:var(--r-3);
@@ -176,6 +198,29 @@
     a{display:inline-flex;align-items:center;justify-content:center}
     input[type=range]{height:44px}
   }
+  /* —— 本页动效：低频、克制、只响一次 ——
+     四页原来零 @keyframes，兜底只有 hover 过渡；这一页是给孩子看的，所以只加
+     "到点轻轻动一下就停"这一类，没有一条循环动画（循环闪烁对低龄孩子不安全）。
+     每条的关键帧都写成"从偏移态 → 自然态"，所以不带 animation 时元素就是完整的
+     自然状态；下面 prefers-reduced-motion 那条把它们全关掉时，页面不会缺任何东西。 */
+  /* ⚠ 入场动画（kIn / kSlide / kPanel）一律**只动 transform，不从 opacity:0 起**。
+     这一页用的是 animation-fill-mode:both，它会在整个延迟期把元素按死在 from 态；
+     一旦渲染器不推进 CSS 动画（后台/被冻结的标签页），内容就**永久停在 opacity:0** ——
+     占位还在、看着像没加载出来。home/index 上实测过这个现象，等 60 秒、hover 强制
+     重绘都恢复不了。只动 transform 时，动画不跑的后果仅仅是"位置偏 6px"，内容始终
+     完整可读。脉冲类（kPop 从 .35 起、kNudge）本来就只影响一瞬间，保留淡入。 */
+  @keyframes kIn{from{transform:translateY(var(--k-rise))}to{transform:none}}
+  @keyframes kPop{0%{opacity:.35;transform:scale(.93)}55%{transform:scale(1.035)}100%{opacity:1;transform:none}}
+  @keyframes kSlide{from{transform:translateX(-6px)}to{transform:none}}
+  @keyframes kPanel{from{transform:translateY(6px)}to{transform:none}}
+  @keyframes kNudge{0%{transform:none}35%{transform:translateY(-3px)}100%{transform:none}}
+  .card{animation:kIn var(--k-lift) var(--ease) both}
+  /* 下面四个由 JS 加 class 触发（加之前先去掉、等一帧再上，才播得起来）。 */
+  .k-pop{animation:kPop .5s var(--ease) both}
+  .k-slide{animation:kSlide .45s var(--ease) both}
+  .k-panel{animation:kPanel .4s var(--ease) both}
+  /* 猜中那一次轻轻点个头（不循环）：让"对了"有个落点。 */
+  .k-nudge{animation:kNudge .6s var(--ease) both}
   @media(prefers-reduced-motion:reduce){
     *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
   }
@@ -187,7 +232,7 @@
   <h1>行星小实验</h1>
   <div class="lead">点一下画面，放一颗行星 —— 看看它绕恒星转一圈，要多久。</div>
 
-  <div class="card">
+  <div class="card" style="animation-delay:.05s">
     <canvas id="sky" role="img" aria-label="实验画面：中间那个黄点是恒星，在它旁边点一下就放一颗行星" width="720" height="520"></canvas>
     <div class="tip" id="tip" aria-live="polite">画面里的黄点是恒星。在它周围点一下，行星就放在那儿。</div>
 
@@ -203,13 +248,24 @@
         <input type="range" id="ecc" min="0" max="0.6" step="0.1" value="0">
       </div>
     </div>
+    <!-- 键盘能走的路：点画布要用鼠标，这里四个按钮给不方便拖的人（也是最快的重复尝试），
+         正好和"离恒星几步远"那个旋钮一样，都是 1~4 步。两个按钮各有 48px 高。 -->
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px" id="quickwrap">
+      <button id="quick1">近一点</button>
+      <button id="quick2">再远一点</button>
+      <button id="quick3">更远</button>
+      <button id="quick4">最远</button>
+    </div>
     <div style="text-align:center;margin-top:14px" id="againwrap">
-      <button id="again">换成这个再试一次</button>
+      <button id="again">看快一点的样子</button>
+    </div>
+    <div style="text-align:center;margin-top:10px" id="pairwrap">
+      <button id="dopair" aria-pressed="false">放两颗，一起跑</button>
     </div>
   </div>
 
-  <div class="card">
-    <div class="big">转一圈要 <b id="period">—</b> <span id="unit">年</span></div>
+  <div class="card" style="animation-delay:.14s">
+    <div class="big"><span id="who">转一圈要</span> <b id="period">—</b> <span id="unit">年</span></div>
     <div class="tip" id="ptip" aria-live="polite">正在问……</div>
     <div class="guess" id="guess" style="display:none">
       <div class="ask" id="ask">你猜：它转一圈要多久？</div>
@@ -226,7 +282,7 @@
     <div class="found" id="found" style="display:none;margin-top:14px"></div>
   </div>
 
-  <div class="card">
+  <div class="card" style="animation-delay:.23s">
     <div class="tip" id="coltip" aria-live="polite">还想看别的？这里有两颗行星，可以让它们撞一下看看。</div>
     <div style="text-align:center;margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
       <button id="dobump">让它们撞一下</button>
@@ -264,6 +320,7 @@
         把位置画出来，以及按"一圈占几帧"把动画循环起来。
       </div>
       <div style="margin-top:10px" id="colnums">还没有试过撞一下。</div>
+      <div style="margin-top:10px" id="pairnums">还没有并排试过。</div>
       <div style="margin-top:10px">
         "猜一猜"的对错也<b>不来自页面判断</b>：页面把内核回显的<b>两次</b>一圈时长相除得到倍数，
         再按 1.5 / 2.4 两个分界把它归到三档里，与你选的那一档比对。
@@ -303,44 +360,286 @@ let tried = [];               // 每揭晓一次记一条：{dist, ecc, period}
 let mode = 'sandbox';         // 'sandbox' 单颗行星的小实验 / 'collide' 两颗撞一下
 let col = null;               // 撞一下那一组的数据（全部来自回执）
 let pendingGuess = null;      // 正在等孩子猜的那一次
+let pair = null;              // 并排那一次：{near, far}（两步都是旋钮里的值）
+let ghost = null;             // 上一颗走过的路（画成灰虚线，让两次能叠着比）
+let pathList = [];            // 这一轮要画哪几条路：{idx, solid, glow, dot, text, label, body, r, spr, dly}
 
 function px(step, angle) {
   return [cx + Math.cos(angle) * step * scale, cy - Math.sin(angle) * step * scale];
 }
 
-function drawSky() {
-  ctx.clearRect(0, 0, cv.width, cv.height);
+/* ================= 画面层 =================
+   两条规矩，别的都可以商量：
+   ① 这一页不产生任何数字。画布上每一个位置都来自回执里的逐帧坐标，
+      下面这些函数只回答"怎么画好看"，一个数都不回答。
+   ② 每帧尽量便宜。不变的两样东西各缓存到一张离屏画布上（底图、恒定的轨迹），
+      每帧只 blit 两次；行星的辉光是**建一次**的小图，之后只 drawImage ——
+      不给每帧新建渐变，那是这一页最容易把帧率拖垮的一步。 */
+function newLayer() {
+  const c = document.createElement('canvas');
+  c.width = cv.width; c.height = cv.height;
+  return { cv: c, g: c.getContext('2d') };
+}
+let skyL = null, pathL = null, skyDirty = true, pathDirty = true;
+function sky() { if (!skyL) skyL = newLayer(); return skyL; }
+function pathLayer() { if (!pathL) pathL = newLayer(); return pathL; }
+
+// 辉光小图：建一次，反复用。
+const GLOW_SPEC = {
+  a: { r: 30, s: [[0, 'rgba(94,142,250,.50)'], [0.45, 'rgba(47,109,246,.18)'], [1, 'rgba(47,109,246,0)']] },
+  b: { r: 30, s: [[0, 'rgba(242,154,74,.50)'], [0.45, 'rgba(214,110,40,.18)'], [1, 'rgba(214,110,40,0)']] },
+  m: { r: 42, s: [[0, 'rgba(198,146,255,.55)'], [0.45, 'rgba(122,63,208,.20)'], [1, 'rgba(122,63,208,0)']] },
+  f: { r: 64, s: [[0, 'rgba(255,255,255,.92)'], [0.3, 'rgba(255,228,156,.5)'],
+                 [0.72, 'rgba(255,170,60,.16)'], [1, 'rgba(255,170,60,0)']] }
+};
+const sprites = {};
+function glowOf(key) {
+  if (sprites[key]) return sprites[key];
+  const sp = GLOW_SPEC[key];
+  if (!sp) return null;
+  const c = document.createElement('canvas');
+  c.width = c.height = sp.r * 2;
+  const g = c.getContext('2d');
+  if (!g) return null;              // 没有 2D 上下文就安静退化成"只有实心球"
+  const gr = g.createRadialGradient(sp.r, sp.r, 0, sp.r, sp.r, sp.r);
+  sp.s.forEach((s) => gr.addColorStop(s[0], s[1]));
+  g.fillStyle = gr; g.fillRect(0, 0, sp.r * 2, sp.r * 2);
+  sprites[key] = c;
+  return c;
+}
+
+// 画布上写字用的字体：跟正文同一套系统字体，不引任何外部字体。
+const FONT = 'system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif';
+
+// 时间源：动效的"年龄"都从它算。极老的环境没有 performance.now 就退回 Date.now。
+const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+
+// 少动模式：系统说了"少动"，这一页就一动不动（闪动对低龄孩子是真的会不舒服）。
+const mq = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
+  ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+let calm = mq ? !!mq.matches : false;
+if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', (e) => { calm = !!e.matches; });
+
+// 画面上的一次性效果：落位的涟漪、撞上的闪光与碎光点、擦肩的圈。每个都有寿命，到点自己消失。
+let fx = [];
+function addFx(f) { f.t0 = nowMs(); fx.push(f); if (fx.length > 20) fx.shift(); }
+
+function buildSky() {
+  const L = sky();
+  if (!L.g) { skyDirty = false; return; }
+  const g = L.g;
+  g.clearRect(0, 0, cv.width, cv.height);
+  // 底：中心亮、四周沉一点，让"离得远"这件事在画面上有方向
+  const vg = g.createRadialGradient(cx, cy, scale * 0.4, cx, cy, scale * MAXSTEP * 1.15);
+  vg.addColorStop(0, '#fffdf6'); vg.addColorStop(1, '#f6efdf');
+  g.fillStyle = vg; g.fillRect(0, 0, cv.width, cv.height);
   // 淡淡的圈：每一格代表"离恒星几步远"
-  ctx.strokeStyle = '#efe7d8'; ctx.lineWidth = 1;
-  for (let s = 1; s <= MAXSTEP; s++) {
-    ctx.beginPath(); ctx.arc(cx, cy, s * scale, 0, Math.PI * 2); ctx.stroke();
+  g.strokeStyle = '#e9dfcc'; g.lineWidth = 1;
+  for (let s = 1; s <= MAXSTEP; s++) { g.beginPath(); g.arc(cx, cy, s * scale, 0, Math.PI * 2); g.stroke(); }
+  // 恒星：外面一大团散光（原来没有）、里面一层亮面（偏左上，像被照着）、中间一个实心小核
+  const halo = g.createRadialGradient(cx, cy, 2, cx, cy, 78);
+  halo.addColorStop(0, 'rgba(255,206,92,.40)');
+  halo.addColorStop(0.5, 'rgba(255,198,61,.12)');
+  halo.addColorStop(1, 'rgba(255,198,61,0)');
+  g.fillStyle = halo; g.beginPath(); g.arc(cx, cy, 78, 0, Math.PI * 2); g.fill();
+  const face = g.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 16);
+  face.addColorStop(0, '#fff4cd'); face.addColorStop(0.5, '#ffc63d'); face.addColorStop(1, '#f4a300');
+  g.fillStyle = face; g.beginPath(); g.arc(cx, cy, 16, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#f4a300'; g.beginPath(); g.arc(cx, cy, 7, 0, Math.PI * 2); g.fill();
+  skyDirty = false;
+}
+
+function drawSky(t) {
+  t = t || nowMs();
+  if (skyDirty) buildSky();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (sky().g) ctx.drawImage(sky().cv, 0, 0);
+  // 恒星会呼吸：每帧只多补一圈很淡的光环。少动模式下不呼吸，画面完全静止。
+  if (!calm) {
+    const w = Math.sin(t / 760);
+    ctx.strokeStyle = 'rgba(244,163,0,' + (0.10 + 0.09 * w).toFixed(3) + ')';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(cx, cy, 19 + 2.4 * w, 0, Math.PI * 2); ctx.stroke();
   }
-  // 恒星
-  const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, 16);
-  g.addColorStop(0, '#ffe89a'); g.addColorStop(0.5, '#ffc63d'); g.addColorStop(1, 'rgba(255,198,61,0)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#f4a300'; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+}
+
+// 把回执里第 idx 颗天体的逐帧位置连成一条线（只描路径，不描）。
+function traceRoute(g, idx, n) {
+  g.beginPath();
+  for (let i = 0; i < n; i++) {
+    const p = frames[i].p[idx];
+    const x = cx + p[0] * scale, y = cy - p[1] * scale;
+    i ? g.lineTo(x, y) : g.moveTo(x, y);
+  }
+}
+
+function buildPath() {
+  const L = pathLayer();
+  if (!L.g || !frames) { pathDirty = false; return; }
+  const g = L.g;
+  g.clearRect(0, 0, cv.width, cv.height);
+  // 上一颗走过的路：灰色虚线，不抢眼但一直留在画面上 ——
+  // "离得越远它的一年越长"这件事，叠着看两次才看得出来。
+  if (ghost) {
+    g.setLineDash([7, 7]); g.lineWidth = 1.5; g.strokeStyle = 'rgba(124,110,80,.45)';
+    g.beginPath();
+    ghost.forEach((p, i) => { i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); });
+    g.stroke();
+    g.setLineDash([]);
+  }
+  // 本轮的路：先铺一层很宽很淡的同色底衬（细线在暖白底上"站得住"），再压主线。
+  pathList.forEach((pl) => {
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    traceRoute(g, pl.idx, frames.length);
+    g.strokeStyle = pl.glow; g.lineWidth = 7; g.stroke();
+    traceRoute(g, pl.idx, frames.length);
+    g.strokeStyle = pl.solid; g.lineWidth = 2; g.stroke();
+  });
+  pathDirty = false;
 }
 
 function drawPath() {
   if (!frames) return;
-  ctx.strokeStyle = 'rgba(47,109,246,.45)'; ctx.lineWidth = 2; ctx.beginPath();
-  frames.forEach((f, i) => {
-    const p = f.p[1];
-    const x = cx + p[0] * scale, y = cy - p[1] * scale;
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  if (pathDirty) buildPath();
+  if (pathLayer().g) ctx.drawImage(pathLayer().cv, 0, 0);
+  // 路上标"几步远"：写的就是孩子自己拨的那个旋钮值（也标在终点圆的一侧），
+  // 不是算出来的。终点圆就是那颗行星的出发点 —— 内核回显的第 0 帧。
+  ctx.font = '600 15px ' + FONT;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  if (ghost) {
+    ctx.fillStyle = 'rgba(112,100,76,.95)';
+    ctx.fillText('刚才那颗', ghost[0][0] + 14, ghost[0][1] - 16);
+  }
+  pathList.forEach((pl) => {
+    if (!pl.label) return;
+    const p = frames[0].p[pl.idx];
+    ctx.fillStyle = pl.text;
+    ctx.fillText(pl.label, cx + p[0] * scale + 14, cy - p[1] * scale - 16);
   });
-  ctx.stroke();
 }
 
-function drawPlanetAt(fi) {
-  const p = frames[fi].p[1];
-  const x = cx + p[0] * scale, y = cy - p[1] * scale;
-  ctx.fillStyle = '#2f6df6';
-  ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(47,109,246,.25)'; ctx.lineWidth = 6;
-  ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.stroke();
-  return [x, y];
+// 行星身后那条渐淡的尾巴：只存最近 TRAIL_N 个画布坐标，越老越淡。
+const TRAIL_N = 20;
+let trail = [];
+function drawTrail(rgb) {
+  const n = trail.length;
+  if (n < 2) return;
+  ctx.lineCap = 'round';
+  for (let i = 1; i < n; i++) {
+    const k = i / n;
+    ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.05 + 0.5 * k * k).toFixed(3) + ')';
+    ctx.lineWidth = 0.5 + 2.4 * k;
+    ctx.beginPath();
+    ctx.moveTo(trail[i - 1][0], trail[i - 1][1]);
+    ctx.lineTo(trail[i][0], trail[i][1]);
+    ctx.stroke();
+  }
+}
+
+// 一颗球：外圈辉光（那张建好的小图）+ 实心球 + 一点高光，让它看起来是个球。
+function drawBody(x, y, r, fill, glowKey, a) {
+  const s = glowKey ? glowOf(glowKey) : null;
+  if (s) {
+    ctx.globalAlpha = a;
+    const d = r * 6.2;
+    ctx.drawImage(s, x - d / 2, y - d / 2, d, d);
+    ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = fill;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.34, r * 0.4, 0, Math.PI * 2); ctx.fill();
+}
+
+// 落位时"弹"一下再稳住：只改画出来的半径，一个回显数字都不碰。
+// dly 是给并排那颗的错开时间（两颗别一起弹）。
+let popT0 = 0;
+function popScale(t, dly) {
+  if (calm || !popT0) return 1;
+  const k = (t - popT0 - (dly || 0)) / 520;
+  if (!(k >= 0) || k >= 1) return 1;
+  const e = 1 - Math.pow(1 - k, 3);                     // 缓出
+  return 0.4 + 0.6 * e + 0.14 * Math.sin(Math.PI * k);  // 末尾轻轻过冲一下
+}
+
+// 一次性的画面效果。四种，各自画各自的，全都在这里就地画完（不留到下一帧）。
+// kind: drop 落位的涟漪 / flash 撞上的闪光 / sparks 碎光点 / near 擦肩的圈
+function drawFx(t) {
+  for (let i = fx.length - 1; i >= 0; i--) {
+    const f = fx[i], k = (t - f.t0) / f.dur;
+    if (!(k >= 0) || k >= 1) { fx.splice(i, 1); continue; }
+    const e = 1 - Math.pow(1 - k, 2);
+    if (f.kind === 'drop') {
+      for (let n = 0; n < 3; n++) {
+        const kk = e - n * 0.22;
+        if (kk <= 0) continue;
+        ctx.strokeStyle = 'rgba(' + f.rgb + ',' + (0.5 * (1 - kk)).toFixed(3) + ')';
+        ctx.lineWidth = 3 - n * 0.7;
+        ctx.beginPath(); ctx.arc(f.x, f.y, 12 + 78 * kk, 0, Math.PI * 2); ctx.stroke();
+      }
+    } else if (f.kind === 'flash') {
+      const s = glowOf('f');
+      if (s) {
+        ctx.globalAlpha = Math.max(0, 1 - k) * 0.95;
+        const d = f.r * (0.7 + 2.4 * e);
+        ctx.drawImage(s, f.x - d / 2, f.y - d / 2, d, d);
+        ctx.globalAlpha = 1;
+      }
+      ctx.strokeStyle = 'rgba(255,238,196,' + (0.7 * (1 - k)).toFixed(3) + ')';
+      ctx.lineWidth = 1 + 4 * (1 - k);
+      ctx.beginPath(); ctx.arc(f.x, f.y, 14 + 118 * e, 0, Math.PI * 2); ctx.stroke();
+    } else if (f.kind === 'sparks') {
+      f.d.forEach((a) => {
+        const dd = a * e * 88;
+        ctx.fillStyle = 'rgba(' + f.rgb + ',' + Math.max(0, 0.9 - k).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(f.x + Math.cos(a) * dd, f.y + Math.sin(a) * dd, 1 + 3 * (1 - k), 0, Math.PI * 2);
+        ctx.fill();
+      });
+    } else if (f.kind === 'near') {
+      ctx.strokeStyle = 'rgba(124,110,80,' + (0.55 * (1 - k)).toFixed(3) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(f.x, f.y, 16 + 26 * e, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+}
+
+// 画面左上角一枚小牌子：撞上了 / 没撞上 —— 一眼就分得开，不靠读下面的字。
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+function badge(txt, solid) {
+  ctx.font = '600 19px ' + FONT;
+  const w = ctx.measureText(txt).width + 34, h = 40;
+  roundRect(ctx, 14, 14, w, h, 20);
+  ctx.fillStyle = solid ? '#9a4a10' : 'rgba(255,255,255,.94)';
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = solid ? '#9a4a10' : 'rgba(160,120,50,.6)';
+  ctx.stroke();
+  ctx.fillStyle = solid ? '#fffaf2' : '#5a4a26';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(txt, 31, 14 + h / 2 + 1);
+}
+
+// 第 fi 帧上每一条路对应的天体，现在在画面哪儿（坐标全部来自回执）。
+function spotsAt(fi) {
+  const f = frames[Math.max(0, Math.min(fi, frames.length - 1))];
+  return pathList.map((pl) => {
+    const p = f.p[pl.idx];
+    return [cx + p[0] * scale, cy - p[1] * scale];
+  });
+}
+function spotOf(idx, fi) {
+  const f = frames[Math.max(0, Math.min(fi, frames.length - 1))];
+  const p = f.p[idx];
+  return [cx + p[0] * scale, cy - p[1] * scale];
 }
 
 // 动画用"代次"（token）来管，而不是一个 playing 布尔量。
@@ -348,17 +647,41 @@ function drawPlanetAt(fi) {
 // 并看到 playing 又变 true，于是新旧两轮同时画 —— 行星会闪、会突然变快。
 // 每次 play/stop 都把 token 加一，旧的那轮醒来发现自己过期了就退出。
 let animToken = 0;
+
+// 落位：孩子最期待的一刻，现在给它三样反馈 —— 球从半大弹到正常大、地上荡开一圈涟漪、
+// 画布边框亮一下。都只改"怎么画"，不碰任何回显数字。少动模式下全都不做。
+function land() {
+  popT0 = calm ? 0 : nowMs();
+  if (calm || !frames || !pathList.length) return;
+  const s = spotOf(pathList[0].idx, 0);
+  addFx({ kind: 'drop', x: s[0], y: s[1], dur: 1000, rgb: pathList[0].dot });
+  cv.classList.add('k-land');
+  setTimeout(() => cv.classList.remove('k-land'), 520);
+}
 function play() {
   if (!frames) return;
   const my = ++animToken;
   // 一圈占几帧 = 内核给的一圈时长 ÷ 内核给的每帧时长。页面只做这一处"除法"，
   // 为的是让动画恰好绕一圈就重来（这是画图的事，不是物理）。
+  // 并排的两颗共用这一个 span、同一个帧号：帧号相同就意味着同一时刻，
+  // 谁先跑完一圈完全由那份坐标决定，页面没有为它们做任何时间换算。
   const per = Math.max(2, Math.round(period / dtYears));
   const span = Math.min(per, frames.length);
   let i = 0;
+  trail = [];
   const step = () => {
     if (my !== animToken) return;      // 已经有新的一轮了，这一轮到此为止
-    drawSky(); drawPath(); drawPlanetAt(i % span);
+    const t = nowMs();
+    const sp = spotsAt(i % span);
+    drawSky(t); drawPath();
+    trail.push(sp[0]);
+    if (trail.length > TRAIL_N) trail.shift();
+    drawTrail(pathList[0].dot);
+    pathList.forEach((pl, n) => {
+      if (!pl.body) return;
+      drawBody(sp[n][0], sp[n][1], pl.r * popScale(t, pl.dly), pl.body, pl.spr, 1);
+    });
+    drawFx(t);
     i++;
     setTimeout(step, 1000 / 30);
   };
@@ -380,11 +703,21 @@ function bucketOf(ratio) {
 }
 const fmtRatio = (r) => (r >= 10 ? r.toFixed(0) : r.toFixed(1));
 
+// 让一段动效重新播一遍：先摘掉这个 class、逼浏览器认一次、再戴上。
+// 不这么做的话，连着两次给同一个元素加同一个 class 不会重新触发动画。
+function replay(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+function show(on, id) { $(id).style.display = on ? 'block' : 'none'; }
 function showGuess() {
   pendingGuess = { dist: dist, ecc: ecc };
-  $('guess').style.display = 'block';
-  $('verdict').style.display = 'none';
-  $('found').style.display = 'none';
+  const was = $('guess').style.display === 'block';
+  show(true, 'guess');
+  show(false, 'verdict');
+  show(false, 'found');
+  if (!was) replay($('guess'), 'k-panel');   // 已经摆着就别重播，免得它一直抖
   $('period').textContent = '？';
   // 这句话孩子会看到，所以不许出现"内核"这种词 —— 判据会把写进页面的字一起查。
   $('ptip').textContent = '先猜一猜，再按一个按钮 —— 按完才知道答案。';
@@ -394,16 +727,19 @@ function showGuess() {
 // 第一次进来不问 —— 先让孩子自己动手放一颗，保留原来的顺序。
 // 另外：**正在等孩子猜的时候，任何别的操作都不揭晓**（拖"路有多扁"、再点画面、
 // 按"再试一次"都只是把猜一猜继续摆着）—— 否则动一下别的滑块就绕过了这条规则。
+// 并排那一次不问：它问的不是"多久"，是"哪颗跑得慢"，插一句问话反而把话头带走。
 function requestRun(needGuess) {
   if (pendingGuess) { showGuess(); return; }
-  if (needGuess && tried.length > 0 && mode === 'sandbox') { stop(); showGuess(); return; }
-  $('guess').style.display = 'none';
+  if (needGuess && tried.length > 0 && mode === 'sandbox' && !pair) { stop(); showGuess(); return; }
+  show(false, 'guess');
   run(null);
 }
 
 function reveal(guess) {
   const prevPeriod = tried.length ? tried[tried.length - 1].period : null;
+  $('who').textContent = '转一圈要';     // 从并排切回单颗时把这句改回来
   $('period').textContent = period.toFixed(period < 10 ? 2 : 1);
+  replay($('period'), 'k-pop');          // 数字落地时轻轻弹一下（少动模式下被兜底关掉）
   $('ptip').textContent = '这就是它绕恒星跑一整圈用的时间。';
 
   tried.push({ dist: dist, ecc: ecc, period: period });
@@ -423,7 +759,7 @@ function reveal(guess) {
     const ratio = period / prevPeriod;
     const actual = bucketOf(ratio);
     const hit = (guess === actual);
-    v.style.display = 'block';
+    show(true, 'verdict');
     v.className = hit ? 'found' : 'miss';
     v.innerHTML = hit
       ? '你猜对了！确实是「' + GLABEL[actual] + '」：上一次是 <b>' + prevPeriod.toFixed(2)
@@ -433,58 +769,170 @@ function reveal(guess) {
       : '这次没猜中 —— 你说的是「' + GLABEL[guess] + '」，其实是「' + GLABEL[actual]
         + '」。没关系：上一次是 <b>' + prevPeriod.toFixed(2) + ' 年</b>，这一次是 <b>'
         + period.toFixed(2) + ' 年</b>，是上一次的 <b>' + fmtRatio(ratio) + ' 倍</b>。';
+    replay(v, hit ? 'k-nudge' : 'k-slide');
   } else {
-    v.style.display = 'none';
+    show(false, 'verdict');
   }
 
-  // 孩子自己"发现"：试过两个不同远近，就把两次结果并排摆出来，不替他下结论之外的话。
+  // 孩子自己"发现"：试过两个不同远近，就把每一次的结果并排摆出来，不替他下结论之外的话。
+  // 条子的长度只按"同一批回显数字里的相对长短"画（最长的那条画满）——
+  // 它是那些年数的样子，不是页面算出来的新数字；真的数就写在每条右边。
   const byDist = {};
   tried.forEach(t => { byDist[t.dist] = t.period; });
   const ds = Object.keys(byDist).map(Number).sort((a, b) => a - b);
   if (ds.length >= 2) {
     const a = ds[0], b = ds[ds.length - 1];
     const parts = ds.map(d => d + ' 步远 → ' + byDist[d].toFixed(2) + ' 年');
-    $('found').style.display = 'block';
-    $('found').innerHTML = '你试了这么多：<b>' + parts.join('，') + '</b>。<br>'
+    const top = Math.max.apply(null, ds.map(d => byDist[d]));
+    const bars = '<div class="bars">' + ds.map(d =>
+      '<div class="bar"><span class="lab">' + d + ' 步</span>'
+      + '<span class="track"><span class="fill" style="width:' + (100 * byDist[d] / top).toFixed(1) + '%"></span></span>'
+      + '<span class="num">' + byDist[d].toFixed(2) + ' 年</span></div>').join('') + '</div>';
+    const was = $('found').style.display === 'block';
+    show(true, 'found');
+    $('found').innerHTML = '你试了这么多：<b>' + parts.join('，') + '</b>。<br>' + bars
+      + '先看看条子的长短 ——<br>'
       + '同一颗恒星，行星离得越远，它的一年就越长 —— 远了 ' + (b / a).toFixed(0)
       + ' 倍，一圈的时间从 ' + byDist[a].toFixed(2) + ' 年变成了 ' + byDist[b].toFixed(2) + ' 年。';
+    if (!was) replay($('found'), 'k-slide');
   }
+}
+
+// 带超时的 fetch。
+// 为什么必须有：裸 `await fetch(...)` 没有上限，服务端不回话时它永远挂着 ——
+// 不 resolve 也不 reject，于是这页会一直停在"正在算……"，看不出是算错了还是没算完。
+// 超时按失败处理，下面就能把话说清楚。
+// 不用 Promise.race 拼一个假超时：那只是提前返回，真实请求还在飞；
+// AbortController 是真的把它掐掉。
+// 老 jsdom 里可能没有 AbortController（判据要用 jsdom 加载页面），
+// 那就退回裸 fetch：宁可不超时，也不能让判据环境直接抛错。
+function fetchT(url, opts) {
+  opts = opts || {};
+  const ms = opts.timeout || 15000;
+  if (typeof AbortController === 'undefined') return fetch(url, opts);
+  const ac = new AbortController();
+  const timer = setTimeout(function () { ac.abort(); }, ms);
+  const o = Object.assign({}, opts, { signal: ac.signal });
+  return fetch(url, o).finally(function () { clearTimeout(timer); });
+}
+
+// 超时/人话化：AbortError 自带 "The user aborted a request" 对小朋友没意义。
+function errText(e) {
+  if (e && e.name === 'AbortError') return '等太久了，服务一直没回话。再点一次试试。';
+  return e && e.message ? e.message : '出了点问题';
+}
+
+// 这一页向内核要数据只有两种，都写在这儿：单颗（一颗，放在 dist 步远）、
+// 并排（两颗，远的比近的多一步）。别的什么都不变 —— years / samples / primary 都一样。
+// ⚠ 天体名必须是纯英文：它会走命令行参数。
+function labPayload() {
+  const sun = { name: 'Sun', a: 1, e: 0, inc: 0, raan: 0, argp: 0, M0: 0, mass: 1.0 };
+  const planet = (name, a) =>
+    ({ name: name, a: a, e: ecc, inc: 0, raan: 0, argp: 0, M0: 0, mass: 3e-6 });
+  return {
+    scenario: 'custom', solar: 'none', primary: 'Sun',
+    years: 12, samples: 720,
+    bodies: pair
+      ? [sun, planet('Near', pair.near), planet('Far', pair.far)]
+      : [sun, planet('Planet', dist)]
+  };
+}
+
+// 两条路的画法。颜色只用这一页已经在用的那两支（蓝 / 橙），不另造一套。
+const ROUTE_A = { solid: 'rgba(47,109,246,.50)', glow: 'rgba(47,109,246,.13)', dot: '90,140,250', text: '#2a4a9e' };
+const ROUTE_B = { solid: 'rgba(214,110,40,.55)', glow: 'rgba(214,110,40,.15)', dot: '242,154,74', text: '#8f4710' };
+// 球的颜色。名字带 SKIN_ 是为了跟下面碰撞那节已有的 BODY_A / BODY_B 区分开。
+const SKIN_A = '#2f6df6', SKIN_B = '#d66e28', SKIN_M = '#7a3fd0';
+function route(idx, c, label, body, spr, dly) {
+  // glow 是描线用的那层淡底衬（一个颜色），spr 是这颗球辉光那张小图的键 —— 两个别混。
+  return { idx: idx, solid: c.solid, glow: c.glow, dot: c.dot, text: c.text,
+           label: label, body: body, r: 8, spr: spr, dly: dly || 0 };
+}
+
+// 把上一轮单颗行星的路记下来，下一轮当"刚才那颗"画成灰虚线 ——
+// 两次叠在同一张画面上，差多少才看得出来。每 3 帧取一个点，够画了。
+function snapshot() {
+  if (!frames || pair) return null;
+  const keep = [];
+  for (let i = 0; i < frames.length; i += 3) {
+    const p = frames[i].p[1];
+    keep.push([cx + p[0] * scale, cy - p[1] * scale]);
+  }
+  return keep;
+}
+let lastKind = null;          // 上一轮是单颗还是并排（决定要不要留旧路）
+// 并排那一次的两步：近的那颗放在哪，远的就是近的往外再挪一步。
+// 只从旋钮那 1~4 步里取，不算任何东西。
+const pairOf = (near) => ({ near: near, far: near + 1 });
+
+// 并排模式的开关：只改"这次向内核要几颗行星"，别的什么都不动。
+function setPair(on) {
+  const b = $('dopair');
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.textContent = on ? '一颗就好' : '放两颗，一起跑';
+  if (on) syncDist(Math.min(dist, 3));
 }
 
 async function run(guess) {
   mode = 'sandbox';
-  $('guess').style.display = 'none';
+  show(false, 'guess');
   pendingGuess = null;
   $('period').textContent = '…';
+  $('period').classList.remove('k-pop');
   // "年"写死在 HTML 里、这里不去动它：这样即使脚本没跑起来，
   // 静态页面读出来也是完整的一句"转一圈要 — 年"，而不是一个没有单位的数字。
   $('ptip').textContent = '正在算……';
   stop();
+  // 旧路只在"上一轮也是单颗、这一轮还是单颗"时留着。
+  ghost = (lastKind === 'single' && !pair) ? snapshot() : null;
+  pathList = pair
+    ? [route(1, ROUTE_A, pair.near + ' 步', SKIN_A, 'a'),
+       route(2, ROUTE_B, pair.far + ' 步', SKIN_B, 'b', 120)]
+    : [route(1, ROUTE_A, dist + ' 步', SKIN_A, 'a')];
+  pathDirty = true;
   try {
-    const r = await fetch('/api/nbody', {
+    const r = await fetchT('/api/nbody', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      // 名字必须是纯英文：天体名会走命令行参数，而中文名在那条路上不可靠。
-      body: JSON.stringify({
-        scenario: 'custom', solar: 'none', primary: 'Sun',
-        years: 12, samples: 720,
-        bodies: [
-          { name: 'Sun', a: 1, e: 0, inc: 0, raan: 0, argp: 0, M0: 0, mass: 1.0 },
-          { name: 'Planet', a: dist, e: ecc, inc: 0, raan: 0, argp: 0, M0: 0, mass: 3e-6 }
-        ]
-      })
+      body: JSON.stringify(labPayload()),
+      timeout: 60000
     });
     const j = await r.json();
     if (!j.frames || !j.frames.length || !j.sampling || !j.sampling.min_period_years) {
       throw new Error(j.error || '没拿到结果');
     }
     frames = j.frames; dtYears = j.dt_years; period = j.sampling.min_period_years;
-    drawSky(); drawPath(); play();
-    reveal(guess);
+    lastKind = pair ? 'pair' : 'single';
+    drawSky(); drawPath(); land(); play();
+    if (pair) revealPair(); else reveal(guess);
   } catch (e) {
     $('period').textContent = '—';
-    $('ptip').textContent = '没能算出来：' + e.message + '（这一页需要一个在跑的服务，'
+    $('ptip').textContent = '没能算出来：' + errText(e) + '（这一页需要一个在跑的服务，'
       + '直接双击打开文件是不行的）';
   }
+}
+
+// 并排那一次的"揭晓"：只说画面上有的东西，一个新数字都不给。
+function revealPair() {
+  $('who').textContent = '里面那颗转一圈要';
+  $('period').textContent = period.toFixed(period < 10 ? 2 : 1);
+  replay($('period'), 'k-pop');
+  $('ptip').textContent = '外面那颗在 ' + pair.far + ' 步。看看它们谁先跑完一圈。';
+  show(false, 'verdict');
+  show(false, 'found');
+  $('cli').textContent = 'starpivot nbody --scenario custom --solar none --primary Sun \\\n'
+    + '  --years 12 --samples 720 \\\n'
+    + '  --body "Sun,1,0,0,0,0,0,1.0" --body "Near,' + pair.near + ',' + ecc.toFixed(1)
+    + ',0,0,0,0,0.000003" --body "Far,' + pair.far + ',' + ecc.toFixed(1)
+    + ',0,0,0,0,0.000003"';
+  $('pairnums').innerHTML =
+    '并排那一次：一次放了两颗行星，一次发出去（<code>a = ' + pair.near + '</code> 与 <code>a = '
+    + pair.far + '</code>，路扁都是 <code>e = ' + ecc.toFixed(1) + '</code>）。'
+    + '画面上两个位置都取自同一批回执帧（<code>frames[i].p[1]</code> 与 <code>p[2]</code>），'
+    + '所以两颗共用同一个帧号 —— 谁快谁慢由那份坐标决定，页面没有为它们做任何时间换算。'
+    + '<br>回显的 <code>sampling.min_period_years</code> 取的是**两颗里较短的那一个**'
+    + '（内核对每颗各算一遍再取最小，见 <code>sampling.method</code>），'
+    + '所以大数字上写的是里面那颗的年数。外面那颗自己的年数回执没有单独给，'
+    + '这一页也不去补算 —— 并排只用眼睛看。';
 }
 
 /* ================= 玩法 B：撞一下看看 =================
@@ -503,34 +951,79 @@ function colPayload(collide) {
 function drawColPaths() {
   if (!col) return;
   const n = col.mergeFrame >= 0 ? col.mergeFrame : col.frames.length - 1;
-  const lines = [[1, 'rgba(47,109,246,.40)'], [2, 'rgba(214,110,40,.40)']];
+  // 这一节的回执有 2000 帧，是玩法 A 的近三倍。描线时每隔一帧取一个点 ——
+  // 一帧只挪 3 个像素，看不出差别，但每帧的描线次数少一半。
+  const S = 2;
+  // 底下先铺一层宽而淡的同色底衬，细线在暖白底上才站得住（和玩法 A 一样）。
+  const lines = [[1, 'rgba(47,109,246,.40)', 'rgba(47,109,246,.12)'],
+                 [2, 'rgba(214,110,40,.40)', 'rgba(214,110,40,.12)']];
   lines.forEach((ln) => {
     const idx = ln[0];
-    ctx.strokeStyle = ln[1]; ctx.lineWidth = 2; ctx.beginPath();
-    for (let i = 0; i <= n && i < col.frames.length; i++) {
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i <= n && i < col.frames.length; i += S) {
       const p = col.frames[i].p[idx];
       const x = cx + p[0] * scale, y = cy - p[1] * scale;
       i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     }
-    ctx.stroke();
+    ctx.strokeStyle = ln[2]; ctx.lineWidth = 7; ctx.stroke();
+    ctx.strokeStyle = ln[1]; ctx.lineWidth = 2; ctx.stroke();
   });
+  // 两颗的路线是同一个椭圆，只是出发时刻不同 —— 给一点点虚线，好让"路一样、时候不同"看得出来。
+  ctx.beginPath();
+  for (let i = 0; i <= n && i < col.frames.length; i += S) {
+    const p = col.frames[i].p[1];
+    const x = cx + p[0] * scale, y = cy - p[1] * scale;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.setLineDash([5, 9]); ctx.strokeStyle = 'rgba(140,110,60,.35)'; ctx.lineWidth = 1.5;
+  ctx.stroke(); ctx.setLineDash([]);
 }
 
-function drawColScene(fi) {
-  drawSky(); drawColPaths();
+function drawColScene(fi, t) {
+  t = t || nowMs();
+  drawSky(t); drawColPaths();
   const i = Math.max(0, Math.min(fi, col.frames.length - 1));
   const f = col.frames[i];
-  const dot = (p, fill, r) => {
-    const x = cx + p[0] * scale, y = cy - p[1] * scale;
-    ctx.fillStyle = fill;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  };
   if (col.mergeFrame >= 0 && i >= col.mergeFrame) {
-    dot(f.p[1], '#7a3fd0', 11);           // 合成后的那一颗
+    // 合成之后：紫色大球 + 一层慢慢呼吸的柔光（少动模式下不呼吸）
+    const p = f.p[1];
+    const x = cx + p[0] * scale, y = cy - p[1] * scale;
+    drawBody(x, y, 12, SKIN_M, 'm', 1);
+    if (!calm) {
+      const w = Math.sin(t / 620);
+      ctx.strokeStyle = 'rgba(122,63,208,' + (0.18 + 0.16 * w).toFixed(3) + ')';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x, y, 20 + 5 * w, 0, Math.PI * 2); ctx.stroke();
+    }
   } else {
-    dot(f.p[1], '#2f6df6', 8);            // A
-    dot(f.p[2], '#d66e28', 8);            // B
+    drawBody(cx + f.p[1][0] * scale, cy - f.p[1][1] * scale, 9, SKIN_A, 'a', 1);
+    drawBody(cx + f.p[2][0] * scale, cy - f.p[2][1] * scale, 9, SKIN_B, 'b', 1);
+    // 画到哪儿算哪儿：这两个点快叠在一起了就说明它们正在擦肩（或者正要撞上）。
+    // 这只是"两个圆有没有重叠"的画面判断，不算任何东西、不显示任何数。
+    // 一次擦肩只放一个圈，不然擦肩的那半秒里会叠出十几个圈，看着像在闪。
+    if (!calm) {
+      const ax = cx + f.p[1][0] * scale, ay = cy - f.p[1][1] * scale;
+      const bx = cx + f.p[2][0] * scale, by = cy - f.p[2][1] * scale;
+      if (Math.hypot(ax - bx, ay - by) < 20 && t - nearT0 > 420) {
+        nearT0 = t;
+        addFx({ kind: 'near', x: (ax + bx) / 2, y: (ay + by) / 2, dur: 500 });
+      }
+    }
   }
+  drawFx(t);
+  // 左上角那枚牌子：撞上了 / 没撞上。两种结局一眼就分得开，不靠读下面的字。
+  badge(col.mergeFrame >= 0 ? '撞上了' : '没撞上', col.mergeFrame >= 0);
+}
+
+// 撞上的那一下：一次闪光 + 一圈冲击波 + 一把碎光点。都在这里就地画完，不留到下一帧。
+let nearT0 = 0;
+function burst(x, y) {
+  if (calm) return;
+  addFx({ kind: 'flash', x: x, y: y, dur: 520, r: 130 });
+  const dirs = [];
+  for (let n = 0; n < 14; n++) dirs.push((n / 14) * Math.PI * 2 + 0.2);
+  addFx({ kind: 'sparks', x: x, y: y, dur: 700, rgb: '255,206,120', d: dirs });
 }
 
 function playCollision() {
@@ -538,10 +1031,17 @@ function playCollision() {
   const my = ++animToken;
   const span = col.mergeFrame >= 0 ? col.mergeFrame : col.frames.length - 1;
   const inc = Math.max(1, Math.ceil(span / 90));   // 无论几千帧，约 3 秒走完
-  let i = 0;
+  let i = 0, boomed = false;
   const step = () => {
     if (my !== animToken) return;
-    drawColScene(i);
+    const t = nowMs();
+    // 越过 mergeFrame 的那一帧：闪光只放一次（放完这一轮就停住，不会反复闪）。
+    if (!boomed && col.mergeFrame >= 0 && i >= col.mergeFrame) {
+      boomed = true;
+      const f = col.frames[col.mergeFrame];
+      burst(cx + f.p[1][0] * scale, cy - f.p[1][1] * scale);
+    }
+    drawColScene(i, t);
     if (i >= span) {
       if (col.mergeFrame >= 0) return;   // 撞上就停住
       i = 0;                             // "穿过去"那一组让它一直绕
@@ -556,7 +1056,8 @@ const fmtNum = (x) => (+x.toFixed(2)).toString();
 function showCollisionStory() {
   const ev = col.ev;
   const st = $('colstory');
-  st.style.display = 'block';
+  show(true, 'colstory');
+  replay(st, 'k-slide');
   // 半径放大的披露是**静态**写在这一页上的（不靠脚本填），运行到这里只补事实。
   if (ev) {
     // "重量一点没少"这句必须有回执撑腰：拿 mass_before 与 mass_after 比出来的。
@@ -588,14 +1089,16 @@ async function runCollision(collide) {
   stop();
   mode = 'collide';
   pendingGuess = null;
-  $('guess').style.display = 'none';
+  show(false, 'guess');
   $('coltip').textContent = '正在算……';
-  $('colstory').style.display = 'none';
+  show(false, 'colstory');
   $('dobump').disabled = true; $('dopass').disabled = true;
+  fx = []; nearT0 = 0; popT0 = 0;      // 上一轮 leftover 的动效别串到这一轮
   try {
-    const r = await fetch('/api/nbody', {
+    const r = await fetchT('/api/nbody', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(colPayload(collide))
+      body: JSON.stringify(colPayload(collide)),
+      timeout: 60000
     });
     const j = await r.json();
     if (!j.frames || !j.frames.length) throw new Error(j.error || '没拿到结果');
@@ -605,15 +1108,23 @@ async function runCollision(collide) {
       radiusScale: j.radius_scale, ev: ev,
       mergeFrame: (collide === 'merge' && ev) ? Math.max(1, Math.round(ev.t / j.dt_years)) : -1
     };
+    // 撞一下的时候，"放一颗"那几排按钮先收起来：两套玩法别同时招徕。
     $('knobs').style.display = 'none';
+    $('quickwrap').style.display = 'none';
     $('againwrap').style.display = 'none';
+    $('pairwrap').style.display = 'none';
     $('backlab').style.display = 'inline-block';
     $('coltip').textContent = ev ? '看，它们正在靠近……'
       : '看，它们各自绕着自己的路走 —— 谁也没碰到谁。';
+    // 画面上是什么，图上那枚牌子与 aria-label 就得说同一句 —— 读屏的人才拿得到。
+    cv.setAttribute('aria-label', ev
+      ? '实验画面：两颗行星撞到了一起，变成一颗紫色的大行星'
+      : '实验画面：两颗行星互相穿了过去，谁也没碰到谁');
+    $('tip').textContent = ev ? '它们撞到了一起。' : '它们互相穿了过去，谁也没碰到谁。';
     playCollision();
     showCollisionStory();
   } catch (e) {
-    $('coltip').textContent = '没能算出来：' + e.message;
+    $('coltip').textContent = '没能算出来：' + errText(e);
   } finally {
     $('dobump').disabled = false; $('dopass').disabled = false;
   }
@@ -622,37 +1133,69 @@ async function runCollision(collide) {
 function backToSandbox() {
   col = null; mode = 'sandbox';
   $('knobs').style.display = '';
+  $('quickwrap').style.display = '';
   $('againwrap').style.display = '';
+  $('pairwrap').style.display = '';
   $('backlab').style.display = 'none';
-  $('colstory').style.display = 'none';
+  show(false, 'colstory');
   $('coltip').textContent = '还想看别的？这里有两颗行星，可以让它们撞一下看看。';
+  // 画布上留着上一轮的东西会骗人（撞完的紫色大球、灰色旧路），这里都清掉。
+  fx = []; nearT0 = 0; popT0 = 0; ghost = null; pathDirty = true;
   run(null);
+}
+
+// "放一颗在 n 步远"：点画面、拖旋钮、按那四个按钮，走的都是这一条路。
+// 并排开着的时候，点一下挪的是**里面**那颗 —— 外面那颗自动往外挪一步。
+function placeAt(n) {
+  if (mode === 'collide') return;      // 撞一下的画面里不管放行星，免得两套玩法打架
+  if (pair) {
+    const near = Math.min(n, 3);        // 近的那颗顶多 3 步，好让远的有一颗可放
+    pair = pairOf(near); dist = near;
+    $('tip').textContent = '里面那颗在 ' + near + ' 步，外面那颗在 ' + pair.far + ' 步。';
+    syncDist(); requestRun(false);
+    return;
+  }
+  const changed = (n !== dist);
+  dist = n;
+  $('tip').textContent = '你把它放在了 ' + dist + ' 步远的地方。';
+  syncDist(); requestRun(changed);
+}
+function syncDist(n) {
+  if (n !== undefined) dist = n;
+  $('dist').value = String(dist); $('vdist').textContent = String(dist);
 }
 
 // 点画面：按点的方向、按点到中心的距离定"多远"（吸附到整数步，孩子好对账）
 cv.addEventListener('click', (ev) => {
-  if (mode === 'collide') return;      // 撞一下的画面里点它不做事，免得两套玩法打架
   const rect = cv.getBoundingClientRect();
   const mx = (ev.clientX - rect.left) * (cv.width / rect.width) - cx;
   const my = (ev.clientY - rect.top) * (cv.height / rect.height) - cy;
   const step = Math.round(Math.hypot(mx, my) / scale);
-  const nd = Math.min(4, Math.max(1, step));
-  const changed = (nd !== dist);
-  dist = nd;
-  $('dist').value = String(dist); $('vdist').textContent = String(dist);
-  $('tip').textContent = '你把它放在了 ' + dist + ' 步远的地方。';
-  requestRun(changed);
+  placeAt(Math.min(4, Math.max(1, step)));
 });
-$('dist').addEventListener('input', (e) => {
-  const nd = +e.target.value;
-  const changed = (nd !== dist);
-  dist = nd; $('vdist').textContent = String(dist);
-  requestRun(changed);
-});
+$('dist').addEventListener('input', (e) => placeAt(+e.target.value));
 $('ecc').addEventListener('input', (e) => {
   ecc = +e.target.value; $('vecc').textContent = ecc.toFixed(1); requestRun(false);
 });
 $('again').addEventListener('click', () => requestRun(false));
+// 四个"几步远"按钮与点画面走同一条路 —— 重复试一次只要按一下，代价最小。
+// 也顺带给了不用鼠标的人一条能走完的路（画布只能靠点，键盘给不出坐标）。
+[[1, 'quick1'], [2, 'quick2'], [3, 'quick3'], [4, 'quick4']].forEach((p) => {
+  $(p[1]).addEventListener('click', () => placeAt(p[0]));
+});
+$('dopair').addEventListener('click', () => {
+  if (mode === 'collide') return;
+  const on = !pair;
+  setPair(on);
+  pair = on ? pairOf(dist) : null;
+  if (on) { pendingGuess = null; show(false, 'guess'); show(false, 'verdict'); }
+  // 换玩法就清一次动效与旧路：上一轮留下的涟漪不该跟着下一轮跑。
+  fx = []; popT0 = 0; ghost = null; pathDirty = true;
+  $('tip').textContent = on
+    ? '两颗一起跑：里面那颗在 ' + pair.near + ' 步，外面那颗在 ' + pair.far + ' 步。'
+    : '一次放一颗。在画面上点一下，或者按上面那几个按钮。';
+  requestRun(false);
+});
 ['near', 'double', 'much'].forEach((g) => {
   $('g_' + g).addEventListener('click', () => { if (pendingGuess) run(g); });
 });

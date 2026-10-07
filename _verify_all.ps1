@@ -263,6 +263,11 @@ if (-not (Test-Path $ZIG)) {
         # 软判据：没有 zig/node 时探针自报环境缺席（退出码 2）记 SKIP，
         # 不把"这机器上没装 zig"判成"WASM 路线失败"。
         RunPySoft '_probe_wasm.py' 'D3 WASM/WASI：内核库链成模块 + 真宿主实例化执行（软判据）'
+        # 两个新内核子命令的独立判据。**用 RunPy 而不是 RunPySoft**：
+        # _probe_lagrange_kernel.py 在"lagrange 子命令不存在"时**故意**退出码 2，
+        # 它的作者写明"这是红，不是判据自身出错" —— 用软判据会把它降级成 SKIP。
+        RunPy '_probe_genesis_kernel.py' 'genesis 内核：stdout 字节级复现 + 异 seed 必须不同 + 质量区间与互 Hill 半径独立复算'
+        RunPy '_probe_lagrange_kernel.py' 'lagrange 内核：力平衡 / 几何独立复算（不复用内核那套五次方程）'
     }
 }
 
@@ -275,6 +280,10 @@ Section 'E. 页面级端到端（jsdom，需要 8765 服务）'
 $live2 = (Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue |
           Measure-Object).Count
 if ($live2 -gt 0) {
+    # keepalive 写在最前：它不是 jsdom 探针，走 python + RunPySoft ——
+    # 它按设计在"8765 上没有服务"时返回退出码 2，用软判据才是 SKIP 而不是 FAIL。
+    # （位置与 _runall.sh 的 E 段一致：那份把 E 段循环单独收集，所以它落在这 18 条之前。）
+    RunPySoft '_probe_keepalive.py' '网关 keep-alive：未知路由不污染连接（同一连接连发两条）'
     RunNode '_probe_home.js' '首页：真加载 → 脚本填出内核状态 → 工具入口可达（含负样本）'
     RunNode '_probe_kids.js' '小朋友页：真改旋钮 → 教的那件事（越远越慢）成不成立'
     RunNode '_probe_orbit.js' '轨道页：真加载 → 样本逐字渲染 → conj 真调内核（含负路径与负样本）'
@@ -286,6 +295,12 @@ if ($live2 -gt 0) {
     RunNode '_probe_tools.js'   '双击画面放行星 / 信息卡 / 倒放与键盘 / 等价 CLI 命令真跑比对 / 撞击的瞬时表现'
     RunNode '_probe_dualmode.js' '普通人/教授双模式（含"切模式不改变计算"）+ 类型调色板'
     RunNode '_probe_tour.js'    '导览（deep link / 每步真切算法）/ 积分器下拉 / 能量曲线 / CSV / 新预设'
+    RunNode '_probe_anchors.js' '引力锚点 L1-L5：点数跟着 /api/lagrange 回执走 + 稳定说法不夸大'
+    RunNode '_probe_predict.js' '预演/计划模式：预演真的更短 + 幽灵轨迹来自预演回执 + 放弃真 abort'
+    RunNode '_probe_protocols.js' '协议任务链：达成判定真读内核回执 + 落进既有 session'
+    RunNode '_probe_scheme.js' '方案保存/分享：命名保存 + 载入逐项还原 + 不冲掉对方会话'
+    RunNode '_probe_timescale.js' '时间压缩档位：改档真改 years 并重算（防死控件）'
+    RunNode '_probe_seeded.js' '随机宇宙种子：同 seed 逐位复现 + bodies 走既有 nbody payload'
     # 首屏耗时的分段实测（内核 / 网关 / JSON.parse / 首帧渲染）。它不是门禁，是仪表：
     # 存在的意义是"优化前先量，别拿自己造的秒数立项"（上一轮就踩过这个坑）。
     RunNode '_probe_firstpaint.js' '首屏耗时分解：内核 / 网关 / JSON.parse / 首帧渲染（记录用，非门禁）'

@@ -96,6 +96,23 @@
   tbody tr:last-child td{border-bottom:0}
   tbody tr:hover{background:var(--card2)}
   td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+  /* —— "判读轴"所在的列（这一页的表全是"键 → 解释"结构）——
+     原来键与解释同色同粗细，扫的时候得一行一行找。给键列一条竖发丝线 + 键本身加重。
+     为什么是竖线而不是整列垫底色：垫底色会被下面 tbody tr:hover 吃掉，悬停反馈反而没了；
+     竖线是"这一列是轴"的结构线，悬停时仍在。
+     类别本身由**徽章文字**承担（.obs/.cal/.mod/.asm），颜色只是衬底，不单独传达信息。 */
+  table.t-key td:first-child{border-left:1px solid var(--line2);font-weight:600}
+  /* 键列本身就很窄的表（整列就是一枚徽章或一个短标签）：把列宽收到内容宽，
+     别让"键"占掉解释那半张表。反过来，键列是长句的表**不能**用它（见 ② 几个具体的数）。 */
+  table.t-key.t-fit td:first-child{width:1%;white-space:nowrap}
+  /* 来源表：判读轴是第三列的"类别"，但它夹在"是什么 / 从哪来"右边，扫读时被跳过。
+     竖线标出它 + 列宽收到徽章刚好放下（width:1%），两个并排的徽章窄屏时竖着叠，不会被拉散。
+     同一张表里压一级层次：数据名加重（600），来源退到 ink2，
+     "口径说明"留 --ink —— 那一列才是这一页最要紧的。 */
+  table.t-src td:nth-child(3){border-left:1px solid var(--line2)}
+  table.t-src th:nth-child(3),table.t-src td:nth-child(3){width:1%}
+  table.t-src td:nth-child(1){font-weight:600}
+  table.t-src td:nth-child(2){color:var(--ink2)}
   /* 徽章：字只有 12px，全靠"一圈边线 + 内边距"才立得住。
      统一 padding 与 line-height，四个页面的徽章高度才会一致（组件层是共用的）。 */
   .badge{display:inline-block;padding:2px 10px;border-radius:var(--r-full);font-size:var(--fs-xs);
@@ -130,6 +147,9 @@
          box-shadow:var(--sh-1);
          transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease)}
   .entry:hover{border-color:var(--accent);box-shadow:var(--sh-2);transform:translateY(-2px)}
+  /* 键盘也要拿到和鼠标一样的"抬起来"：入口是这一页唯一的可点区，
+     只给 :hover 就等于把最重要的反馈留给鼠标。 */
+  .entry:focus-visible{border-color:var(--accent);box-shadow:var(--sh-2);transform:translateY(-2px)}
   .entry b{font-size:var(--fs-md);color:var(--accent)}
   .entry p{margin:var(--sp-2) 0 0;font-size:var(--fs-sm);color:var(--ink2);line-height:1.7}
   .kbd{font-size:var(--fs-xs);color:var(--ink3)}
@@ -155,7 +175,17 @@
   .entry .ico{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;
               font-size:21px;line-height:1;border-radius:12px;background:var(--accent-soft);
               margin-bottom:var(--sp-3)}
-  .entry b{display:block;font-size:var(--fs-lg);letter-spacing:-.15px}
+  /* 入口卡的标题行改成"标题 + 右侧雪佛龙"：三个入口是这一页唯一要人动手的地方，
+     标题与说明之间原来没有边界，扫过去像三段等权的字。雪佛龙用边框画（不用字符）：
+     content 里放字符会被读屏念出来，也会被 _check_home.js 数进首屏汉字。 */
+  .entry b{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-2);
+           font-size:var(--fs-lg);letter-spacing:-.15px}
+  .entry b::after{content:'';width:9px;height:9px;flex:0 0 auto;opacity:.55;
+                  border-top:2px solid var(--ink3);border-right:2px solid var(--ink3);
+                  transform:rotate(45deg);
+                  transition:border-color var(--dur) var(--ease),opacity var(--dur) var(--ease)}
+  .entry:hover b::after,.entry:focus-visible b::after{border-color:var(--accent);opacity:1}
+  .entry.kids:hover b::after{border-color:var(--ink2)}
   .entry.kids{border-color:#eeddc4;border-top-color:var(--accent2);background:var(--accent2-soft)}
   /* 暖色入口卡的图标底片也要是暖的，但底片**不能**用 --accent2-soft（它在同色的卡面上看不出来），
      所以拿强调色本身兑一点透明度当底 —— 它只是一块"面"，不承载文字。 */
@@ -198,6 +228,61 @@
   details.card>summary:hover{background:var(--card2)}
   details.card[open]>summary{border-bottom:1px solid var(--line)}
   details.card>.dbody{padding:var(--sp-4) var(--sp-5) var(--sp-3)}
+  /* ===== 动效：这一页原本零 @keyframes，这里补最克制的一层 =====
+     约束（同时也是下面 reduced-motion 那条兜底能生效的前提）：
+     ① 全部 @keyframes + CSS，**没有一个 JS 定时器**；
+     ② 只动 opacity / transform / background-color —— 不动 width/height/top，不引起重排；
+     ③ 时长写在动画简写里，**不动 --dur**（它是四页共用的 160ms 交互档，改它要四页一起改）；
+     ④ fill-mode 用 backwards 而不是 both：both 会让末帧的 transform 一直压在普通声明之上
+        （动画在层叠里的优先级高于普通声明），.entry:hover 的 translateY(-2px) 就永远抬不起来了；
+     ⑤ 每一条都只动"看见的顺序感"，不决定"能不能读" —— 文案不依赖动画才可读。
+     ⑥ ⚠ **入场动画一律不许从 opacity:0 起始**，只许动 transform。
+        原因是一次实测：这一页原来 spRise 从 opacity:0 起，配上 animation-delay 与
+        fill-mode:backwards，**渲染器一旦不推进 CSS 动画**（后台标签页、被冻结的
+        渲染进程等），backwards 会在整个延迟期把元素按死在 opacity:0 ——
+        于是首屏三张入口卡、内核状态条、三条承诺**全部永久不可见**，占位还在，
+        页面看着像加载坏了，交互也恢复不了（等 60 秒、hover 强制重绘都试过）。
+        只动 transform 时，动画不跑的后果仅仅是"整体低 8px"，内容始终完整可读 ——
+        这才是"动画失败也不该丢内容"该有的降级方式。
+     全部兜底：@media(prefers-reduced-motion:reduce) 里的 *{animation:none!important}
+     会把这些动画整体关掉，元素回到自然状态（不会停在 opacity:0）。 */
+  @keyframes spRise{from{transform:translateY(8px)}to{transform:none}}
+  /* 表格行"进场"：只从左边滑进 7px，**不改 opacity** —— 外层 .dbody 已经在淡入了，
+     两层同时淡会把 12–13px 的小字压虚。 */
+  @keyframes spSlide{from{transform:translateX(-7px)}to{transform:none}}
+  /* 状态行"刚更新过"：闪一下 --accent-soft 就退回透明。
+     刻意用中性蓝而不是 --ok 绿 —— 见上面 .kbar 的注释：这一页不给状态上颜色承诺，
+     一个恒亮的绿点会把"问不到"也画成"在线"。闪完即退，不在页面上留下任何状态色。 */
+  @keyframes spTick{0%{background:var(--accent-soft)}28%{background:var(--accent-soft)}
+                    100%{background:transparent}}
+  /* 首屏错峰：最晚一块 0.3 秒后才开始，0.7 秒内全部到位。
+     排序仍按阅读优先级（是什么 → 从哪开始 → 内核状态 → 三条承诺），错峰只是让它有先后。 */
+  header{animation:spRise 400ms var(--ease) backwards}
+  .lead{animation:spRise 400ms var(--ease) 40ms backwards}
+  .hint{animation:spRise 400ms var(--ease) 70ms backwards}
+  .entry{animation:spRise 420ms var(--ease) 100ms backwards}
+  .entry:nth-child(2){animation-delay:135ms}
+  .entry:nth-child(3){animation-delay:170ms}
+  .kbar{animation:spRise 400ms var(--ease) 200ms backwards}
+  .promise li{animation:spRise 400ms var(--ease) backwards}
+  .promise li:nth-child(1){animation-delay:230ms}
+  .promise li:nth-child(2){animation-delay:265ms}
+  .promise li:nth-child(3){animation-delay:300ms}
+  /* 内核状态行"从正在问 → 有结论"的那一下：由脚本给 #kstatus 挂 .ks 再摘掉重放。
+     这是全站最该有反馈的一处 —— 之前它是无声地换掉一句话。 */
+  #kstatus{border-radius:var(--r-1)}
+  #kstatus.ks{animation:spTick 1.15s var(--ease) 1}
+  /* 折叠区展开：整块内容淡入上移，表格行 24ms 一步从左边滑进（到第 8 步封顶，
+     再多就变成"看动画"而不是"看内容"了）。 */
+  details.card[open]>.dbody{animation:spRise 260ms var(--ease) backwards}
+  details.card[open] .dbody tbody tr{animation:spSlide 240ms var(--ease) backwards}
+  details.card[open] .dbody tbody tr:nth-child(2){animation-delay:24ms}
+  details.card[open] .dbody tbody tr:nth-child(3){animation-delay:48ms}
+  details.card[open] .dbody tbody tr:nth-child(4){animation-delay:72ms}
+  details.card[open] .dbody tbody tr:nth-child(5){animation-delay:96ms}
+  details.card[open] .dbody tbody tr:nth-child(6){animation-delay:120ms}
+  details.card[open] .dbody tbody tr:nth-child(7){animation-delay:144ms}
+  details.card[open] .dbody tbody tr:nth-child(8){animation-delay:168ms}
   /* —— 可访问性：键盘焦点必须看得见 —— */
   a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,[tabindex]:focus-visible{
     outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-1)}
@@ -310,7 +395,7 @@
       <div class="note" style="margin-top:0;margin-bottom:12px">
         逐项列出来。<b>把推导值说成观测值，是这类产品最容易犯也最不可原谅的错。</b>
       </div>
-      <div class="tablewrap"><table>
+      <div class="tablewrap"><table class="t-src">
         <thead><tr><th>数据</th><th>来源</th><th>类别</th><th>口径说明</th></tr></thead>
         <tbody>
           <tr>
@@ -357,9 +442,9 @@
       </table></div>
 
       <h3 aria-level="2">四类怎么分（这不是措辞讲究，是这句话决定了它能不能被信任）</h3>
-      <div class="tablewrap"><table>
+      <div class="tablewrap"><table class="t-key t-fit">
         <tbody>
-          <tr><td style="width:120px"><span class="badge obs">观测</span></td><td>公开编目/发布值，能追到具体来源与查询语句</td></tr>
+          <tr><td><span class="badge obs">观测</span></td><td>公开编目/发布值，能追到具体来源与查询语句</td></tr>
           <tr><td><span class="badge cal">标定</span></td><td>用一张对照表把观测量换算成物理量（如 <code>SpType→T_eff</code>）。<b>页面上必须写明用的是哪张表</b></td></tr>
           <tr><td><span class="badge mod">模型参数 / 推导</span></td><td>由公式算出来的量（距离、绝对星等、光度），或内核自己的物理模型</td></tr>
           <tr><td><span class="badge asm">假设</span></td><td><b>数据源里没有、由我们摆上去的</b>。目前有两处：真实行星系统的轨道朝向与相位、行星质量的性质</td></tr>
@@ -377,7 +462,7 @@
     <summary>怎么自己验：五层判据、几个能被独立复算的数、可直接粘贴的命令</summary>
     <div class="dbody">
       <h3 aria-level="2">① 判据：五层，全绿</h3>
-      <div class="tablewrap"><table>
+      <div class="tablewrap"><table class="t-key t-fit">
         <thead><tr><th>层</th><th>内容</th><th>抓什么错</th></tr></thead>
         <tbody>
           <tr><td>A 静态</td><td>解析源码做结构检查</td><td>printf 说明符与实参个数不符、跨文件字段名走散</td></tr>
@@ -392,7 +477,7 @@
       </div>
 
       <h3 aria-level="2">② 几个具体的数（都能被独立复算打回来）</h3>
-      <div class="tablewrap"><table>
+      <div class="tablewrap"><table class="t-key">
         <thead><tr><th>验的是</th><th>结果</th></tr></thead>
         <tbody>
           <tr><td>开普勒第三定律互校（19 颗真实行星，实测周期 vs 实测半长轴）</td>
@@ -424,7 +509,7 @@
   <details class="card">
     <summary>我们明确没做的事（以及为什么）</summary>
     <div class="dbody">
-      <div class="tablewrap"><table>
+      <div class="tablewrap"><table class="t-key">
         <tbody>
           <tr><td style="width:190px">不显示恒星的温度与光度</td>
               <td><code>SpType→T_eff</code> 与 <code>BC</code> 的<b>标定表未接入</b>。在接入之前宁可不显示，也不编一个值出来 —— 也因此 H-R 图上目前没有真实恒星。</td></tr>
@@ -450,13 +535,41 @@
 </div>
 
 <script>
+// 带超时的 fetch。
+// 为什么需要：裸 `await fetch(...)` 没有上限，服务端冷启动或网络抖动时会**永远挂着** ——
+// 不 resolve 也不 reject，页面于是既不报错也不超时。实测冷启动首个请求要 4~5 秒
+// （`/api/dataset/*` 首次到过 20 秒），碰上更差的情况，首页这行就会一直停在
+// "正在问内核……"，而这恰恰是这个站最不该含糊的一句话。
+// 超时按失败处理，让页面说得出"问不到"，而不是装死。
+// 不用 Promise.race 拼一个假的超时：那只是提前返回，真实请求还在飞，
+// AbortController 是真的把它掐掉。
+function fetchT(url, opts){
+  opts = opts || {};
+  const ms = opts.timeout || 15000;
+  // 老 jsdom 里可能没有 AbortController（判据要用 jsdom 加载页面），
+  // 那就退回裸 fetch：宁可不超时，也不能让判据环境直接抛错。
+  if (typeof AbortController === 'undefined') return fetch(url, opts);
+  const ac = new AbortController();
+  const timer = setTimeout(function(){ ac.abort(); }, ms);
+  const o = Object.assign({}, opts, { signal: ac.signal });
+  return fetch(url, o).finally(function(){ clearTimeout(timer); });
+}
+
 // 内核在线状态：这个站点最核心的一句话是"真在算"，那就把这一点做成一屏可见的事实，
 // 而不是一句宣传语。问不到就如实说问不到（不假装在线）。
 (async function () {
   const el = document.getElementById('kstatus');
-  const say = (t) => { el.innerHTML = t; };
+  // 说一次，同时给一次"刚更新过"的短强调（纯 CSS，靠 .ks 触发）。
+  // 强调只能走 class：#kstatus 是 aria-live 区域，改它的内容就已经是一次播报，
+  // 再叠一层纯装饰的重复播报只会吵。这里不动 innerHTML 的写法。
+  const say = (t) => {
+    el.innerHTML = t;
+    el.classList.remove('ks');
+    void el.offsetWidth;          // 强制重排，让同一条换文案时也能重放这一次强调
+    el.classList.add('ks');
+  };
   try {
-    const r = await fetch('/api/health');
+    const r = await fetchT('/api/health');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const h = await r.json();
     if (!h.exists) {
@@ -469,6 +582,13 @@
       + '内核 <code>' + h.exe + '</code>（' + h.size + ' 字节 ≈ ' + mb + ' MB）'
       + (ex ? ex : ''));
   } catch (e) {
+    // 超时要单独说：AbortError 自带的 "The user aborted a request" 对读者毫无意义，
+    // 而"服务没回"与"服务说不行"是两种完全不同的情况，不该混成一句。
+    if (e && e.name === 'AbortError') {
+      say('内核状态：<b>没等到回话</b>（15 秒内服务没有响应，通常是服务正在冷启动）。'
+        + '稍等几秒刷新即可 —— 这不代表内核算不了。');
+      return;
+    }
     say('内核状态：<b>问不到</b>（' + e.message + '）。如果你是在本地直接双击打开这个 HTML，'
       + '那不会有后端 —— 需要用 <code>tools/webapp.py</code> 起服务。');
   }

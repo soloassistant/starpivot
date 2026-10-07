@@ -44,7 +44,14 @@ async function open() {
               lastResp: null, close: () => dom.window.close() };
   // 顺手把内核响应存下来，判据要直接看内核回了什么
   const origFetch = w.fetch;
-  w.fetch = (u, o) => origFetch(u, o).then(r => r.clone().json().then(j => { p.lastResp = j; }).catch(() => {}).then(() => r));
+  // 只跟踪 /api/nbody 的回执。曾经这里"抓任意 JSON 响应"当 lastResp，但页面现在
+  // 每次 nbody 落地后还会调 /api/lagrange（锚点层）—— 那个响应也带 JSON、却没有
+  // frames 字段，会把 lastResp 覆盖掉，让"预设跑了几帧"一律读成 0。断言的对象是
+  // nbody 回执，就只认 nbody 回执。
+  w.fetch = (u, o) => origFetch(u, o).then(r => {
+    if (!String(u).includes('/api/nbody')) return r;
+    return r.clone().json().then(j => { p.lastResp = j; }).catch(() => {}).then(() => r);
+  });
   return p;
 }
 

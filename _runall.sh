@@ -190,6 +190,8 @@ if "$ZIG" c++ -std=c++17 -O2 -ffp-contract=off -I"$P/include" -o "$P/build/bin/s
   # D3 不依赖上面那颗 .exe，依赖的是 zig 与 node（都要起子进程，所以只能 python 写）。
   # 软判据：没有 zig/node 时探针自报环境缺席 → SKIP，而不是把整条路线判死。
   run pysoft _probe_wasm.py 'D3 WASM/WASI：内核库链成模块 + 真宿主实例化执行（软判据）'
+  run py   _probe_genesis_kernel.py 'genesis 内核：stdout 字节级复现 + 异 seed 必须不同 + 质量区间与互 Hill 半径独立复算'
+  run py   _probe_lagrange_kernel.py 'lagrange 内核：力平衡 / 几何独立复算（不复用内核那套五次方程）'
 else
   say "  [FAIL] 内核 + CLI 编译失败（见 _c_build2.txt）"; fail=$((fail+1))
 fi
@@ -199,8 +201,11 @@ sec "E. 页面级端到端（jsdom，需要 8765 服务）"
 # 同一个变量写两处，迟早有一处忘了改。
 live2=$(netstat -ano 2>/dev/null | grep -c '127.0.0.1:8765.*LISTENING')
 if [ "${live2:-0}" -gt 0 ]; then
-  # ⚠ 这 12 条与 _verify_all.ps1 的 E 段**逐条同名同序**（连标签文案也照抄），
+  # ⚠ E 段这些条目与 _verify_all.ps1 的 E 段**逐条同名同序**（连标签文案也照抄），
   #   好让以后直接 diff 两段的探针清单就能看出谁加了没同步。
+  # keepalive 写在这里（而不是 for 循环里）：它不是 jsdom 探针，走 python + pysoft ——
+  # 它按设计在"8765 上没有服务"时返回 rc=2，用 pysoft 才是 SKIP 而不是 FAIL。
+  run pysoft _probe_keepalive.py '网关 keep-alive：未知路由不污染连接（同一连接连发两条）'
   for pair in "_probe_home.js|首页：真加载 → 脚本填出内核状态 → 工具入口可达（含负样本）" \
               "_probe_kids.js|小朋友页：真改旋钮 → 教的那件事（越远越慢）成不成立" \
               "_probe_orbit.js|轨道页：真加载 → 样本逐字渲染 → conj 真调内核（含负路径与负样本）" \
@@ -212,6 +217,12 @@ if [ "${live2:-0}" -gt 0 ]; then
               "_probe_tools.js|双击画面放行星 / 信息卡 / 倒放与键盘 / 等价 CLI 命令真跑比对 / 撞击的瞬时表现" \
               "_probe_dualmode.js|普通人/教授双模式（含\"切模式不改变计算\"）+ 类型调色板" \
               "_probe_tour.js|导览（deep link / 每步真切算法）/ 积分器下拉 / 能量曲线 / CSV / 新预设" \
+              "_probe_anchors.js|引力锚点 L1-L5：点数跟着 /api/lagrange 回执走 + 稳定说法不夸大" \
+              "_probe_predict.js|预演/计划模式：预演真的更短 + 幽灵轨迹来自预演回执 + 放弃真 abort" \
+              "_probe_protocols.js|协议任务链：达成判定真读内核回执 + 落进既有 session" \
+              "_probe_scheme.js|方案保存/分享：命名保存 + 载入逐项还原 + 不冲掉对方会话" \
+              "_probe_timescale.js|时间压缩档位：改档真改 years 并重算（防死控件）" \
+              "_probe_seeded.js|随机宇宙种子：同 seed 逐位复现 + bodies 走既有 nbody payload" \
               "_probe_firstpaint.js|首屏耗时分解：内核 / 网关 / JSON.parse / 首帧渲染（记录用，非门禁）"; do
     f="${pair%%|*}"; l="${pair#*|}"
     run node "$f" "$l"

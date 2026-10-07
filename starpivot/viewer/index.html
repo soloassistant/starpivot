@@ -111,6 +111,16 @@
   .note{font-size:var(--fs-sm);color:var(--ink2);margin-top:var(--sp-3);line-height:var(--lh-loose)}
   .warnbox{border-left:3px solid var(--warn);background:var(--warn-soft);padding:var(--sp-3) var(--sp-4);
            border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#7c3d0a;line-height:var(--lh-loose)}
+  /* 诚实披露从"首屏一整块黄框"改成"一行可展开的入口"。
+     它是**被质疑时的答案**，不是上手必读 —— 排在操作区前面会让人先读完一屏半说明才动手。
+     文字一字未改，只是收起来；summary 这行把里面有什么先说出来，不用点开也知道。 */
+  .disclose{margin-bottom:var(--sp-4);border:1px solid var(--line);border-radius:var(--r-2);
+           background:var(--card2)}
+  .disclose>summary{cursor:pointer;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-2);
+           font-size:var(--fs-sm);color:var(--ink2);list-style-position:inside}
+  .disclose>summary:hover{color:var(--ink)}
+  .disclose[open]>summary{border-bottom:1px solid var(--line);border-radius:var(--r-2) var(--r-2) 0 0}
+  .disclose .warnbox{border:0;border-radius:0;background:transparent;padding:var(--sp-3) var(--sp-4)}
   .okbox{border-left:3px solid var(--ok);background:var(--ok-soft);padding:var(--sp-3) var(--sp-4);
          border-radius:0 var(--r-2) var(--r-2) 0;font-size:var(--fs-sm);color:#0d5b3e;line-height:var(--lh-loose)}
   code{font-family:var(--mono);font-size:var(--fs-sm);background:var(--grid);
@@ -131,6 +141,85 @@
   .navlink.muted{color:var(--ink2)}
   /* 动态生成的表格（#kv / #model / #cresult）在窄屏上也要能横滚 —— 保持原来的写法不动 */
   #cresult,.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* ===== 动效：这一页原本零 @keyframes，这里补最克制的一层 =====
+     完整约束见 home.html 同名段落（① 不用 JS 定时器 ② 只动 opacity/transform/背景色
+     ③ 不动 :root 令牌 ④ fill-mode 用 backwards 不用 both —— both 会让末帧 transform
+     压住 hover 的 transform）。兜底同样是下面 prefers-reduced-motion 那条
+     *{animation:none!important}：动画被整体关掉，元素回到自然状态，不会停在 opacity:0。 */
+  @keyframes spRise{from{transform:translateY(8px)}to{transform:none}}
+  /* 结果表的行：只从左边滑进，不改 opacity（行文字只有 12–13px，两层同时淡会发虚）。 */
+  @keyframes spSlide{from{transform:translateX(-7px)}to{transform:none}}
+  /* "刚更新过"的一次性强调：闪一下 --accent-soft 就退回透明，不在页面上留下任何状态色。 */
+  @keyframes spTick{0%{background:var(--accent-soft)}28%{background:var(--accent-soft)}
+                    100%{background:transparent}}
+  /* 下面三个是循环动画。它们的**可见性本身**放在关键帧里（基态 opacity:0）：
+     reduced-motion 把 animation 关掉时，高亮/转圈/脉冲会一起消失，
+     只留下文字与形状 —— 少一层装饰，但不丢任何信息。 */
+  @keyframes spSweep{0%{opacity:1;transform:translateX(-100%)}100%{opacity:1;transform:translateX(263%)}}
+  @keyframes spSpin{0%{opacity:1;transform:rotate(0)}100%{opacity:1;transform:rotate(1turn)}}
+  @keyframes spPulse{0%,100%{box-shadow:0 0 0 0 rgba(36,85,214,0)}50%{box-shadow:var(--ring)}}
+  /* 页面骨架错峰入场：这一页首屏是"披露条 + 控件 + 画布"，每一块都能独立看，
+     所以错峰只是让它有先后，不改变"从上往下读"的顺序。300ms 封顶。 */
+  .wrap>*{animation:spRise 380ms var(--ease) backwards}
+  .wrap>*:nth-child(2){animation-delay:50ms}
+  .wrap>*:nth-child(3){animation-delay:100ms}
+  .wrap>*:nth-child(4){animation-delay:150ms}
+  .wrap>*:nth-child(5){animation-delay:200ms}
+  .wrap>*:nth-child(6){animation-delay:250ms}
+  .wrap>*:nth-child(n+7){animation-delay:300ms}
+  canvas{animation:spRise 420ms var(--ease) 150ms backwards}
+  /* 折叠区展开：披露条与原始 JSON 各淡入一次（summary 的悬停底色也补上，
+     原来只有 .disclose 有，原始 JSON 那条点起来像没反应）。 */
+  details>summary{transition:background var(--dur) var(--ease)}
+  details:not(.disclose)>summary:hover{background:var(--card2)}
+  .disclose[open]>.warnbox{animation:spRise 240ms var(--ease) backwards}
+  details:not(.disclose)[open]>pre{animation:spRise 240ms var(--ease) backwards}
+  /* 结果表逐行进入。
+     ⚠ 只给 #cresult：#kv 与 #model 是 render() 每次都重写的，而 render() 挂在
+       slider 的 input 上（回放时每 30ms 一次）—— 给它们加进场动画会变成永动机。
+       #cresult 只在拿到新结果时整体替换，所以新行出现 = 新结果到达，正好该动一下。 */
+  #cresult tbody tr{animation:spSlide 260ms var(--ease) backwards}
+  #cresult tbody tr:nth-child(2){animation-delay:26ms}
+  #cresult tbody tr:nth-child(3){animation-delay:52ms}
+  #cresult tbody tr:nth-child(4){animation-delay:78ms}
+  #cresult tbody tr:nth-child(5){animation-delay:104ms}
+  #cresult tbody tr:nth-child(6){animation-delay:130ms}
+  #cresult tbody tr:nth-child(7){animation-delay:156ms}
+  #cresult tbody tr:nth-child(8){animation-delay:182ms}
+  #cresult tbody tr:nth-child(9){animation-delay:208ms}
+  #cresult tbody tr:nth-child(10){animation-delay:234ms}
+  #cstatus,#cresult{border-radius:var(--r-1)}
+  #cstatus.ks,#cresult.ks{animation:spTick 1.1s var(--ease) 1}
+  /* —— 慢交互（/api/find-close，1–2 分钟）的等待态 ——
+     刻意不画百分比进度条：服务端不回传中间阶段，一个往前走的条就是在假装在算。
+     这里的"进度"只有两件真事：一条长度不确定的活动条（只表示"还在等"），
+     和几行确实已经发生的客户端阶段。左侧那条 --accent 竖线是**这一页在等**，
+     不是"内核算得怎么样"的颜色承诺（和 home.html 刻意不给状态上色是同一个道理）。 */
+  .busy{margin-top:var(--sp-3);padding:var(--sp-3) var(--sp-4);background:var(--card2);
+        border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r-1)}
+  .busy[hidden],#ccancel[hidden]{display:none}
+  .busybar{height:4px;margin-top:var(--sp-1);border-radius:var(--r-full);
+           background:var(--grid);overflow:hidden}
+  .busybar::after{content:'';display:block;width:38%;height:100%;border-radius:inherit;opacity:0;
+                  background:linear-gradient(90deg,rgba(36,85,214,0),var(--accent),rgba(36,85,214,0));
+                  animation:spSweep 1.7s var(--ease) infinite}
+  .busysteps{list-style:none;margin:var(--sp-3) 0 0;padding:0;
+             font-size:var(--fs-sm);color:var(--ink2);line-height:var(--lh-loose)}
+  .busysteps li::before{content:'';display:inline-block;width:9px;height:9px;margin-right:8px;
+                        border:1px solid var(--line2);border-radius:50%;vertical-align:middle}
+  .busysteps li.done::before{background:var(--accent);border-color:var(--accent)}
+  .busysteps li.now::before{border-color:var(--accent);animation:spPulse 1.6s var(--ease) infinite}
+  .busywhy{margin-bottom:0}
+  .busywhy b{color:var(--ink)}
+  .busyact{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;margin-top:var(--sp-3)}
+  .busyact .note{margin:0}
+  /* 按钮在跑的时候（.working）继续用"进行中"的光标；只是被别处按住的那个用 not-allowed。
+     顺序有意义：.working 写在后面，所以它自己按下时不会被这条改成 not-allowed。 */
+  button:disabled{cursor:not-allowed;opacity:.7}
+  button.working{opacity:.7;cursor:progress}
+  button.working::after{content:'';display:inline-block;width:11px;height:11px;margin-left:7px;
+    border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;
+    opacity:0;vertical-align:-1px;animation:spSpin .8s linear infinite}
   /* —— 可访问性：键盘焦点必须看得见 —— */
   a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,
   select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{
@@ -170,13 +259,16 @@
   <div class="sub">
     轨迹与碰撞预警均为本机 <code>starpivot</code> CLI 的真实输出；本页只做绘制与请求转发，不做任何计算。
   </div>
-  <div class="warnbox" style="margin-bottom:16px">
-    <b>上半页这三份轨道是随页面打包的预计算样本</b>（<code>viewer/demo.js</code>），
-    加载时不会调用本地内核 —— 实测打开本页只发过一次 <code>/api/health</code>。
-    它们确实是 CLI 算出来的真结果，但是<b>打包那一刻算的</b>。想用你自己这台机器现算，
-    命令行跑 <code>starpivot verify-tle …</code>；本页只有下半部分的
-    <b>conj（碰撞预警）</b> 两个按钮是真·现场调用。
-  </div>
+  <details class="disclose">
+    <summary>这份数据是哪来的？（被质疑时的答案 · 5 条）</summary>
+    <div class="warnbox">
+      <b>上半页这三份轨道是随页面打包的预计算样本</b>（<code>viewer/demo.js</code>），
+      加载时不会调用本地内核 —— 实测打开本页只发过一次 <code>/api/health</code>。
+      它们确实是 CLI 算出来的真结果，但是<b>打包那一刻算的</b>。想用你自己这台机器现算，
+      命令行跑 <code>starpivot verify-tle …</code>；本页只有下半部分的
+      <b>conj（碰撞预警）</b> 两个按钮是真·现场调用。
+    </div>
+  </details>
 
   <div class="card">
     <div class="row">
@@ -255,6 +347,22 @@
       <div style="flex:0 0 auto;align-self:flex-end">
         <button id="cfind">🔍 从真实编目找近距对</button>
         <button id="crun" style="background:var(--accent);color:#fff;border-color:var(--accent)">运行 conj</button>
+      </div>
+    </div>
+    <div id="cbusy" class="busy" hidden>
+      <div class="busybar" aria-hidden="true"></div>
+      <ol class="busysteps" id="csteps">
+        <li>请求已交给本地服务</li>
+        <li>在等服务回话</li>
+        <li>拿到结果</li>
+      </ol>
+      <div class="note busywhy">
+        <b>这里没有百分比进度条。</b>服务端不回传中间阶段，一条往前走的条就是在假装在算 ——
+        上面三行是这一页能确知的全部。这一步要真的去 Celestrak 拉编目，再逐对真实传播。
+      </div>
+      <div class="busyact">
+        <button id="ccancel" hidden>取消这次等待</button>
+        <span class="note">「取消」只让这一页不再等；请求已经发出去了，服务端那一趟是否还在跑，本页不知道。</span>
       </div>
     </div>
     <div id="cstatus" class="note" aria-live="polite"></div>
@@ -568,20 +676,57 @@
   // 页面不做任何数值计算：输入 TLE 原样交给本地服务，由 C++ CLI 返回 JSON。
   const $ = id => document.getElementById(id);
 
+  // 带超时的 fetch。
+  // 为什么必须有：裸 `await fetch(...)` 没有上限，服务端不回话时它永远挂着 ——
+  // 不 resolve 也不 reject，页面于是既不报错也不超时，看着像坏了却说不出原因。
+  // 实测冷启动时确实撞上过（首个请求 4~5 秒，更差时更久）。
+  // 超时按失败处理，页面就能说得出"没等到"，并且把按钮解开让人重试。
+  // 不用 Promise.race 拼一个假超时：那只是提前返回，真实请求还在飞；
+  // AbortController 是真的把它掐掉。
+  // 老 jsdom 里可能没有 AbortController（判据要用 jsdom 加载页面），
+  // 那就退回裸 fetch：宁可不超时，也不能让判据环境直接抛错。
+  // opts.signal 是给调用方的第二条取消通道（"从真实编目找近距对"那一路要跑 1–2 分钟，
+  // 页面上得有个真能掐掉它的按钮）：它一断，这一次 fetch 也真的 abort，
+  // 而不是"页面不再等、请求还在飞"。没传 signal 时行为与原来逐字一致。
+  function fetchT(url, opts) {
+    opts = opts || {};
+    const ms = opts.timeout || 15000;
+    if (typeof AbortController === 'undefined') return fetch(url, opts);
+    const ac = new AbortController();
+    const timer = setTimeout(function () { ac.abort(); }, ms);
+    if (opts.signal) {
+      if (opts.signal.aborted) ac.abort();
+      else if (typeof opts.signal.addEventListener === 'function') {
+        opts.signal.addEventListener('abort', function () { ac.abort(); });
+      }
+    }
+    const o = Object.assign({}, opts, { signal: ac.signal });
+    return fetch(url, o).finally(function () { clearTimeout(timer); });
+  }
+  // 把超时翻译成读者看得懂的话：AbortError 自带的英文对读者没有意义。
+  function errText(e) {
+    if (e && e.name === 'AbortError') return '等太久了，服务一直没回话';
+    return e && e.message ? e.message : '出了点问题';
+  }
+
   // 启动健康检查：file:// 直接打开时没有本地服务，明确提示而不是静默失败。
-  fetch('/api/health').then(r => r.json()).then(h => {
+  fetchT('/api/health').then(r => r.json()).then(h => {
     if (!h.exists) {
       $('cstatus').innerHTML = '<span style="color:#c2410c">未找到 starpivot 可执行文件（'
         + h.exe + '）——请先编译。</span>';
     }
-  }).catch(() => {
-    $('cstatus').innerHTML = '<span style="color:#c2410c">检测不到本地服务。'
+  }).catch(e => {
+    $('cstatus').innerHTML = '<span style="color:#c2410c">检测不到本地服务（'
+      + errText(e) + '）。'
       + '请先运行 <code>python tools/webapp.py</code>，然后从 http://localhost:8765 打开本页。</span>';
   });
 
   async function postJSON(url, body) {
-    const r = await fetch(url, { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    // 上限比网关的 CLI 超时短一截（conj 是 120 秒、verify-tle 是 60 秒）：
+    // 页面应该先说"这次没算出来"，而不是陪着网关一起等到它放弃。
+    const r = await fetchT(url, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      timeout: 90000 });
     const js = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(js.error || ('HTTP ' + r.status));
     return js;
@@ -650,6 +795,38 @@
     $('cmapbox').style.display = 'block';
   }
 
+  // 状态变化时的一次性强调：只加类，不碰 DOM。
+  // 强调必须走 class 而不是再改一次 innerHTML —— #cstatus 是 aria-live 区域，
+  // 改内容就是一次播报，套一层纯装饰的重复播报只会吵。同一类重复加不会重放，
+  // 所以先摘掉、强制重排一次再挂上（这是 CSS 动画在同一元素上重放的标准做法）。
+  function flash(el) {
+    if (!el) return;
+    el.classList.remove('ks');
+    void el.offsetWidth;
+    el.classList.add('ks');
+  }
+
+  // 慢交互的等待态：/api/find-close 要去 Celestrak 拉真实编目、再逐对真实传播
+  //（Starlink 组 1–2 分钟）。这一段的"进度感"只由两件真事构成：
+  // 一条长度不确定的活动条（只表示"还在等"），和三行确实已经发生的客户端阶段。
+  // 页面上不出现任何新数字 —— 所有物理量仍然只来自内核的 JSON 回显。
+  const steps = $('csteps').children;
+  let findCancel = null;
+  function step(i, state) {
+    const li = steps[i];
+    if (li) li.className = state || '';
+  }
+  function busy(on) {
+    $('cbusy').hidden = !on;
+    $('ccancel').hidden = !on;
+    $('cfind').classList.toggle('working', on);
+    $('cfind').disabled = on;   // 同一趟一两分钟的活不该被连点两次
+    $('crun').disabled = on;     // 免得两趟 CLI 去抢同一个内核
+  }
+  $('ccancel').addEventListener('click', function () {
+    if (findCancel) findCancel.abort();
+  });
+
   $('crun').addEventListener('click', async () => {
     try {
       const [l1, l2] = parseTleBox($('tleA').value, '对象 A');
@@ -663,20 +840,34 @@
       });
       $('cstatus').textContent = '';
       $('cresult').innerHTML = fmtConj(d);
+      flash($('cresult'));
       drawConjMap(d.result || {});
       $('cjson').textContent = JSON.stringify(d, null, 2);
     } catch (e) {
       $('cstatus').innerHTML = '<span style="color:#c2410c">' + e.message + '</span>';
+      flash($('cstatus'));
     }
   });
 
   $('cfind').addEventListener('click', async () => {
+    const groups = $('cgroups').value;
+    // 老 jsdom 里没有 AbortController：那时取消按钮不出现，其余行为照旧。
+    const mine = (typeof AbortController === 'undefined') ? null : new AbortController();
+    findCancel = mine;
+    busy(true);
+    // 没有 AbortController 的环境（老 jsdom）里，这个按钮按下去什么也做不了 ——
+    // 那就不摆它。宁可少一个功能，也不能给一个点了没反应的按钮。
+    if (!mine) $('ccancel').hidden = true;
+    step(0, 'done'); step(1, 'now'); step(2, '');
     try {
-      const groups = $('cgroups').value;
       $('cstatus').textContent = '从 Celestrak 拉取真实 TLE 并逐对真实传播'
         + (groups.indexOf('starlink') >= 0 ? '（Starlink 约 1–2 分钟）' : '（约 10–30 秒）') + '…';
-      const r = await fetch('/api/find-close?groups=' + encodeURIComponent(groups)
-        + '&top=12&cap=1500');
+      const r = await fetchT('/api/find-close?groups=' + encodeURIComponent(groups)
+        + '&top=12&cap=1500',
+        // 这一路要去 Celestrak 拉真实编目再逐对真实传播，界面自己就写了"约 10–30 秒"、
+        // Starlink 更久，所以上限给得比别处宽；但仍要短于网关自己的 420 秒上限，
+        // 好让页面先说"没等到"并把按钮解开，而不是两个人一起干等。
+        { timeout: 300000, signal: mine ? mine.signal : undefined });
       const js = await r.json();
       if (!r.ok) throw new Error(js.error || ('HTTP ' + r.status));
       const pairs = js.pairs || [];
@@ -696,6 +887,8 @@
       html += '</table><div class="note">点击任意行把该对载入上方输入框；第 1 名已填入。</div>';
       $('cresult').innerHTML = html;
       $('cstatus').textContent = '';
+      step(0, 'done'); step(1, 'done'); step(2, 'done');
+      flash($('cresult'));
       $('cjson').textContent = JSON.stringify(js, null, 2);
       $('cresult').querySelectorAll('tr[data-i]').forEach(tr => {
         tr.addEventListener('click', () => {
@@ -705,7 +898,19 @@
         });
       });
     } catch (e) {
-      $('cstatus').innerHTML = '<span style="color:#c2410c">' + e.message + '</span>';
+      // 取消与超时是两回事：取消是我们自己掐的，超时是等太久 —— 分开说，别混成一句。
+      if (mine && mine.signal.aborted) {
+        $('cstatus').innerHTML = '<span style="color:#c2410c">已取消这次等待。</span>'
+          + '这一页不再等了；请求已经发出去，服务端那一趟是否还在跑，本页不知道。'
+          + '想再试一次，直接再点「从真实编目找近距对」。';
+      } else {
+        $('cstatus').innerHTML = '<span style="color:#c2410c">' + e.message + '</span>'
+          + '　可以再点一次「从真实编目找近距对」重试。';
+        flash($('cstatus'));
+      }
+    } finally {
+      busy(false);
+      findCancel = null;
     }
   });
 
