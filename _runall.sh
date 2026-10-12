@@ -11,7 +11,7 @@ export PATH="/c/Users/geral/.workbuddy/binaries/PortableGit/versions/1.2.0/usr/b
 # 静静地把 tools 放过去 —— 直到 E 层回放时才发现"这条命令没录到"，报成一个
 # 看起来毫不相关的 FAIL。设早一行就没事，所以设早一行。
 export NODE_PATH='C:\Users\geral\.workbuddy\binaries\node\workspace\node_modules'
-NODE="C:/Users/geral/.workbuddy/binaries/node/versions/22.22.2-3/node.exe"
+NODE="C:/Users/geral/.workbuddy/binaries/node/versions/22.22.2-6/node.exe"
 PY="C:/Users/geral/.workbuddy/binaries/python/versions/3.13.12/python.exe"
 ZIG="D:/tmp/zigdl/zig/ziglang/zig.exe"
 R="C:/Users/geral/WorkBuddy/2026-09-24-16-11-48"
@@ -143,7 +143,8 @@ if "$ZIG" c++ -std=c++17 -O2 -ffp-contract=off -I"$P/include" -o "$P/build/bin/s
     rm -f "$pf"
     rc=2
     for _round in 1 2 3 4 5 6 7 8; do
-      "$NODE" "$R/$f" >/dev/null 2>&1; rc=$?
+      # stderr 单独留档（覆盖式 → 留下的就是最后一轮，也就是崩掉的那一轮）。
+      "$NODE" "$R/$f" >/dev/null 2>"$R/_d0_${f%.js}.err"; rc=$?
       [ "$rc" -ne 2 ] && break
       "$PY" "$R/_record.py" >/dev/null 2>&1 || break
       # 录完必须立刻让**下一轮**读得到，否则 table() 永远为空、每轮都把同样的
@@ -152,6 +153,15 @@ if "$ZIG" c++ -std=c++17 -O2 -ffp-contract=off -I"$P/include" -o "$P/build/bin/s
       # 淹没成了一件不值得看的事 —— 见下面那段说明。
       export STARPIVOT_REPLAY="$R/_replay.json"
     done
+    # 证据要留得住 —— 这里真丢过一次关键证据。
+    # 探针抓到异常时是把**栈写进它自己的 _probe_<名>.txt**（不是 stderr）；而那份 .txt
+    # 随后会被 E 层的同名探针覆盖。于是 D0 只剩一句"真崩了"，崩在哪谁也说不清 ——
+    # 我为了定位它，只能从计划文件缺失反推"崩在第一条 spawn 之前"，再一行行找。
+    # 现在把这一轮的 stderr 与探针自己那份 .txt 合成一份快照（两个名字都在 .gitignore 里）。
+    # ⚠ 源路径是 `${f%.js}.txt`（= _probe_tools.txt），**不是** `_probe_${f%.js}.txt` ——
+    #   探针自己的文件已经带了 `_probe_` 前缀，再加一层就指向一个不存在的文件，
+    #   而 2>/dev/null 会让这个错**静默通过**（我第一次就写成了两层，靠"快照仍是 68 字节"才发现）。
+    cat "$R/${f%.js}.txt" >> "$R/_d0_${f%.js}.err" 2>/dev/null
     # 收集轮的退出码必须当场判读，不能只 break。
     # 真踩过的坑：_probe_tools.js 是 jsdom 探针，而 NODE_PATH 当时写在 E 层（本段之后），
     # 于是它在 require('jsdom') 处 rc=1 —— 一条命令都没收到。当时的代码只 break 不吭声，
@@ -159,6 +169,7 @@ if "$ZIG" c++ -std=c++17 -O2 -ffp-contract=off -I"$P/include" -o "$P/build/bin/s
     # 与真实原因隔了一整层，看着毫不相关。所以判据是"有没有计划文件"：
     if [ ! -f "$pf" ] && [ "$rc" -eq 1 ]; then
       say "  [FAIL] D0 收集 $f 时探针真崩了（rc=1，且没有计划文件）—— 它要的命令一条都没录到"
+      say "         它的 stderr 与探针自己的 ${f%.js}.txt 已合成在 _d0_${f%.js}.err —— 栈在那儿。"
       fail=$((fail+1))
     elif [ ! -f "$pf" ] && [ "$rc" -eq 2 ]; then
       say "  [FAIL] D0 收集 $f：跑了 8 轮仍一条命令都没收到（rc=2）"
@@ -223,7 +234,8 @@ if [ "${live2:-0}" -gt 0 ]; then
               "_probe_scheme.js|方案保存/分享：命名保存 + 载入逐项还原 + 不冲掉对方会话" \
               "_probe_timescale.js|时间压缩档位：改档真改 years 并重算（防死控件）" \
               "_probe_seeded.js|随机宇宙种子：同 seed 逐位复现 + bodies 走既有 nbody payload" \
-              "_probe_firstpaint.js|首屏耗时分解：内核 / 网关 / JSON.parse / 首帧渲染（记录用，非门禁）"; do
+              "_probe_firstpaint.js|首屏耗时分解：内核 / 网关 / JSON.parse / 首帧渲染（记录用，非门禁）" \
+              "_probe_seqguard.js|并发重算的序号守卫：先发后到的旧结果不许覆盖新结果（自带负对照）"; do
     f="${pair%%|*}"; l="${pair#*|}"
     run node "$f" "$l"
   done

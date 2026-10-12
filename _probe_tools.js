@@ -125,7 +125,16 @@ const dblclick = (p, x, y) => {
 
 (async () => {
   const p = await open();
-  await p.settle(2500);
+  // ⚠ 这里原来是固定 `settle(2500)`，然后一路固定 settle 等到进放置模式为止。
+  //   两个"等回执"的地方都在赌毫秒，而它们**决定了 §1 反解出的 a**：
+  //   `unprojectToEcliptic` 用 `fitScale()`，而 `fitScale()` 取的是**当前 data** 的全帧最大半径
+  //   （universe.html:4559）——data 是哪一份，全看双击那一刻哪一发响应已经落地。
+  //   实测（_diag_scale.js，三遍一致）：data=太阳系那份 → a=24.1236；data=custom 那份 → a=24.1242。
+  //   而 §6b 要拿"页面导出的那条命令"**真跑一遍**，命令里就带着这个 a ⇒ 两次跑出不同的 a
+  //   ⇒ 录制回放的键对不上 ⇒ "命令没录到"（rc=2）。2026-10-09 全量唯一那 1 条 FAIL 就是它。
+  //   改成等条件（和 dualmode / errbar 同一套）：每一发都按回执等回来，data 才是确定的那一份。
+  await p.waitResponses(1);                            // 初次装载（太阳系）那一发先落地
+  await p.settle(300);
   p.fire(p.$('play'), 'click'); await p.settle(200);   // 暂停，免得帧一直在动
 
   // ---------- 1. 点画面放行星 ----------
@@ -134,8 +143,11 @@ const dblclick = (p, x, y) => {
      '默认不在放置模式');
   // 从太阳系场景进入放置模式：应当自动切到自定义，否则行星表被忽略、点了没反应
   ok(p.$('scenario').value === 'solar', '起点是太阳系场景');
+  const nR1 = p.respLog.length;
   p.fire(p.$('placemode'), 'click');
-  await p.settle(3000);
+  // custom 那一发回执二十多 MB、实测 2~16 s。**必须等它到**：不等的话双击时 data 还是太阳系那份，
+  // 反解出的 a 会差 0.0006 AU —— 而 §6b 的等价命令会被整个改掉（这一条曾经假红过）。
+  await p.waitResponses(nR1 + 1);
   ok(p.$('scenario').value === 'custom', '进入放置模式后自动切到「自定义」（否则行星表不生效，点了没反应）');
   ok(p.$('placemode').classList.contains('primary'), '按钮变成"放置中"状态');
   ok(/反解回黄道面/.test(p.$('toolnote').textContent), '并且说明位置是怎么来的（屏幕坐标反解回黄道面）');

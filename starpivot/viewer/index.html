@@ -78,6 +78,9 @@
   select,input,textarea,button{font:inherit;font-size:max(16px,var(--fs-base));color:var(--ink);
         background:var(--card);border:1px solid var(--line2);border-radius:var(--r-1);padding:7px 10px;
         touch-action:manipulation}
+  /* select 的固有宽由最长的 option 决定，窄屏会把整页顶宽 11px（2026-10-09 视觉验收实测）。
+     给个上限，让它跟着容器收。 */
+  select{max-width:100%}
   textarea{font-family:var(--mono);font-size:max(16px,var(--fs-base));line-height:1.5}
   button{cursor:pointer;box-shadow:var(--sh-1);
         transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
@@ -272,7 +275,7 @@
 
   <div class="card">
     <div class="row">
-      <div style="flex:0 0 auto">
+      <div style="flex:0 0 auto;min-width:0;max-width:100%">
         <label for="scenario">场景</label>
         <select id="scenario"></select>
       </div>

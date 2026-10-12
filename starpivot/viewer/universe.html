@@ -65,6 +65,12 @@
   h1{margin:0;font-size:var(--fs-2xl);font-weight:650;letter-spacing:-.3px;line-height:var(--lh-tight)}
   .ver{color:var(--ink3);font-size:var(--fs-sm);letter-spacing:.01em}
   .back{color:var(--accent);font-size:var(--fs-sm);text-decoration:none}
+  /* 正文里的行内链接必须自己定色。以前这里只给 .back 定了色，
+     行内 <a>（导语里的「天体类型」那种）就落回**浏览器默认链接蓝 #0000EE** ——
+     叠在这页的深色底上对比度只有 1.72:1，几乎看不见（2026-10-09 视觉验收实测）。
+     令牌表扫描（_check_home.js 那一套）只能验 --ink/--ink2/--ink3 的组合，
+     扫不到"浏览器插进来的默认色"，所以这条得显式写出来。 */
+  a{color:var(--accent)}
   /* 两段导语（普通人版 / 教授版）各是 4~6 行的一段话，排在页首时就是一堵墙。
      给它们一块面板：--card2 底 + 左侧一条强调线 —— 一眼看出"这是导语，不是正文"，
      读完也知道该往哪儿跳。（文字一字未动，只是把它摆成"一块前言"。） */
@@ -150,6 +156,19 @@
   /* 全屏时它已经是浮层、不再顶布局，所以照常显示 —— 全屏恰恰是最需要它的场景。 */
   .stage:fullscreen #selcard{top:var(--sp-3);left:var(--sp-3)}
   .row{display:flex;gap:var(--sp-3) var(--sp-4);flex-wrap:wrap;align-items:flex-end}
+  /* 窄屏控件收缩。select 的固有宽由**最长的 option 文字**决定（"撞击碎裂 · 高速撞碎、
+     低速重聚（默认 · 碎片成束溅射 + 级联）"那一句就能把它撑到 487px），
+     而 flex 子项的 min-width:auto 会让它**拒绝收缩** —— 于是顶出 .dbody，
+     再被 details.card 的 overflow:hidden 裁掉，右侧那截用户永远够不到
+     （2026-10-09 视觉验收：手机上 select#collide 被裁 130px）。
+     解开 min-width、并给 select 一个上限即可；宽屏没压力，尺寸不变。 */
+  .row > *{min-width:0}
+  select{max-width:100%}
+  /* .dbody 里的横排有**两种写法**：有的是 .row，有的是一串内联 style 写的 flex
+     （作者没给它们类名），所以 .row > * 盖不住后者。这里直接盖 .dbody 里的 div / label：
+     对块级元素是空操作（它们本来就不吃 min-width:auto），只对 flex 子项生效 ——
+     正好是我们要的那一类。 */
+  .dbody div, .dbody label{min-width:0;max-width:100%}
   .stat{font-size:var(--fs-sm);color:var(--ink2)}
   .stat b{color:var(--ink);font-family:var(--mono)}
   /* 结论条：与 home / index 用同一组尺寸（padding + 左实线 + 圆角方向一致），
@@ -1084,7 +1103,10 @@
   // 判定。name / tip 是术语版（教授模式），plain 是给普通人的一句话 ——
   // 同一件事的两种说法，判定码本身仍然来自内核，页面只是换措辞。
   const VERDICT = [
-    { name:'无光照', col:'#6b7280', tip:'它是光源自己（r=0），辐照度为 0',
+    // col 是**判定文字的着色**，画在 --card(#111a30) 上，所以必须 ≥4.5:1。
+    // 原来这里是 #6b7280（gray-500），在深色底上只有 3.58:1 —— 2026-10-09 视觉验收实测出来的；
+    // 换成 gray-400 #9ca3af（6.69:1），仍然是四个判定里最"暗"的那个，语义没变。
+    { name:'无光照', col:'#9ca3af', tip:'它是光源自己（r=0），辐照度为 0',
       plain:'没有光照到它' },
     { name:'冻结',   col:'#7fb2e5', tip:'地表温低于水的冰点 273 K，液态水不存在',
       plain:'太冷了：水全冻成冰，出不了生命' },
@@ -1301,6 +1323,7 @@
   let placedStack = [];   // 本次会话里"点画面投放"放下的天体：撤销只撤这些（预设/存档来的不算）
   let perpetual = false;  // 时长「永久」：算到末尾不停，把时长翻倍再算、并保住当前时刻
   let extending = false;  // 正在为"永久"延长（防止在算的过程中重复触发）
+  let computeSeq = 0;     // 重算序号：只有最后发起的那一发允许写回 data —— 见 compute() 开头
   let seekTAfterCompute = null;   // 延长之后要回到的那个时刻（年）；null = 回到开头
   renderBodyTable();
 
@@ -4093,6 +4116,14 @@
   }
 
   async function compute(){
+    // 重算序号：**只有最后发起的那一次**才允许写回 data / 改界面。
+    // 为什么需要（2026-10-12）：按钮 disabled 只挡得住"点按钮重复发"，而
+    // 首页装载、切场景/太阳系档位、进放置模式、时长「永久」延长这几条路径都是
+    // **直接调 compute()**，不经过按钮 —— 两发并发时，后**返回**的那一发会覆盖先发的，
+    // 页面就显示**上一组参数**的结果（而且看不出任何异常）。
+    // 这不是假想：tools 探针 2026-10-09 那次"反解出的 a 时好时坏"就是它的一个实例
+    // （同一串交互，data 有时还是上一发的结果）。修在**发起处**这一个地方。
+    const mySeq = ++computeSeq;
     const btn = $('compute');
     btn.disabled = true; btn.textContent = '积分中…';
     const payload = buildPayload();
@@ -4107,6 +4138,10 @@
         // 而不是陪着网关一起等到它放弃。120 秒对最重的载荷也留了余量。
         timeout: 120000 });
       const js = await r.json();
+      // 过期响应：更新的那一发已经在路上/已落地，这一发整份作废 —— 连 data 都不许碰。
+      // 放在这里（而不是只守成功分支）是因为它同时挡住了"过期请求把 data 覆盖回去"
+      // 和"过期请求 clearError() 抹掉新请求的告警"两件事。见函数开头那段。
+      if (mySeq !== computeSeq) return;
       if (!r.ok) throw new Error(js.error || ('HTTP ' + r.status));
       // 内核契约守卫：status:"ok" 却给回 0 帧（--dt 0 或极小 dt 就会这样），
       // 照单全收的话 render() 里 data.frames[0] 是 undefined，下一句 .t 抛异常，
@@ -4166,6 +4201,9 @@
       // 这版参数已经真的生效了 —— **除非**算的路上用户又改过（那样标记要留着）。
       setDirty(paramRev !== revSent);
     } catch (e) {
+      // 过期请求的失败也不该盖掉新请求的结果 —— 否则会弹一条**已经无关**的告警条，
+      // 而画面上明明是新结果。同样交还给最新那一发。
+      if (mySeq !== computeSeq) return;
       // 失败时不消脏标记：参数确实还没生效。
       // 超时单独说：AbortError 自带的 "The user aborted a request" 对读者没有意义，
       // 而且它和"内核说不行"是两回事 —— 前者可以重试，后者改了参数也没用。
@@ -4173,10 +4211,15 @@
         ? '等了 120 秒内核还没回话就放弃了。这通常是服务冷启动或算得太重，'
           + '不是参数错了 —— 调小「积分年数」或「输出帧数」再算一次通常就好了。'
         : e.message);
+    } finally {
+      // 收尾只归**最新那一发**：过期的那一发连按钮都不许碰 ——
+      // 否则它会把"还在算"的按钮点回可用，用户以为算完了（而屏幕上仍是旧结果）。
+      if (mySeq === computeSeq){
+        extending = false;      // 成功失败都要清：否则"永久"延长只会发生一次
+        btn.disabled = false;
+        paintComputeBtn();
+      }
     }
-    extending = false;          // 成功失败都要清：否则"永久"延长只会发生一次
-    btn.disabled = false;
-    paintComputeBtn();
   }
 
   // ---- 时长「永久」：算到末尾不停，把时长翻倍再算一遍，并**保住当前时刻** ----

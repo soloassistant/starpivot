@@ -46,7 +46,7 @@
 $ErrorActionPreference = 'Continue'
 $R = 'C:\Users\geral\WorkBuddy\2026-09-24-16-11-48'
 $P = "$R\starpivot"
-$NODE = 'C:\Users\geral\.workbuddy\binaries\node\versions\22.22.2-3\node.exe'
+$NODE = 'C:\Users\geral\.workbuddy\binaries\node\versions\22.22.2-6\node.exe'
 $PY   = 'C:\Users\geral\.workbuddy\binaries\python\versions\3.13.12\python.exe'
 $ZIG  = 'D:\tmp\zigdl\zig\ziglang\zig.exe'
 
@@ -201,10 +201,12 @@ if (-not (Test-Path $ZIG)) {
         # 清单要在同一份录制里，所以服务在的时候一起预热。
         if ($live -gt 0) { $warm += @('_probe_tools.js','_probe_firstpaint.js') }
         foreach ($f in $warm) {
-            $pf = "$R\_plan_$([IO.Path]::GetFileNameWithoutExtension($f)).json"
+            $x = [IO.Path]::GetFileNameWithoutExtension($f)      # 例：_probe_tools
+            $pf = "$R\_plan_$($x).json"
             Remove-Item $pf -ErrorAction SilentlyContinue
             for ($round = 1; $round -le 8; $round++) {
-                $null = & $NODE "$R\$f" 2>&1
+                # stderr 单独留档（覆盖式 → 留下的就是最后一轮，也就是崩掉的那一轮）。
+                $null = & $NODE "$R\$f" 2>"$R\_d0_$($x).err"
                 if ($LASTEXITCODE -ne 2) { break }      # 0/1 = 数据齐了或真失败，都别再录
                 $null = & $PY "$R\_record.py" 2>&1
                 # 录完必须立刻让**下一轮**读得到。不设的话 table() 永远为空，
@@ -212,6 +214,17 @@ if (-not (Test-Path $ZIG)) {
                 # 而"恒为 2"最坏的地方不是慢 —— 是它把 rc=1（探针在收集时就真崩了）
                 # 淹没成一件不值得看的事。下面那段判据就是为了不再淹它。
                 $env:STARPIVOT_REPLAY = "$R\_replay.json"
+            }
+            # 证据要留得住 —— 这里真丢过一次关键证据。
+            # 探针抓到异常时是把**栈写进它自己的 _probe_<名>.txt**（不是 stderr）；而那份
+            # .txt 随后会被 E 层的同名探针覆盖，于是 D0 只剩一句"真崩了"，崩在哪说不清。
+            # 所以把这一轮的 stderr 与探针自己那份 .txt 合成一份快照（两个名字都在 .gitignore 里）。
+            # ⚠ 源路径是 "$R\$x.txt"（= _probe_tools.txt），**不是** "$R\_probe_$($x).txt" ——
+            #   探针自己的文件已经带了 `_probe_` 前缀，再加一层就指向一个不存在的文件，
+            #   而 Test-Path 会让这个错**静默通过**（bash 那侧我第一次就写成了两层，靠
+            #   "快照仍是 68 字节"才发现；这边同改）。
+            if (Test-Path "$R\$x.txt") {
+                Get-Content "$R\$x.txt" | Out-File -FilePath "$R\_d0_$($x).err" -Encoding utf8 -Append
             }
             # 收集轮的退出码必须当场判读，不能只 break。
             # 真踩过的坑：_probe_tools.js 是 jsdom 探针，NODE_PATH 缺席时它在
@@ -221,6 +234,7 @@ if (-not (Test-Path $ZIG)) {
             # 所以判据是"有没有计划文件"：计划文件在 = 它确实报过要哪些命令。
             if ((-not (Test-Path $pf)) -and ($LASTEXITCODE -eq 1)) {
                 Bad "D0 收集 $f 时探针真崩了（rc=1，且没有计划文件）—— 它要的命令一条都没录到"
+                Out2 "         它的 stderr 与探针自己的 $($x).txt 已合成在 _d0_$($x).err —— 栈在那儿。"
             } elseif ((-not (Test-Path $pf)) -and ($LASTEXITCODE -eq 2)) {
                 Bad "D0 收集 $f：跑了 8 轮仍一条命令都没收到（rc=2）"
             } elseif ($LASTEXITCODE -eq 1) {
@@ -304,6 +318,9 @@ if ($live2 -gt 0) {
     # 首屏耗时的分段实测（内核 / 网关 / JSON.parse / 首帧渲染）。它不是门禁，是仪表：
     # 存在的意义是"优化前先量，别拿自己造的秒数立项"（上一轮就踩过这个坑）。
     RunNode '_probe_firstpaint.js' '首屏耗时分解：内核 / 网关 / JSON.parse / 首帧渲染（记录用，非门禁）'
+    # 并发重算的序号守卫（2026-10-12）。自带负对照：同一套测法会在"把守卫变异掉"的
+    # 页面上再跑一遍，那一遍**必须**复现竞态 —— 只测修复后的版本等于恒真。
+    RunNode '_probe_seqguard.js' '并发重算的序号守卫：先发后到的旧结果不许覆盖新结果（自带负对照）'
 } else {
     Skip '8765 上没有服务，页面级 e2e 未跑（先运行 tools/webapp.py）'
 }

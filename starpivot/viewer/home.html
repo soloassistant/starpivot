@@ -578,7 +578,15 @@ function fetchT(url, opts){
     }
     const mb = (h.size / 1048576).toFixed(1);
     const ex = h.exec ? '' : '，但<b>缺少可执行位</b>（上传/解包常丢 mode）';
-    say('内核状态：<b>在线</b>　平台 <code>' + h.platform + '</code>　'
+    // 服务端回显的 platform 是 Node/Python 那一路的原始值（Windows 上是 "nt"、
+    // Linux 上是 "linux"），直接摆给用户看是"把内部值当人话"。
+    // 加一个人话标签，但**原始值照旧显示在括号里** —— 它是服务端说的，
+    // 不能因为加了标签就把它藏起来（页面自己编不出来的东西要一直看得见）。
+    const PLAT = { nt:'Windows', linux:'Linux', darwin:'macOS', win32:'Windows' };
+    const platTxt = PLAT[h.platform]
+      ? PLAT[h.platform] + '（<code>' + h.platform + '</code>）'
+      : '<code>' + h.platform + '</code>';
+    say('内核状态：<b>在线</b>　平台 ' + platTxt + '　'
       + '内核 <code>' + h.exe + '</code>（' + h.size + ' 字节 ≈ ' + mb + ' MB）'
       + (ex ? ex : ''));
   } catch (e) {
