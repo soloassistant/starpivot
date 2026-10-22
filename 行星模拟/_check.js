@@ -2,7 +2,7 @@
 // 这里直接把 universe.html 里的 project / orbitView 原文抠出来跑，不重写一份，
 // 否则测的是副本而不是产品代码。
 const fs = require('fs');
-const p = 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot/viewer/universe.html';
+const p = 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot/viewer/universe.html';
 const h = fs.readFileSync(p, 'utf8');
 
 function grab(name) {

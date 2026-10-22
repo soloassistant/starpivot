@@ -220,13 +220,13 @@ print("=" * 74)
 print("Q4  webapp.py 能否通过语法检查，并把 solar 转发给内核")
 r = subprocess.run(
     [sys.executable, "-m", "py_compile",
-     "C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot/tools/webapp.py"],
+     "C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot/tools/webapp.py"],
     capture_output=True, text=True)
 if r.returncode != 0:
     bad("webapp.py 编译失败: " + r.stderr.strip())
 else:
     print("  py_compile 通过")
-src = open("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot/tools/webapp.py",
+src = open("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot/tools/webapp.py",
            encoding="utf-8").read()
 if '"--solar", solar' not in src:
     bad("webapp.py 没有把 --solar 传给内核")

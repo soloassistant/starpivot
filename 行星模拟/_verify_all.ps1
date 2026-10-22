@@ -44,7 +44,11 @@
 # 不能验证的重构不做，宁可留两份明摆着的重复。
 
 $ErrorActionPreference = 'Continue'
-$R = 'C:\Users\geral\WorkBuddy\2026-09-24-16-11-48'
+# 代理：只排除环回，别把代理变量整个清掉 —— 清掉会连外网一起断（C5 要访问线上站）。
+# 这与 _runall.sh 开头那段是同一件事，两份入口必须保持一致。
+$env:NO_PROXY = '127.0.0.1,localhost,::1'
+$env:no_proxy = $env:NO_PROXY
+$R = 'C:\Users\geral\WorkBuddy\2026-09-24-16-11-48\行星模拟'
 $P = "$R\starpivot"
 $NODE = 'C:\Users\geral\.workbuddy\binaries\node\versions\22.22.2-6\node.exe'
 $PY   = 'C:\Users\geral\.workbuddy\binaries\python\versions\3.13.12\python.exe'

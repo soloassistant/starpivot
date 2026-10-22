@@ -3,6 +3,14 @@
 # Invoke-Expression 被安全策略拦下），所以照 _verify_all.ps1 的顺序用 bash 走一遍。
 # 这不是替换品：_verify_all.ps1 仍是正式入口，本文件用完即删。
 set -u
+# ---- 代理：只把"环回"排除出去，**不要**把代理变量整个 unset ----
+# 本机带 HTTP(S)_PROXY=http://127.0.0.1:54459。它会把**发往 127.0.0.1 的请求也劫走**，
+# 于是 E 层"页面 → 网关"的请求落到代理上、拿不到 8765，整段 E 层变成 [SKIP]。
+# 以前的应对是调用前把代理变量全 unset —— 但那样会**连外网一起切断**：C5 要访问线上站，
+# 没有代理时 python 直接 getaddrinfo failed，C5 只能记 SKIP（2026-10-22 实测踩到）。
+# 两个毛病一个解：留着代理，只把环回地址放进 no_proxy。
+export NO_PROXY='127.0.0.1,localhost,::1'
+export no_proxy="$NO_PROXY"
 export PATH="/c/Users/geral/.workbuddy/binaries/PortableGit/versions/1.2.0/usr/bin:/c/Users/geral/.workbuddy/binaries/PortableGit/versions/1.2.0/bin:/c/Windows/System32:$PATH"
 # NODE_PATH 必须在这里设，**不能**等到 E 层再设。
 # 理由是一条真踩过的坑：D0 要把内核命令录下来，而它收集的探针里有 jsdom 探针
@@ -14,7 +22,7 @@ export NODE_PATH='C:\Users\geral\.workbuddy\binaries\node\workspace\node_modules
 NODE="C:/Users/geral/.workbuddy/binaries/node/versions/22.22.2-6/node.exe"
 PY="C:/Users/geral/.workbuddy/binaries/python/versions/3.13.12/python.exe"
 ZIG="D:/tmp/zigdl/zig/ziglang/zig.exe"
-R="C:/Users/geral/WorkBuddy/2026-09-24-16-11-48"
+R="C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟"
 P="$R/starpivot"
 
 # ---- T4：并发写坏，一处收口 ----

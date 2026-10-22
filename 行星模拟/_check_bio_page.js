@@ -18,7 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot';
+const ROOT = 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot';
 const html = fs.readFileSync(path.join(ROOT, 'viewer', 'universe.html'), 'utf8');
 const cli = fs.readFileSync(path.join(ROOT, 'tools', 'starpivot_cli.cpp'), 'utf8');
 

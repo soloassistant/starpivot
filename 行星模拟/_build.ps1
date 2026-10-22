@@ -3,7 +3,7 @@
 # stdout cannot be captured, so an exit code alone carries no information.
 # NOTE: ASCII only on purpose. A .ps1 containing non-ASCII needs a UTF-8 BOM,
 # otherwise PS 5.1 parses it as ANSI and the whole script silently misbehaves.
-$R = 'C:\Users\geral\WorkBuddy\2026-09-24-16-11-48'
+$R = 'C:\Users\geral\WorkBuddy\2026-09-24-16-11-48\行星模拟'
 $P = "$R\starpivot"
 $ZIG = 'D:\tmp\zigdl\zig\ziglang\zig.exe'
 $env:ZIG_GLOBAL_CACHE_DIR = 'D:\tmp\zigcache'

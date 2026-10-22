@@ -25,7 +25,7 @@
 const fs = require('fs');
 const { execFileSync } = require('child_process');   // 只在 D 的说明里提到，不用于执行
 
-const R = 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48';
+const R = 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟';
 const HTML = R + '/starpivot/viewer/universe.html';
 const DATA = R + '/starpivot/data/real_exoplanets.json';
 const BASE = process.env.STARPIVOT_BASE || 'http://127.0.0.1:8765';

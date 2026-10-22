@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot")
+ROOT = Path("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot")
 spec = importlib.util.spec_from_file_location(
     "webapp", ROOT / "tools" / "webapp.py")
 webapp = importlib.util.module_from_spec(spec)

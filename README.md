@@ -8,19 +8,38 @@
 > 这条规矩也是全部判据的立足点 —— 一旦页面开始"帮内核算一点"，判据立刻失效。
 
 - 线上实例：<https://starpivot-universe.app.workbuddy.host/>
-- 内核自述（更详细）：[`starpivot/README.md`](starpivot/README.md)
-- 设计与验收文档：[`starpivot/docs/`](starpivot/docs)
+- 内核自述（更详细）：[`行星模拟/starpivot/README.md`](行星模拟/starpivot/README.md)
+- 设计与验收文档：[`行星模拟/starpivot/docs/`](行星模拟/starpivot/docs)
 
 ## 组成
 
 | 层 | 内容 | 位置 |
 | --- | --- | --- |
-| **物理内核** | 引力 N 体、四种积分器（leapfrog / hermite 等）、碰撞与碎裂、级联、定向溅射、演化层（生命形态）、轨道根数、SGP4/SDP4、带谐重力 / 大气阻力 / 太阳光压、自转与岁差 | `starpivot/src` · `starpivot/include` |
-| **命令行** | `nbody` · `propagate` · `elements` · `j2` · `conj` · `groundtrack` · `verify-tle` · `about` | `starpivot/tools/starpivot_cli.cpp` |
-| **网关** | 纯标准库 Python，只做 argv 转发与 JSON 透传 | `starpivot/tools/webapp.py` |
-| **前端** | 首页 / 轨道递推页 / N 体沙盒 / 小朋友页（四页共用一套设计令牌） | `starpivot/viewer` |
-| **判据** | 五层（A 静态 / B 独立复算 / C 真代码单测 / D 端到端 / E 页面级），30+ 个探针 | 仓库根 `_probe_*.js` · `_check*.js` · `_runall.sh` · `_verify_all.ps1` |
-| **数据** | 公开目录数据的落地副本，逐项标注观测 / 标定 / 模型参数 | `starpivot/data`（出处见 `PROVENANCE.md`） |
+| **物理内核** | 引力 N 体、四种积分器（leapfrog / hermite 等）、碰撞与碎裂、级联、定向溅射、演化层（生命形态）、轨道根数、SGP4/SDP4、带谐重力 / 大气阻力 / 太阳光压、自转与岁差 | `行星模拟/starpivot/src` · `行星模拟/starpivot/include` |
+| **命令行** | `nbody` · `propagate` · `elements` · `j2` · `conj` · `groundtrack` · `verify-tle` · `about` | `行星模拟/starpivot/tools/starpivot_cli.cpp` |
+| **网关** | 纯标准库 Python，只做 argv 转发与 JSON 透传 | `行星模拟/starpivot/tools/webapp.py` |
+| **前端** | 首页 / 轨道递推页 / N 体沙盒 / 小朋友页（四页共用一套设计令牌） | `行星模拟/starpivot/viewer` |
+| **判据** | 五层（A 静态 / B 独立复算 / C 真代码单测 / D 端到端 / E 页面级），49 个探针 | `行星模拟/` 下的 `_probe_*.js` · `_check*.js` · `_runall.sh` · `_verify_all.ps1` |
+| **数据** | 公开目录数据的落地副本，逐项标注观测 / 标定 / 模型参数 | `行星模拟/starpivot/data`（出处见 `PROVENANCE.md`） |
+
+## 目录结构
+
+仓库根只留两样东西：本文件，以及 `行星模拟/`。**和行星模拟相关的一切都在 `行星模拟/` 下面**——
+构建、起网关、跑判据，都在那个目录里做：
+
+```
+.
+├── README.md
+└── 行星模拟/
+    ├── starpivot/         产品本身：内核源码 · 网关 · 四页前端 · 数据 · 文档
+    ├── _probe_*.js        判据探针（五层）
+    ├── _check*.js         静态检查器
+    ├── _runall.sh         判据入口（bash 镜像）
+    └── _verify_all.ps1    判据入口（正式）
+```
+
+判据脚本把路径写成了绝对路径，因此**从哪个目录调用都可以**；但相对路径的产物
+（`_replay.json`、`_runall.txt`、各探针的 `_probe_*.txt`）都落在 `行星模拟/` 下。
 
 ## 快速开始
 
@@ -29,12 +48,12 @@
 需要 CMake ≥ 3.16 与支持 C++17 的编译器（`STARPIVOT_BUILD_PYTHON=ON` 才需要 pybind11）：
 
 ```bash
-cd starpivot
+cd 行星模拟/starpivot
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-产物 `starpivot/build/bin/starpivot`（Windows 上是 `starpivot.exe`）。
+产物 `行星模拟/starpivot/build/bin/starpivot`（Windows 上是 `starpivot.exe`）。
 **零第三方数值依赖** —— 只用 `<cmath>`、`<vector>` 等标准库；没有 Eigen / GSL / numpy。
 
 ### 2. 起网关
@@ -42,17 +61,18 @@ cmake --build build -j
 Python 标准库即可，不需要装任何包：
 
 ```bash
-python starpivot/tools/webapp.py --port 8765
+python 行星模拟/starpivot/tools/webapp.py --port 8765
 # 打开 http://127.0.0.1:8765/
 ```
 
 网关按 `PORT` 环境变量监听：有 `PORT` 时绑 `0.0.0.0`（部署平台约定），否则 `127.0.0.1:8765`。
-`starpivot/requirements.txt` 是空的依赖清单，存在的唯一理由是告诉部署平台"这是个 Python 应用"
+`行星模拟/starpivot/requirements.txt` 是空的依赖清单，存在的唯一理由是告诉部署平台"这是个 Python 应用"
 （否则会被当成纯静态站，`/api/*` 全部 404）。
 
 ### 3. 跑一次判据
 
 ```bash
+cd 行星模拟
 ./_verify_all.ps1        # PowerShell（正式入口）
 bash _runall.sh          # bash 镜像，同一套探针
 ```

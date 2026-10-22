@@ -21,7 +21,7 @@ from pathlib import Path
 # 失败的是进程太旧，不是代码。所以判据要么自带健康检查，要么换端口重跑。
 import os
 BASE = os.environ.get("STARPIVOT_BASE", "http://127.0.0.1:8765")
-ROOT = Path("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot")
+ROOT = Path("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot")
 EXE = ROOT / "build" / "bin" / "starpivot.exe"
 
 fails = []

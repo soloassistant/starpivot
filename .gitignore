@@ -15,9 +15,12 @@ build/
 # ---------- 发布用的 Linux 静态二进制 ----------
 # 它放 kernel/ 而不是 build/，是为了让发布包能带上它；但它仍是可重建的产物
 # （zig c++ -target x86_64-linux-musl），因此不进版本库。
-# ⚠ 前缀必须写全 /starpivot/ —— 写成 kernel/... 只匹配仓库根下的 kernel/，
-#   而真实路径是 starpivot/kernel/...（踩过：8.7 MB 的 ELF 差点被提交）。
-/starpivot/kernel/linux-x86_64/starpivot
+# ⚠ **必须靠 `**/` 前缀**（2026-10-12 二次踩）。gitignore 的规则是：
+#   模式里**只要含斜杠**（开头或中间都算），就相对本文件所在目录锚定；
+#   只有"不含斜杠的单段"（如上面的 build/）才在任意层级生效。
+#   最初写的是 /starpivot/kernel/...，整个产品树搬进 行星模拟/ 后当场失效，
+#   8.999 MB 的 ELF 立刻变成未跟踪文件 —— 只要 `git add -A` 一次就进历史。
+**/kernel/linux-x86_64/starpivot
 
 # ---------- 探针的运行产物 ----------
 # 录制缓存：可用 python _record.py 从内核重录，并且绑 体积+sha1，内核一重建就作废。
@@ -26,8 +29,9 @@ _replay.json
 _replay.json.bak*
 _plan_*.json
 *.err
-# 散落在 starpivot/ 根下的调试 JSON（真实数据在 starpivot/data/，不在忽略之列）。
-/starpivot/_*.json
+# 散落在产品根下的调试 JSON（真实数据在 data/，不在忽略之列）。
+# 同上：含斜杠即锚定，必须用 **/ 才能跨层级命中。
+**/starpivot/_*.json
 _f_*.json
 _frag*.json
 

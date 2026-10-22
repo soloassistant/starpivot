@@ -1,7 +1,7 @@
 // 判据：网页端"太阳系可选"三档是否真的接到了内核的 --solar 上。
 // 同样把 universe.html 里的原文抠出来跑，不重写一份副本。
 const fs = require('fs');
-const p = 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot/viewer/universe.html';
+const p = 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot/viewer/universe.html';
 const h = fs.readFileSync(p, 'utf8');
 
 function grab(name) {

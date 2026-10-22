@@ -31,7 +31,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-R = Path("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot")
+R = Path("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot")
 EXE = R / "build" / "bin" / "starpivot.exe"
 
 fails = []

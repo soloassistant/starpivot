@@ -5,9 +5,9 @@
 unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY
 export no_proxy='*' NO_PROXY='*'
 export NODE_PATH='C:\Users\geral\.workbuddy\binaries\node\workspace\node_modules'
-export STARPIVOT_REPLAY='C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/_replay.json'
+export STARPIVOT_REPLAY='C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/_replay.json'
 NODE='C:\Users\geral\.workbuddy\binaries\node\versions\22.22.2-3\node.exe'
-cd 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48'
+cd 'C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟'
 
 "$NODE" --version
 curl -s --noproxy '*' -o /dev/null -w 'health=%{http_code}\n' http://127.0.0.1:8765/api/health

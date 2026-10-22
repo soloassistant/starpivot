@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-EXE = Path("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/starpivot/build/bin/starpivot.exe")
+EXE = Path("C:/Users/geral/WorkBuddy/2026-09-24-16-11-48/行星模拟/starpivot/build/bin/starpivot.exe")
 
 # TRAPPIST-1 实测（NASA Exoplanet Archive pscomppars）
 #   宿主：M=0.0898 Msun, R=0.1192 Rsun=82970 km, T_eff=2566 K
