@@ -265,7 +265,8 @@
   <details class="disclose">
     <summary>这份数据是哪来的？（被质疑时的答案 · 5 条）</summary>
     <div class="warnbox">
-      <b>上半页这三份轨道是随页面打包的预计算样本</b>（<code>viewer/demo.js</code>），
+      <b>上半页这三份轨道是随页面发布的预计算样本</b>（<code>viewer/demo.js</code>），
+      默认不随首屏下载，选择场景或点「播放」时才按需加载；
       加载时不会调用本地内核 —— 实测打开本页只发过一次 <code>/api/health</code>。
       它们确实是 CLI 算出来的真结果，但是<b>打包那一刻算的</b>。想用你自己这台机器现算，
       命令行跑 <code>starpivot verify-tle …</code>；本页只有下半部分的
@@ -287,6 +288,7 @@
         <button id="play">▶ 播放</button>
       </div>
     </div>
+    <div class="note" id="demostatus" aria-live="polite"></div>
   </div>
 
   <div class="card">
@@ -411,12 +413,19 @@
 </div>
 
 <script src="world.js"></script>
-<script src="demo.js"></script>
+<!-- demo.js 是 246 KB 的冻结样本，首屏不下载。这里只留一个数据源声明：
+     type 不是 JS，浏览器按"数据块"处理，不会发起请求；真正的加载见下方 loadDemo()。
+     判据/工具仍能从 src 找到数据源，不必和页面各记一份文件名。 -->
+<script type="application/x-starpivot-demo" src="demo.js"></script>
 <script>
 (function(){
   const LAND = window.WORLD_LAND || [];
-  const DEMO = window.STARPIVOT_DEMO || {};
-  const keys = Object.keys(DEMO).filter(k => !k.startsWith('__'));
+
+  // 冻结样本按需加载：首屏只取 world.js 与本页。若 DEMO 已被外部预先注入
+  // （判据 jsdom 就是这么做的），则视为已就绪，行为与旧版逐字一致。
+  let DEMO = window.STARPIVOT_DEMO || {};
+  let demoState = Object.keys(DEMO).length ? 'ready' : 'idle';
+  let demoPromise = null;
 
   const sel = document.getElementById('scenario');
   const labels = {
@@ -424,9 +433,14 @@
     iss_drag: '空间站类 · 420 km · i=51.6° · 48 h · 含大气阻力',
     molniya:  '大椭圆轨道 · e=0.74 · 临界倾角 63.4° · 12 h'
   };
-  keys.forEach(k => {
+  Object.keys(labels).forEach(k => {
     const o = document.createElement('option');
-    o.value = k; o.textContent = labels[k] || k;
+    o.value = k; o.textContent = labels[k];
+    sel.appendChild(o);
+  });
+  Object.keys(DEMO).filter(k => !k.startsWith('__') && !(k in labels)).forEach(k => {
+    const o = document.createElement('option');
+    o.value = k; o.textContent = k;
     sel.appendChild(o);
   });
 
@@ -556,6 +570,59 @@
     actx.stroke();
   }
 
+  // ---- 冻结样本按需加载（首屏不下载 demo.js）----
+  const statusEl = document.getElementById('demostatus');
+  function setDemoStatus(text){ if(statusEl) statusEl.textContent = text; }
+
+  function renderPlaceholder(msg){
+    drawBase(map);
+    actx.save();
+    actx.clearRect(0,0,alt.width,alt.height);
+    actx.fillStyle='#fbfcfe'; actx.fillRect(0,0,alt.width,alt.height);
+    actx.fillStyle='#8b94a3'; actx.font='14px system-ui,-apple-system,"Segoe UI",sans-serif';
+    actx.textAlign='center'; actx.textBaseline='middle';
+    actx.fillText(msg, alt.width/2, alt.height/2);
+    actx.restore();
+    document.getElementById('kv').innerHTML='';
+    document.getElementById('model').innerHTML='';
+    document.getElementById('verdict').innerHTML='';
+    document.getElementById('mapnote').textContent = msg;
+  }
+
+  function loadDemo(){
+    if(demoState === 'ready') return Promise.resolve(true);
+    if(demoPromise) return demoPromise;
+    demoState = 'loading';
+    setDemoStatus('样例数据加载中…（demo.js，约 246 KB）');
+    renderPlaceholder('样例数据加载中…');
+    demoPromise = new Promise(function(resolve){
+      const s = document.createElement('script');
+      s.src = 'demo.js';
+      s.onload = function(){
+        DEMO = window.STARPIVOT_DEMO || {};
+        if(Object.keys(DEMO).length){
+          demoState = 'ready';
+          setDemoStatus('样例数据已就绪（demo.js 按需加载完成）');
+          render();
+          resolve(true);
+        }else{
+          demoState = 'failed'; demoPromise = null;
+          setDemoStatus('样例数据为空：demo.js 没有提供 STARPIVOT_DEMO');
+          renderPlaceholder('样例数据为空，请刷新页面重试。');
+          resolve(false);
+        }
+      };
+      s.onerror = function(){
+        demoState = 'failed'; demoPromise = null;
+        setDemoStatus('样例数据加载失败：demo.js 没能取到，请刷新页面重试');
+        renderPlaceholder('样例数据加载失败，请刷新页面重试。');
+        resolve(false);
+      };
+      document.head.appendChild(s);
+    });
+    return demoPromise;
+  }
+
   function kvTable(d){
     const el = d.final_elements_osculating || {};
     const m0 = d.mean_elements_start || {};
@@ -648,7 +715,13 @@
   function render(){
     const k = sel.value;
     const d = DEMO[k];
-    if(!d) return;
+    if(!d){
+      // 首屏/加载中：底图先画出来，别留白屏；表格区给出同样的说明。
+      renderPlaceholder(demoState === 'loading'
+        ? '样例数据加载中…'
+        : '样例数据尚未加载：选择场景或点「播放」后按需加载（约 246 KB）。');
+      return;
+    }
     const track = d.ground_track || [];
     const upto = Math.max(1, Math.round(slider.value/1000*track.length));
     drawBase(map);
@@ -659,20 +732,33 @@
     verdict(k, d);
   }
 
-  sel.addEventListener('change', render);
-  slider.addEventListener('input', render);
-  document.getElementById('play').addEventListener('click', function(){
-    if(playing){ clearInterval(timer); playing=false; this.textContent='▶ 播放'; return; }
-    playing = true; this.textContent='⏸ 暂停';
+  // 选场景 / 拖回放 / 点播放都算"要看样例"：第一次触发时才去取 demo.js。
+  sel.addEventListener('change', function(){
+    if(demoState === 'ready') render(); else loadDemo();
+  });
+  slider.addEventListener('input', function(){
+    if(demoState === 'ready') render(); else loadDemo();
+  });
+  const playBtn = document.getElementById('play');
+  function startPlay(){
+    if(playing){ clearInterval(timer); playing=false; playBtn.textContent='▶ 播放'; return; }
+    playing = true; playBtn.textContent='⏸ 暂停';
     slider.value = 0;
     timer = setInterval(function(){
       let v = +slider.value + 12;
       if(v >= 1000){ v = 1000; clearInterval(timer); playing=false;
-                     document.getElementById('play').textContent='▶ 播放'; }
+                     playBtn.textContent='▶ 播放'; }
       slider.value = v; render();
     }, 30);
+  }
+  playBtn.addEventListener('click', function(){
+    if(demoState === 'ready'){ startPlay(); return; }
+    loadDemo().then(function(okLoaded){ if(okLoaded) startPlay(); });
   });
 
+  setDemoStatus(demoState === 'ready'
+    ? '样例数据已就绪（demo.js 按需加载完成）'
+    : '样例数据按需加载：选择场景或点「播放」时再取 demo.js（约 246 KB）');
   render();
 
   // ================= 碰撞预警（conj）面板 =================
