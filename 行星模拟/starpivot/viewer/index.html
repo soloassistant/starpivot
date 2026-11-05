@@ -419,7 +419,25 @@
 <script type="application/x-starpivot-demo" src="demo.js"></script>
 <script>
 (function(){
-  const LAND = window.WORLD_LAND || [];
+  // world.js 里存的是环内一阶差分的整数（单位 1/s 度），这里还原成 [lon,lat] 环。
+  // 编码/校验见 scripts/build-world-land.mjs，往返无损（sha256 相同）。
+  function decodeLand(enc){
+    if(!enc || !enc.s || !Array.isArray(enc.d)) return [];
+    const out = [];
+    for(const flat of enc.d){
+      const ring = [];
+      let x = 0, y = 0;
+      for(let i = 0; i < flat.length; i += 2){
+        x += flat[i];
+        y += flat[i + 1];
+        ring.push([x / enc.s, y / enc.s]);
+      }
+      out.push(ring);
+    }
+    return out;
+  }
+
+  const LAND = decodeLand(window.WORLD_LAND_ENC);
 
   // 冻结样本按需加载：首屏只取 world.js 与本页。若 DEMO 已被外部预先注入
   // （判据 jsdom 就是这么做的），则视为已就绪，行为与旧版逐字一致。
