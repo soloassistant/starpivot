@@ -339,9 +339,9 @@
       </div>
     </div>
     <div class="row" style="align-items:flex-end;margin-top:10px">
-      <div><label for="cwin">窗口（分钟）</label><input id="cwin" type="number" value="1440" style="width:110px"></div>
-      <div><label for="cstep">步长（分钟）</label><input id="cstep" type="number" value="1" step="0.5" style="width:90px"></div>
-      <div><label for="cthr">告警阈值（km）</label><input id="cthr" type="number" value="100" style="width:110px"></div>
+      <div><label for="cwin">窗口（分钟）</label><input id="cwin" type="number" min="1" step="1" value="1440" style="width:110px"></div>
+      <div><label for="cstep">步长（分钟）</label><input id="cstep" type="number" min="0.5" step="0.5" value="1" style="width:90px"></div>
+      <div><label for="cthr">告警阈值（km）</label><input id="cthr" type="number" min="0" value="100" style="width:110px"></div>
       <div>
         <label for="cgroups">真实编目</label>
         <select id="cgroups">
@@ -935,17 +935,28 @@
     if (findCancel) findCancel.abort();
   });
 
+  // 三个数值框的边界：min 属性挡住方向键/滚轮的越界，这里再兜一次手输的
+  // 负数、0 与 NaN —— 内核收到窗口 < 1 或步长 <= 0 只会回一个拒绝，用户却看不出
+  // 是哪一格填错了。空值仍按老规矩用默认值：窗口 1440、步长 1、阈值不限制(null)。
+  function conjForm() {
+    const win = $('cwin').value.trim();
+    const step = $('cstep').value.trim();
+    const thr = $('cthr').value.trim();
+    return {
+      window_min: win === '' ? 1440 : Math.max(1, +win || 1),
+      step_min: step === '' ? 1 : Math.max(0.5, +step || 0.5),
+      threshold_km: thr === '' ? null : Math.max(0, +thr || 0)
+    };
+  }
+
   $('crun').addEventListener('click', async () => {
     try {
       const [l1, l2] = parseTleBox($('tleA').value, '对象 A');
       const [l3, l4] = parseTleBox($('tleB').value, '对象 B');
       $('cstatus').textContent = '运行 starpivot conj …（窗口内逐对传播，通常 1–2 秒）';
-      const d = await postJSON('/api/conj', {
-        line1: l1, line2: l2, line3: l3, line4: l4,
-        window_min: +$('cwin').value || 1440,
-        step_min: +$('cstep').value || 1,
-        threshold_km: $('cthr').value === '' ? null : +$('cthr').value
-      });
+      const d = await postJSON('/api/conj', Object.assign({
+        line1: l1, line2: l2, line3: l3, line4: l4
+      }, conjForm()));
       $('cstatus').textContent = '';
       $('cresult').innerHTML = fmtConj(d);
       flash($('cresult'));
