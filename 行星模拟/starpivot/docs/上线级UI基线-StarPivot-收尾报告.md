@@ -1,7 +1,7 @@
 # StarPivot 上线级 UI 基线 · 收尾报告
 
 - 基线：[上线级UI基线-StarPivot.md](上线级UI基线-StarPivot.md)（审查对象 `main` @ `02edaec`）
-- 收尾对象：`main` @ `87fd11b`（PR #8 合并后）
+- 收尾对象：`main` @ `7b9f98b`（PR #10 合并后）
 - 日期：2026-11-06
 - 说明：用户给的路径 `D:\Agent\行星模拟\starpivot` 不存在；实际仓库为 `WorkBuddy/2026-09-24-16-11-48`，应用在其 `行星模拟/starpivot` 子目录。收尾在独立 worktree `D:\Agent\.tmp-sp-ui-final` 中进行，未直提 `main`。
 
@@ -15,6 +15,7 @@
 | U-06 危险操作 | 天体删除、卡片删除、方案删除统一二次确认 | #6 | `e0ccfa9` | `b72853a` | 1 file, +20/−1 |
 | U-05 状态完整 | kids/universe 失败态补「重试」，并修正 kids「双击打开文件不行」的误导文案 | #7 | `ffa8c6a` | `4820f8e` | 2 files, +19/−3 |
 | U-03 触控热区 | coarse 档补 `min-width:44px`（4 个播放按钮、导览关闭、两页返回链接） | #8 | `4d20298` | `87fd11b` | 2 files, +5/−0 |
+| 视口 320 裁切/溢出 | home `.grid2`、orbit `#cgroups`、universe 挑战行三处窄屏修复 | #10 | `8a9a347` | `7b9f98b` | 3 files, +6/−3 |
 
 每笔的「改坏必红」证据：
 
@@ -23,10 +24,13 @@
 - **#6**：CDP 实测初始 2 行 → 弹确认「删除天体「A」…」→ 取消仍 2 行 → 确认变 1 行；变异把确认改成 `if (false)` → 弹窗 0 次、取消后 1 行 → 红。
 - **#7**：kids 失败后「再试一次」可见，点击后同步回到「正在算……」并收起；universe 错误条点「重试」后 `#compute` disabled；删 `display=''` / 把监听改 `if(false)` 均红。
 - **#8**：移除两处 `min-width` 后真 Chrome 实测 `<44px` 控件 7 个（红）；恢复后 0 个（绿）。
+- **#10**：三处全部撤回后重测（320×568、`isMobile=false`）：`/` 12 个裁切元素回来、`/orbit` 338/320、`/universe` 341/320；恢复后两种 `isMobile` 档位、320/768 两视口四页全部 `0 实例`（`issue_groups=0`）。
 
 ## 二、未修（有客观判据，但实测否决或超出单笔范围）
 
-**U-01 `/universe` 慢网首屏**：唯一实际尝试是 zstd 压缩。Chrome headless、400kbps/50ms、禁缓存、5 轮中位数、同一设备与同一 worktree：
+**U-01 `/universe` 慢网首屏**：两次实测都否决，改动均已回滚，未留下。
+
+第一次，zstd 压缩。Chrome headless、400kbps/50ms、禁缓存、5 轮中位数、同一设备与同一 worktree：
 
 | 方案 | FCP 中位数 | load 中位数 | `universe.html` 传输字节 |
 |---|---:|---:|---:|
@@ -34,7 +38,28 @@
 | zstd level 19 | 701 ms | 2342 ms | 107,505 B |
 | zstd level 9 | 740 ms | 2363 ms | 121,182 B |
 
-主指标 load 降约 555 ms，但副指标 FCP 升 250–289 ms；上升来自浏览器 zstd 解码/缓冲，不属于「缓存或延后命中」例外。按规则**回滚 `tools/webapp.py`**（`git checkout --` 恢复，工作区干净），未提交、未留下这次改动。基线里写的结构性拆分（把非首屏脚本拆成延迟脚本，预估省 9–15KB gzip）本轮未做：单笔会超 300 行，且必须自带前后实测，属独立 PR。
+主指标 load 降约 555 ms，但副指标 FCP 升 250–289 ms；上升来自浏览器 zstd 解码/缓冲，不属于「缓存或延后命中」例外。按规则**回滚 `tools/webapp.py`**，未提交。
+
+第二次，延迟脚本拆分（同一口径，5 轮中位数）：先量了各候选区段从 HTML 里删掉后的 gzip 差（level 6）：
+
+| 区段 | 行数 | gzip 实测 |
+|---|---:|---:|
+| 内联脚本整体 | 840–5654 | 全文件 132,507 B |
+| 策略层（协议/方案/锚点/鬼影/随机宇宙） | 2235–2990 | 16.3 KB |
+| 协议数据 `PROTOCOLS` | 2268–2431 | 3.4 KB |
+| 预设 `PRESETS` | 1893–2018 | 3.5 KB |
+| 导览数据 `TOUR` | 2994–3074 | 3.1 KB |
+| 挑战 `CHALLENGE` | 2140–2233 | 2.2 KB |
+| 报错解释 `ERR_HELP` | 3994–4013 | 1.2 KB（内联时只占 301 B） |
+
+唯一不参与初始化和每帧渲染的是 `ERR_HELP`：把它挪到 `universe-errhelp.js`（1,286 B gzip），HTML 132,507→132,206 B（−301 B），按 50KB/s 理论只省约 6 ms。实测 FCP 692→**709**、load 2597→**2613**（没有降，落在噪声内），按规则回滚（删文件、`git checkout --`），未建 PR。
+
+其余区段都挂在首屏初始化或每帧渲染上，不能在单笔 300 行内安全拆出：`buildProtocols()`（5643/5647 init）、`renderSchemes()`（1730/5648）、`syncSpanFromYears()`（1731/5598/5603）、`schedulePreview()`（5604/5607）、`onDataSettled()`（4214 每次渲染）、`maybeDrawAnchors()`（5286 每次渲染）、`ghostClear()`（5649）、`startTour()`（3114/5633，首访 300–400 ms 自动开始）。要真的省下 9–15 KB，只剩两条路，都会改动首屏时序，需产品决策：
+
+- 策略层整体（16.3 KB）延迟到 `load` 之后，并在模块到达后重建协议/方案/锚点面板 —— 代价是这些面板在 `load` 前为空，diff 约 1,500 行。
+- 首访自动导览推迟到 `load` 之后（省 `TOUR` 3.1 KB）—— 代价是导览出现晚于现在的 300 ms。
+
+因此 `/universe` 慢网仍是 **2.61 s**（门槛 2.5 s），本轮未修。
 
 ## 三、待决策（不做，列出口径）
 
@@ -52,9 +77,10 @@
 - **U-04 双语**：正文中文单语，英文仅专有名词/单位。
 - **U-09 隐私**：无 analytics、无第三方脚本，`localStorage` 不含 PII。
 - **对比度**：真 Chrome 渲染后逐处量，`/` 175 处、`/orbit` 53 处、`/universe` 195 处、`/kids` 57 处，低于 WCAG 阈值均为 **0 处**。
-- **触控热区**：390×844 + `hasTouch` 下，四页 110 个可点控件全部 ≥44×44（复选框按外层 label 计）。
+- **触控热区**：390×844 + `hasTouch` 下，四页 110 个可点控件全部 ≥44×44（复选框按外层 label 计）；320/768 复测 `small=0`。
+- **视口回归 320 / 768**：真 Chrome，320×568 与 768×1024，`isMobile` true/false 两档。改前 320 有 3 组实例（`/` 12 个元素被 `details.card` 裁掉、`/orbit` 338/320、`/universe` 341/320），已在 #10 修复；768 改前就是 0 实例。改后 8 个组合全部 `scrollWidth==innerWidth`、`0 实例`；无 <44px 控件、无被遮挡的可点控件。
 
-## 五、门禁真实尾行（head `87fd11b`）
+## 五、门禁真实尾行（head `7b9f98b`）
 
 - `_check_home.js` → `[home-static] n=36 fail=0`
 - `_check_kids.js` → `[kids] n=42 fail=0`
@@ -70,10 +96,11 @@
 - `_probe_realdat.js` → exit=0（通过时无输出）
 - `_va_contrast.js` → 四页「低于 WCAG 阈值的 0 处」
 - 触摸实测 → `[touch] total=110 small=0`
+- 视口回归 → `[viewport] issue_groups=0`（320×568 / 768×1024，`isMobile` 两档）
 
 未整跑 `_verify_all.ps1`：它的 `$R` 硬编码到另一份工作树，且 C/D 层需要 zig 编译内核（约 3.5 分钟）后才成立；本轮改动只在 `viewer/*.html`，C++ 与内核未动。D/E 层依赖内核二进制的探针在本机因 `build/bin/starpivot.exe` 缺失（`/api/health` 返回 `status:"no-exe"`）无法成立，与基线记录的环境故障一致，不当作回归。
 
 ## 六、未覆盖与风险
 
-- 真实读屏软件、真实 4G/弱网（本地是 curl 限速与 Chrome 网络模拟）、真机触摸（本地是 `hasTouch` 模拟）、320/768/1440 全视口视觉回归均未做。
+- 真实读屏软件、真实 4G/弱网（本地是 curl 限速与 Chrome 网络模拟）、真机触摸（本地是 `hasTouch` 模拟）、1440 视口视觉回归均未做（320/768 已完成，见上）。
 - `/universe` 慢网仍为 2.61 s（门槛 2.5 s），未修；这是本报告唯一残留的 P1 性能缺口。
