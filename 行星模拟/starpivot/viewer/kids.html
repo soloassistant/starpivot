@@ -267,6 +267,9 @@
   <div class="card" style="animation-delay:.14s">
     <div class="big"><span id="who">转一圈要</span> <b id="period">—</b> <span id="unit">年</span></div>
     <div class="tip" id="ptip" aria-live="polite">正在问……</div>
+    <div id="ptrywrap" style="display:none;margin-top:8px">
+      <button id="ptry" type="button">再试一次</button>
+    </div>
     <div class="guess" id="guess" style="display:none">
       <div class="ask" id="ask">你猜：它转一圈要多久？</div>
       <div class="opts">
@@ -883,6 +886,7 @@ async function run(guess) {
   // "年"写死在 HTML 里、这里不去动它：这样即使脚本没跑起来，
   // 静态页面读出来也是完整的一句"转一圈要 — 年"，而不是一个没有单位的数字。
   $('ptip').textContent = '正在算……';
+  $('ptrywrap').style.display = 'none';
   stop();
   // 旧路只在"上一轮也是单颗、这一轮还是单颗"时留着。
   ghost = (lastKind === 'single' && !pair) ? snapshot() : null;
@@ -907,10 +911,13 @@ async function run(guess) {
     if (pair) revealPair(); else reveal(guess);
   } catch (e) {
     $('period').textContent = '—';
-    $('ptip').textContent = '没能算出来：' + errText(e) + '（这一页需要一个在跑的服务，'
-      + '直接双击打开文件是不行的）';
+    $('ptip').textContent = '没能算出来：' + errText(e) + '（这一页需要一个正在运行的服务，'
+      + '直接双击打开文件是不行的。服务开着还是不行时，多半是本机的计算程序没编译好。）';
+    $('ptrywrap').style.display = '';
   }
 }
+
+$('ptry').addEventListener('click', function(){ run(null); });
 
 // 并排那一次的"揭晓"：只说画面上有的东西，一个新数字都不给。
 function revealPair() {
