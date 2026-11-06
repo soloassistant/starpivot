@@ -381,6 +381,8 @@
      #playbox 用的是既有的 details.card > .dbody 展开动画（sp-drop，只动 transform），
      协议条目 / 方案条目 / 锚点画布本身**一个动画都没加**（见下面的样式段）。
      后面三条是点名兜底：将来有人给这三样加了 transition，这里会先压住它们。 */
+  footer.legal{margin-top:var(--sp-6);border-top:1px solid var(--line);padding-top:var(--sp-4);
+               color:var(--ink3);font-size:var(--fs-xs);line-height:var(--lh-loose)}
   @media(prefers-reduced-motion:reduce){
     *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
     .protocol, .protocol .p-bar > i{transition:none!important}
@@ -826,6 +828,8 @@
       <code>tests/fixtures.hpp</code> 逐字一致（该初值经基线验证：一个整周期闭合 4.1e-8 AU）。
       辛积分器的能量误差在固定带内振荡而非累积，这是它能跑长期演化的原因。</div>
   </div>
+
+  <footer class="legal">陆地数据：<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">Natural Earth 1:110m</a>（公有领域）· 本站不收集个人数据，无第三方统计或跟踪脚本。</footer>
 
 </div>
 
