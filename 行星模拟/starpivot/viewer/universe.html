@@ -4283,7 +4283,16 @@
       ? '（画面上现在还是<b>上一次成功</b>的结果，t = ' + data.frames[frameIndex()].t.toFixed(3) + ' 年）'
       : '（目前画面上没有任何结果）';
       bar.innerHTML = '<b>这次重算失败了，画面没有跟着变。</b>' + stillShowing
-      + '<br>内核说：' + msg + explainError(msg);
+      + '<br>内核说：' + msg + explainError(msg)
+      + '<div style="margin-top:8px"><button type="button" id="eretry"'
+      + ' style="font-size:12px;padding:4px 12px">重试</button></div>';
+    // 失败后留住的不只是那句话，还要留一个能立刻再试一次的入口 ——
+    // 超时/冷启动这类失败改了参数也没用，逼用户去页面另一头找按钮不合理。
+    const retry = bar.querySelector('#eretry');
+    if (retry) retry.addEventListener('click', function(){
+      if ($('compute').disabled) return;
+      compute();
+    });
   }
   function clearError(){
     const bar = $('errbar');
