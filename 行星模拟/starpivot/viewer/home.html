@@ -135,7 +135,7 @@
   pre{background:#0f172a;color:#e6edf7;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-2);
       border:1px solid #1e2b45;
       overflow-x:auto;font-family:var(--mono);font-size:var(--fs-sm);line-height:1.75;margin:var(--sp-3) 0}
-  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--sp-4)}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:var(--sp-4)}
   /* 入口卡：三个入口是这一页唯一要人**动手**的地方，所以它们得一眼看出"可点"。
      旧版三张卡都是 --card2 + 一圈描边，和下面四条折叠区标题几乎长得一样。
      现在给它们三样折叠区没有的东西：白底（比 --card2 亮一档）、头顶一条 3px 强调色、

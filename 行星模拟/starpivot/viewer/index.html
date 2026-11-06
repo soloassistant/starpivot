@@ -193,6 +193,9 @@
   #cresult tbody tr:nth-child(10){animation-delay:234ms}
   #cstatus,#cresult{border-radius:var(--r-1)}
   #cstatus.ks,#cresult.ks{animation:spTick 1.1s var(--ease) 1}
+  /* 编目下拉的选项文字很长（"Iridium+Globalstar+Orbcomm（快）"），
+     320 宽时 select 的固有宽度会把整页顶出横向滚动；让它按容器收窄。 */
+  #cgroups{max-width:100%}
   /* —— 慢交互（/api/find-close，1–2 分钟）的等待态 ——
      刻意不画百分比进度条：服务端不回传中间阶段，一个往前走的条就是在假装在算。
      这里的"进度"只有两件真事：一条长度不确定的活动条（只表示"还在等"），
@@ -343,7 +346,7 @@
       <div><label for="cwin">窗口（分钟）</label><input id="cwin" type="number" min="1" step="1" value="1440" style="width:110px"></div>
       <div><label for="cstep">步长（分钟）</label><input id="cstep" type="number" min="0.5" step="0.5" value="1" style="width:90px"></div>
       <div><label for="cthr">告警阈值（km）</label><input id="cthr" type="number" min="0" value="100" style="width:110px"></div>
-      <div>
+      <div style="min-width:0">
         <label for="cgroups">真实编目</label>
         <select id="cgroups">
           <option value="iridium,globalstar,orbcomm">Iridium+Globalstar+Orbcomm（快）</option>
