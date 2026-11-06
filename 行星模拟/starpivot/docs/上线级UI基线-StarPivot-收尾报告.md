@@ -1,7 +1,7 @@
 # StarPivot 上线级 UI 基线 · 收尾报告
 
 - 基线：[上线级UI基线-StarPivot.md](上线级UI基线-StarPivot.md)（审查对象 `main` @ `02edaec`）
-- 收尾对象：`main` @ `7b9f98b`（PR #10 合并后）
+- 收尾对象：`main` @ `3b7face`（PR #11 合并后）
 - 日期：2026-11-06
 - 说明：用户给的路径 `D:\Agent\行星模拟\starpivot` 不存在；实际仓库为 `WorkBuddy/2026-09-24-16-11-48`，应用在其 `行星模拟/starpivot` 子目录。收尾在独立 worktree `D:\Agent\.tmp-sp-ui-final` 中进行，未直提 `main`。
 
@@ -16,6 +16,7 @@
 | U-05 状态完整 | kids/universe 失败态补「重试」，并修正 kids「双击打开文件不行」的误导文案 | #7 | `ffa8c6a` | `4820f8e` | 2 files, +19/−3 |
 | U-03 触控热区 | coarse 档补 `min-width:44px`（4 个播放按钮、导览关闭、两页返回链接） | #8 | `4d20298` | `87fd11b` | 2 files, +5/−0 |
 | 视口 320 裁切/溢出 | home `.grid2`、orbit `#cgroups`、universe 挑战行三处窄屏修复 | #10 | `8a9a347` | `7b9f98b` | 3 files, +6/−3 |
+| 收尾报告（一） | 已修/未修/待决策清单、U-01 两次否决、320/768 回归（纯文档） | #11 | `4acb924` | `3b7face` | 1 file, +33/−6 |
 
 每笔的「改坏必红」证据：
 
@@ -28,7 +29,7 @@
 
 ## 二、未修（有客观判据，但实测否决或超出单笔范围）
 
-**U-01 `/universe` 慢网首屏**：两次实测都否决，改动均已回滚，未留下。
+**U-01 `/universe` 慢网首屏**：三次实测都否决，改动均已回滚，未留下。
 
 第一次，zstd 压缩。Chrome headless、400kbps/50ms、禁缓存、5 轮中位数、同一设备与同一 worktree：
 
@@ -54,12 +55,34 @@
 
 唯一不参与初始化和每帧渲染的是 `ERR_HELP`：把它挪到 `universe-errhelp.js`（1,286 B gzip），HTML 132,507→132,206 B（−301 B），按 50KB/s 理论只省约 6 ms。实测 FCP 692→**709**、load 2597→**2613**（没有降，落在噪声内），按规则回滚（删文件、`git checkout --`），未建 PR。
 
-其余区段都挂在首屏初始化或每帧渲染上，不能在单笔 300 行内安全拆出：`buildProtocols()`（5643/5647 init）、`renderSchemes()`（1730/5648）、`syncSpanFromYears()`（1731/5598/5603）、`schedulePreview()`（5604/5607）、`onDataSettled()`（4214 每次渲染）、`maybeDrawAnchors()`（5286 每次渲染）、`ghostClear()`（5649）、`startTour()`（3114/5633，首访 300–400 ms 自动开始）。要真的省下 9–15 KB，只剩两条路，都会改动首屏时序，需产品决策：
+其余区段都挂在首屏初始化或每帧渲染上，不能在单笔 300 行内安全拆出：`buildProtocols()`（5643/5647 init）、`renderSchemes()`（1730/5648）、`syncSpanFromYears()`（1731/5598/5603）、`schedulePreview()`（5604/5607）、`onDataSettled()`（4214 每次渲染）、`maybeDrawAnchors()`（5286 每次渲染）、`ghostClear()`（5649）。
+
+第三次，首访导览延后到首帧之后（本轮获准动的唯一一条时序）。先量各段主线程占用（同一口径、5 轮 CPU profile，按函数汇总 self time；run1 冷启动含 JIT，单独标注不参与中位数）：
+
+| 函数 | self time（中位数） | 首次执行时刻（相对导航，中位数） |
+|---|---:|---:|
+| `showTourStep()`（导览真正开卡） | 2.5 ms（run1 首轮 31.6 ms 含 JIT） | 2561 ms |
+| `buildProtocols()` | 0.8 ms | 2153 ms |
+| `renderSchemes()` | 0.6–0.7 ms（多数轮次未被采样到） | 2154 ms |
+
+基线里导览并不在首屏路径上：首次执行在 2.56 s，比 FCP（656 ms，页内 PerformanceObserver）晚 1.9 s，离 load 只有约 50–100 ms；self time 是 2.5 ms 量级。load 由 132.5 KB gzip 在 50 KB/s 下的传输下限决定（约 2.6 s），挪走 2.5 ms 的 JS 不可能降 110 ms。
+
+改法：只动首访分支（deep link 保持原 300 ms 定时器），`setTimeout(startTour, 400)` → 两帧 `requestAnimationFrame` + `requestIdleCallback({timeout:1500})`，无该 API 时退回 200 ms。行为核验：5 轮冷启动里 `showTourStep()` 都在 2252–2272 ms 执行、`#tourcard` 都显示，首访导览仍会自动开始。
+
+| 指标（5 轮中位数） | 改前 | 改后 | 判据 |
+|---|---:|---:|---|
+| FCP | 694 ms | 707 ms | 必须不升 → 升 13 ms，不满足 |
+| load | 2580 ms | 2621 ms | 必须 ≤ 2500 → 未达标且升 41 ms，不满足 |
+| 首访导览启动（首次执行时刻） | 2561 ms | 2258 ms | 必须仍启动 → 满足 |
+
+三条判据两条不满足，按规则回滚（`git restore`、删实验分支、未建 PR）；回滚后确认服务器返回的 `universe.html` 已无 `autoTour`。改后导览反而提前到 2.25 s，落进初始化更密的时段，FCP 与 load 都没降——这也是不能留的原因。
+
+还剩下的两条「真能省 9–15 KB」的路，都会让首屏内容不完整或改变首屏时序，需产品决策：
 
 - 策略层整体（16.3 KB）延迟到 `load` 之后，并在模块到达后重建协议/方案/锚点面板 —— 代价是这些面板在 `load` 前为空，diff 约 1,500 行。
-- 首访自动导览推迟到 `load` 之后（省 `TOUR` 3.1 KB）—— 代价是导览出现晚于现在的 300 ms。
+- 把 `PROTOCOLS`/`PRESETS`/`CHALLENGE` 数据外置（约 9.1 KB）—— 代价是首屏协议/预设面板要等第二个请求到达才可用，弱网下会出现空面板。
 
-因此 `/universe` 慢网仍是 **2.61 s**（门槛 2.5 s），本轮未修。
+因此 `/universe` 慢网仍是 **2.58–2.62 s**（门槛 2.5 s），本轮未修；只动时序不可能进 2.5 s，至少要先少传约 4 KB gzip。
 
 ## 三、待决策（不做，列出口径）
 
@@ -80,7 +103,7 @@
 - **触控热区**：390×844 + `hasTouch` 下，四页 110 个可点控件全部 ≥44×44（复选框按外层 label 计）；320/768 复测 `small=0`。
 - **视口回归 320 / 768**：真 Chrome，320×568 与 768×1024，`isMobile` true/false 两档。改前 320 有 3 组实例（`/` 12 个元素被 `details.card` 裁掉、`/orbit` 338/320、`/universe` 341/320），已在 #10 修复；768 改前就是 0 实例。改后 8 个组合全部 `scrollWidth==innerWidth`、`0 实例`；无 <44px 控件、无被遮挡的可点控件。
 
-## 五、门禁真实尾行（head `7b9f98b`）
+## 五、门禁真实尾行（代码 head `7b9f98b`；`3b7face` 只多了报告文档）
 
 - `_check_home.js` → `[home-static] n=36 fail=0`
 - `_check_kids.js` → `[kids] n=42 fail=0`
@@ -98,9 +121,15 @@
 - 触摸实测 → `[touch] total=110 small=0`
 - 视口回归 → `[viewport] issue_groups=0`（320×568 / 768×1024，`isMobile` 两档）
 
-未整跑 `_verify_all.ps1`：它的 `$R` 硬编码到另一份工作树，且 C/D 层需要 zig 编译内核（约 3.5 分钟）后才成立；本轮改动只在 `viewer/*.html`，C++ 与内核未动。D/E 层依赖内核二进制的探针在本机因 `build/bin/starpivot.exe` 缺失（`/api/health` 返回 `status:"no-exe"`）无法成立，与基线记录的环境故障一致，不当作回归。
+**为什么没整跑 `_verify_all.ps1`（不是跳过，是三处前置在本机不成立）：**
+
+- 脚本里的 `$R` 硬编码到另一份工作树，指不到本 worktree；
+- C/D 层要先 zig 编译内核（约 3.5 分钟）才成立；本轮只改 `viewer/*.html`，C++ 与内核未动；
+- D/E 层依赖内核二进制，本机 `build/bin/starpivot.exe` 缺失（`/api/health` 返回 `status:"no-exe"`），这些探针无法成立，与基线记录的环境故障一致，不当作回归。
+
+A/B 层（上面列的这些）已逐条整跑，尾行就是上面这些。
 
 ## 六、未覆盖与风险
 
 - 真实读屏软件、真实 4G/弱网（本地是 curl 限速与 Chrome 网络模拟）、真机触摸（本地是 `hasTouch` 模拟）、1440 视口视觉回归均未做（320/768 已完成，见上）。
-- `/universe` 慢网仍为 2.61 s（门槛 2.5 s），未修；这是本报告唯一残留的 P1 性能缺口。
+- `/universe` 慢网仍为 2.58–2.62 s（门槛 2.5 s），未修；这是本报告唯一残留的 P1 性能缺口。它的下限由 132.5 KB gzip 在 400 kbps 下的传输时间决定，不先少传约 4 KB 就进不了 2.5 s。
