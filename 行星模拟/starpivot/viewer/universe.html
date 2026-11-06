@@ -373,8 +373,12 @@
   /* —— 触摸设备（pointer:coarse）：可点区域最小 44×44 —— */
   @media(pointer:coarse){
     button,select,input,summary,[tabindex]{min-height:44px}
+    /* 真机尺寸量过：只给 min-height 时，四个播放按钮宽 35.8px、导览「关闭」43px。
+       只补 button 的宽度 —— 复选框的可点区是包着它的 label，补宽度会把那行撑歪。 */
+    button{min-width:44px}
     .tychip{padding-top:12px;padding-bottom:12px}
     a{display:inline-flex;align-items:center;min-height:44px}
+    a.back{min-width:44px}
   }
   /* —— 尊重系统"减少动态效果" ——
      上面那条通配兜底（* { animation:none; transition:none }）已经覆盖策略层：
