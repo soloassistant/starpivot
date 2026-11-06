@@ -1220,6 +1220,11 @@
     { name:'A', a:1.0, e:0.2, inc:0, raan:0, argp:0,   M0:0,   mass:3.0e-6, radius_km:6371 },
     { name:'B', a:1.0, e:0.2, inc:0, raan:0, argp:180, M0:135, mass:3.0e-6, radius_km:6371 }
   ];
+  // 两个删除入口（表格里的「删除」和卡片上的「删掉」）走同一句确认，
+  // 避免以后只改一处、另一处又变成点一下就消失。
+  function confirmDeleteBody(b) {
+    return confirm('删除天体「' + (b.name || '未命名') + '」？删掉后要重新添加并填一遍参数。');
+  }
   // 这三个状态必须声明在这里（而不是和它们的函数放一起）：
   // renderBodyTable() 在本文件靠上的位置就会被调用一次，而它会去读它们 ——
   // 用 const/let 放在后面会直接 TDZ 抛错，整页脚本停在那里（实测就是这样）。
@@ -1306,7 +1311,14 @@
     });
     tb.querySelectorAll('button[data-del]').forEach(btn => {
       btn.addEventListener('click', () => {
-        customBodies.splice(+btn.dataset.del, 1);
+        const i = +btn.dataset.del;
+        const b = customBodies[i];
+        if (!b) return;
+        // 删除是不可撤销的：点错一下就从会话里消失（而且会跟着 saveState 落盘）。
+        // 二次确认只多一次点击，不新增任何存储或撤销栈。
+        if (!confirmDeleteBody(b))
+          return;
+        customBodies.splice(i, 1);
         renderBodyTable();
         saveState();
       });
@@ -2582,6 +2594,11 @@
     }
     const d = e.target.closest('[data-del2]');
     if (d){
+      const rec = schemes.find(s => s.sid === d.dataset.del2);
+      if (!rec) return;
+      // 删方案不可撤回（而且会 saveState 落盘），点错一下就得重填全部参数。
+      if (!confirm('删除方案「' + (rec.name || '未命名') + '」？删除后不可撤回。'))
+        return;
       schemes = schemes.filter(s => s.sid !== d.dataset.del2);
       renderSchemes();
       saveState();
@@ -3325,6 +3342,8 @@
     });
     el.querySelectorAll('button[data-del]').forEach(btn => {
       btn.addEventListener('click', () => {
+        const b = customBodies[+btn.dataset.del];
+        if (!b || !confirmDeleteBody(b)) return;
         customBodies.splice(+btn.dataset.del, 1);
         renderBodyTable();          // 会一并刷新这里
         setDirty(true);
