@@ -83,6 +83,7 @@ run node _check_session.js  '会话持久化：快照不含内核结果 / 版本
 run node _check.js          'A4 点星体算出的 (yaw,pitch) 真的正对该星轨道平面'
 run node _check_solar.js    'A5 太阳系三档：UI 档位 → 真正下发的 payload.solar/primary（含参考系自动判断）'
 run node _check_orbit.js    'A6 轨道页：诚实披露 / 页面不算物理 / demo 字段对齐（含"周期"假数回归）'
+run node _check_dist.js     'A7 构建期去注释：产物与源码同步 / 两次生成逐字节相同 / 词法对抗（https:// 正则 模板 除号）'
 
 sec "B. 独立复算（不需编译）"
 run py _probe_bio.py       '用 SI 单位从第一性原理重推演化层物理'
