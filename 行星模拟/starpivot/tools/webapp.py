@@ -220,8 +220,19 @@ class Handler(BaseHTTPRequestHandler):
         "/kids": "kids.html",      # 给小朋友的一页（正文不许出现术语，见 _check_kids.js）
     }
 
+    # 发布产物：universe.html 的源码保留注释（注释是物理口径说明书，不能从源码删），
+    # 但传输时发 build_viewer.js 生成的去注释副本 —— 同一页面，gzip 135KB → 79KB。
+    # 产物缺失就回退源码：忘记生成只会失去压缩收益，不会 404。
+    DIST = {
+        "/universe": "dist/universe.html",
+        "/universe.html": "dist/universe.html",
+    }
+
     def _static(self, path: str) -> None:
-        if path in self.ROUTES:
+        dist = self.DIST.get(path)
+        if dist is not None and (VIEWER / dist).is_file():
+            p = VIEWER / dist
+        elif path in self.ROUTES:
             p = VIEWER / self.ROUTES[path]
         else:
             p = (VIEWER / path.lstrip("/")).resolve()
