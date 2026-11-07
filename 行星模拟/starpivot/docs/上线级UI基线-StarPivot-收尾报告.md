@@ -212,7 +212,7 @@ A/B 层（上面列的这些）已逐条整跑，尾行就是上面这些。
 
 - raw：351,315 → 282,921 B（−68,394）
 - gzip：**135,135 → 79,145 B**（−55,990，−41.4%）
-- 线上 `curl --noproxy '*' -H 'Accept-Encoding: gzip'` 实测 `Content-Length: 79145`、`Content-Encoding: gzip`
+- 本机网关（同一份 `tools/webapp.py`、同一 gzip 口径）`curl --noproxy '*' -H 'Accept-Encoding: gzip'` 实测 `Content-Length: 79145`、`Content-Encoding: gzip`；线上要等这次发布后才生效
 
 **性能**（同机、400 kbps / 50 ms、禁缓存、每轮清 localStorage 冷启、5 轮中位数；源码与产物在同一会话内先后各测一次）：
 
